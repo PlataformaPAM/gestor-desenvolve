@@ -1,16 +1,47 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { randomBytes, scryptSync } from "node:crypto";
 
 const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL não definida.");
+if (!connectionString) {
+  console.error("Defina DATABASE_URL (URL do PostgreSQL, ex.: produção na Railway).");
+  process.exit(1);
+}
+
+const cpfRaw = process.env.BOOTSTRAP_ADMIN_CPF?.trim() ?? "";
+const password = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "";
+const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+const nomeExibicao = process.env.BOOTSTRAP_ADMIN_NOME?.trim() || "Administrador";
+const telefone = process.env.BOOTSTRAP_ADMIN_TELEFONE?.trim() || null;
+
+function normalizeCpf(value) {
+  return value.replace(/\D/g, "");
+}
+
+const cpf = normalizeCpf(cpfRaw);
+
+if (!cpf || cpf.length !== 11) {
+  console.error(
+    "Defina BOOTSTRAP_ADMIN_CPF com 11 dígitos (pode usar máscara; só números serão usados)."
+  );
+  process.exit(1);
+}
+if (password.length < 8) {
+  console.error("Defina BOOTSTRAP_ADMIN_PASSWORD com pelo menos 8 caracteres.");
+  process.exit(1);
+}
+if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  console.error("Defina BOOTSTRAP_ADMIN_EMAIL com um e-mail válido (único no sistema).");
+  process.exit(1);
+}
 
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
-function hashPassword(password) {
+function hashPassword(pw) {
   const salt = randomBytes(16).toString("hex");
-  const derived = scryptSync(password, salt, 64).toString("hex");
+  const derived = scryptSync(pw, salt, 64).toString("hex");
   return `scrypt$${salt}$${derived}`;
 }
 
@@ -40,29 +71,30 @@ async function ensureAdmin() {
     });
   }
 
-  const senhaHash = hashPassword("admin123");
+  const senhaHash = hashPassword(password);
   await prisma.usuario.upsert({
-    where: { cpf: "07202188961" },
+    where: { cpf },
     create: {
-      cpf: "07202188961",
-      email: "tecnologia@plataformapam.com.br",
-      nomeExibicao: "Michel Silveira Raupp",
-      telefone: "48999696149",
+      cpf,
+      email,
+      nomeExibicao,
+      telefone,
       perfilId: perfil.id,
       ativo: true,
       senhaHash,
     },
     update: {
-      email: "tecnologia@plataformapam.com.br",
-      nomeExibicao: "Michel Silveira Raupp",
-      telefone: "48999696149",
+      email,
+      nomeExibicao,
+      telefone,
       perfilId: perfil.id,
       ativo: true,
       senhaHash,
     },
   });
 
-  console.log("Administrador real criado/atualizado com sucesso.");
+  console.log("Perfil Administrador e usuário inicial prontos.");
+  console.log("Faça login com o CPF informado em BOOTSTRAP_ADMIN_CPF e a senha definida.");
 }
 
 ensureAdmin()
@@ -73,4 +105,3 @@ ensureAdmin()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
