@@ -1,3 +1,4 @@
+import type { Alerta } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/server/api-response";
 import { getSessionFromCookieHeader } from "@/lib/auth";
@@ -60,7 +61,7 @@ export async function GET(req: Request) {
     where: { ...whereUsuario, modulo: { in: [...allowed] } },
     orderBy: { data: "desc" },
     take: 200,
-  })).map((a) => {
+  })).map((a: Alerta) => {
     const descricaoLimpa = cleanUserDescription(a.descricao);
     const texto = `${a.titulo} ${descricaoLimpa}`;
     return {
