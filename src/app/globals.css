@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --accent: #6d28d9;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f1f5f9;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+/* Fundo animado sutil: brilho radial claro que se move lentamente (95% claro) */
+@keyframes layout-glow-drift {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate(2%, -2%) scale(1.05);
+  }
+}
+
+.layout-bg-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.layout-bg-glow::before {
+  content: "";
+  position: absolute;
+  width: 120%;
+  height: 120%;
+  top: -10%;
+  left: -10%;
+  background: radial-gradient(
+    ellipse 80% 60% at 30% 20%,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(243, 232, 255, 0.25) 35%,
+    transparent 60%
+  );
+  animation: layout-glow-drift 20s ease-in-out infinite;
+}
+
+.dark .layout-bg-glow::before {
+  background: radial-gradient(
+    ellipse 85% 65% at 25% 15%,
+    rgba(109, 40, 217, 0.14) 0%,
+    rgba(30, 27, 75, 0.35) 40%,
+    transparent 65%
+  );
+}
+
+.layout-bg-glow::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse 50% 80% at 80% 80%,
+    rgba(250, 245, 255, 0.4) 0%,
+    transparent 50%
+  );
+  animation: layout-glow-drift 25s ease-in-out infinite reverse;
+  animation-delay: -5s;
+}
+
+.dark .layout-bg-glow::after {
+  background: radial-gradient(
+    ellipse 45% 70% at 85% 85%,
+    rgba(109, 40, 217, 0.08) 0%,
+    transparent 55%
+  );
+}
+
+/* Padrão visual global: cards e painéis */
+.card-panel,
+[data-card-panel] {
+  background-color: white;
+  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid rgb(241 245 249); /* border-slate-100 */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.dark .card-panel,
+.dark [data-card-panel] {
+  background-color: rgb(15 23 42); /* slate-900 */
+  border-color: rgb(51 65 85); /* slate-700 */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+  color: rgb(241 245 249); /* legível quando não há utilitário de cor no filho */
+}
+.card-panel:hover,
+[data-card-panel]:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+.dark .card-panel:hover,
+.dark [data-card-panel]:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.35);
+}
+
+/* Modais: mesma linguagem visual */
+.modal-panel {
+  background-color: white;
+  border-radius: 1rem; /* rounded-2xl */
+  border: 1px solid rgb(241 245 249);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.dark .modal-panel {
+  background-color: rgb(15 23 42);
+  border-color: rgb(51 65 85);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+}
+
+/* Login: grade animada sutil */
+@keyframes login-grid-pan {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+.login-auth-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: login-grid-pan 80s linear infinite;
+}
+
+/*
+  Dark mode fallback:
+  Existem componentes que ainda usam utilitários "light-only" (ex.: bg-white/text-slate-900)
+  e não possuem dark: na classe Tailwind.
+  Este bloco garante consistência visual quando a classe `dark` estiver ativa no <html>.
+*/
+.dark .bg-white {
+  background-color: rgb(15 23 42) !important; /* slate-900 */
+}
+
+.dark .bg-slate-50 {
+  background-color: rgb(15 23 42) !important; /* slate-900 */
+}
+
+.dark .bg-slate-100 {
+  background-color: rgb(30 41 59) !important; /* slate-800 */
+}
+
+.dark .bg-slate-50\/30 {
+  background-color: rgba(15, 23, 42, 0.3) !important;
+}
+.dark .bg-slate-50\/50 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+.dark .bg-slate-50\/80 {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+.dark .text-slate-900 {
+  color: rgb(241 245 249) !important; /* slate-100 */
+}
+.dark .text-slate-800 {
+  color: rgb(226 232 240) !important; /* slate-200 */
+}
+.dark .text-slate-700 {
+  color: rgb(226 232 240) !important; /* slate-200 */
+}
+.dark .text-slate-600 {
+  color: rgb(203 213 225) !important; /* slate-300 */
+}
+.dark .text-slate-500 {
+  color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+.dark .border-slate-200 {
+  border-color: rgb(51 65 85) !important; /* slate-700 */
+}
+.dark .border-slate-300 {
+  border-color: rgb(75 85 99) !important; /* slate-600 */
+}
+.dark .border-gray-200 {
+  border-color: rgb(51 65 85) !important; /* slate-700 */
+}
+

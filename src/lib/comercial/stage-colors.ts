@@ -1,0 +1,58 @@
+import type { PipelineStageId } from "./types";
+
+export type StageColorConfig = {
+  /** Fundo da coluna + borda top (ex.: bg-slate-100 border-t-4 border-slate-400) */
+  bg: string;
+  borderTop: string;
+  /** Borda lateral do card */
+  borderLeft: string;
+  /** Badge e ícones (texto vibrante) */
+  badge: string;
+  /** Texto do título da coluna */
+  text: string;
+};
+
+export const STAGE_COLORS: Record<PipelineStageId, StageColorConfig> = {
+  prospecao: {
+    bg: "bg-slate-100 dark:bg-slate-800/90",
+    borderTop: "border-t-4 border-slate-400 dark:border-slate-500",
+    borderLeft: "border-l-slate-400 dark:border-l-slate-500",
+    badge: "bg-slate-200/80 text-slate-700 dark:bg-slate-700/80 dark:text-slate-200",
+    text: "text-slate-700 dark:text-slate-200",
+  },
+  qualificacao: {
+    bg: "bg-orange-50 dark:bg-orange-950/50",
+    borderTop: "border-t-4 border-orange-400 dark:border-orange-500",
+    borderLeft: "border-l-orange-400 dark:border-l-orange-500",
+    badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/60 dark:text-orange-300",
+    text: "text-orange-700 dark:text-orange-300",
+  },
+  proposta: {
+    bg: "bg-purple-50 dark:bg-violet-950/40",
+    borderTop: "border-t-4 border-[#6D28D9] dark:border-violet-400",
+    borderLeft: "border-l-[#6D28D9] dark:border-l-violet-400",
+    badge: "bg-purple-100 text-[#6D28D9] dark:bg-violet-900/50 dark:text-violet-300",
+    text: "text-[#6D28D9] dark:text-violet-300",
+  },
+  contratacao: {
+    bg: "bg-blue-50 dark:bg-blue-950/45",
+    borderTop: "border-t-4 border-blue-500 dark:border-blue-400",
+    borderLeft: "border-l-blue-500 dark:border-l-blue-400",
+    badge: "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300",
+    text: "text-blue-600 dark:text-blue-300",
+  },
+  fechado: {
+    bg: "bg-green-50 dark:bg-emerald-950/40",
+    borderTop: "border-t-4 border-emerald-500 dark:border-emerald-400",
+    borderLeft: "border-l-emerald-500 dark:border-l-emerald-400",
+    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+    text: "text-emerald-700 dark:text-emerald-300",
+  },
+  perdido: {
+    bg: "bg-red-50 dark:bg-red-950/40",
+    borderTop: "border-t-4 border-red-500 dark:border-red-400",
+    borderLeft: "border-l-red-500 dark:border-l-red-400",
+    badge: "bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300",
+    text: "text-red-600 dark:text-red-300",
+  },
+};

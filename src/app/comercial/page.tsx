@@ -1,0 +1,839 @@
+"use client";
+
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import type { DropResult } from "@hello-pangea/dnd";
+import { TabsView, type ViewMode } from "@/components/comercial/tabs-view";
+import { LeadList } from "@/components/comercial/lead-list";
+import { LeadDetailPanel } from "@/components/comercial/lead-detail-panel";
+import { NovoLeadPanel } from "@/components/comercial/novo-lead-panel";
+import { ComercialKanban } from "@/components/comercial/comercial-kanban";
+import { QualificarOportunidadeSheet } from "@/components/comercial/qualificar-oportunidade-sheet";
+import { FechadoCelebrationModal } from "@/components/comercial/fechado-celebration-modal";
+import { Toast } from "@/components/ui/toast";
+import { PIPELINE_STAGES } from "@/lib/comercial/constants";
+import type { Lead, PipelineStageId } from "@/lib/comercial/types";
+import type { Cliente, Contato } from "@/lib/clientes/types";
+import type { UsuarioSistema } from "@/lib/configuracoes/types";
+import {
+  columnsFromLeads,
+  leadsFromColumns,
+  getEmptyColumns,
+  type ColumnsState,
+} from "@/lib/comercial/columns";
+import { canTransitionStage } from "@/lib/comercial/stage-gates";
+import { usePageHeader } from "@/contexts/page-header-context";
+import { useAuth } from "@/contexts/auth-context";
+import { createLeadCreatedLog, generateAuditLogs } from "@/lib/comercial/audit";
+import { createInitialOwnershipInteraction } from "@/lib/comercial/ownership";
+
+function withAudit(
+  oldLead: Lead,
+  newLead: Lead,
+  currentUser: { nome: string; userId?: string | null }
+): Lead {
+  const newLogs = generateAuditLogs(oldLead, newLead, currentUser);
+  if (!newLogs.length) return newLead;
+  return {
+    ...newLead,
+    interactions: [...newLogs, ...(newLead.interactions ?? [])],
+  };
+}
+
+function createSystemLog(
+  currentUser: { nome: string; userId?: string | null },
+  description: string
+): NonNullable<Lead["interactions"]>[number] {
+  return {
+    id:
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `log-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    date: new Date().toISOString(),
+    user: currentUser.nome,
+    userId: currentUser.userId?.trim() || null,
+    type: "sistema",
+    action: "UPDATE",
+    description,
+  };
+}
+
+function ComercialPageContent() {
+  const { setPrimaryAction } = usePageHeader();
+  const { session } = useAuth();
+  const currentUserName = session.userName ?? "Usuário";
+  const searchParams = useSearchParams();
+
+  const [columns, setColumns] = useState<ColumnsState>(getEmptyColumns());
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [novoLeadOpen, setNovoLeadOpen] = useState(false);
+  const [toastError, setToastError] = useState({ visible: false, message: "", duration: 12000 });
+  const [toastPdfSuccess, setToastPdfSuccess] = useState({ visible: false, message: "" });
+  const [toastSave, setToastSave] = useState({ visible: false, message: "" });
+  const [fechadoCelebration, setFechadoCelebration] = useState<{ show: boolean; valorTotal: number }>({
+    show: false,
+    valorTotal: 0,
+  });
+  const [leadToQualifyId, setLeadToQualifyId] = useState<string | null>(null);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
+  const [pendingLeadCountById, setPendingLeadCountById] = useState<Record<string, number>>({});
+  const [pendingStageCountById, setPendingStageCountById] = useState<Partial<Record<PipelineStageId, number>>>({});
+  const orderKey = useMemo(() => `pam.comercial.order.${session.userId ?? session.userName ?? "user"}`, [session.userId, session.userName]);
+
+  const showErrorToast = useCallback((message: string, duration = 12000) => {
+    window.requestAnimationFrame(() => {
+      setToastError({ visible: true, message, duration });
+    });
+  }, []);
+
+  const persistLead = useCallback(async (lead: Lead) => {
+    const res = await fetch(`/api/comercial/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lead }),
+    });
+    if (!res.ok) {
+      const err = new Error("Falha ao persistir lead");
+      throw err;
+    }
+    const json = (await res.json()) as { data?: { lead?: Lead } };
+    const saved = json?.data?.lead;
+    if (!saved) return;
+    setColumns((prev) => {
+      const all = leadsFromColumns(prev);
+      const i = all.findIndex((l) => l.id === saved.id);
+      if (i === -1) return prev;
+      const nextList = [...all.slice(0, i), saved, ...all.slice(i + 1)];
+      return columnsFromLeads(nextList);
+    });
+  }, []);
+
+  const createLead = useCallback(async (lead: Lead) => {
+    const res = await fetch("/api/comercial/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lead }),
+    });
+    if (!res.ok) {
+      throw new Error("Falha ao criar lead no servidor.");
+    }
+  }, []);
+
+  const createCliente = useCallback(async (cliente: Omit<Cliente, "id"> & { contatos?: Contato[] }) => {
+    const res = await fetch("/api/clientes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cliente }),
+    });
+    if (!res.ok) throw new Error("Falha ao criar cliente");
+    const data = (await res.json()) as { cliente: Cliente };
+    return data.cliente;
+  }, []);
+
+  const persistClienteContatos = useCallback(async (clienteId: string, contatos: Contato[]) => {
+    await fetch(`/api/clientes/${clienteId}/contatos`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contatos }),
+    });
+  }, []);
+
+  const loadBootstrap = useCallback(async () => {
+    const res = await fetch("/api/comercial/bootstrap", { cache: "no-store" });
+    if (!res.ok) throw new Error("Falha no bootstrap");
+    const payload = (await res.json()) as { data?: { leads?: Lead[]; clientes?: Cliente[] } };
+    return { leads: payload?.data?.leads ?? [], clientes: payload?.data?.clientes ?? [] };
+  }, []);
+
+  const persistOrder = useCallback((state: ColumnsState) => {
+    try {
+      const payload = {
+        prospecao: (state.prospecao ?? []).map((l) => l.id),
+        qualificacao: (state.qualificacao ?? []).map((l) => l.id),
+        proposta: (state.proposta ?? []).map((l) => l.id),
+        contratacao: (state.contratacao ?? []).map((l) => l.id),
+        fechado: (state.fechado ?? []).map((l) => l.id),
+        perdido: (state.perdido ?? []).map((l) => l.id),
+      };
+      window.localStorage.setItem(orderKey, JSON.stringify(payload));
+    } catch {
+      // noop
+    }
+  }, [orderKey]);
+
+  const applyPersistedOrder = useCallback((state: ColumnsState): ColumnsState => {
+    try {
+      const raw = window.localStorage.getItem(orderKey);
+      if (!raw) return state;
+      const order = JSON.parse(raw) as Partial<Record<PipelineStageId, string[]>>;
+      const sortStage = (stage: PipelineStageId) => {
+        const list = [...(state[stage] ?? [])];
+        const ids = order[stage] ?? [];
+        if (!ids.length) return list;
+        const rank = new Map(ids.map((id, i) => [id, i]));
+        return list.sort((a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+      };
+      return {
+        prospecao: sortStage("prospecao"),
+        qualificacao: sortStage("qualificacao"),
+        proposta: sortStage("proposta"),
+        contratacao: sortStage("contratacao"),
+        fechado: sortStage("fechado"),
+        perdido: sortStage("perdido"),
+      };
+    } catch {
+      return state;
+    }
+  }, [orderKey]);
+
+  const rollbackFromServer = useCallback(async () => {
+    const data = await loadBootstrap();
+    setColumns(applyPersistedOrder(columnsFromLeads(data.leads ?? [])));
+    setClientes(data.clientes ?? []);
+  }, [loadBootstrap, applyPersistedOrder]);
+
+  const leads = useMemo(() => leadsFromColumns(columns), [columns]);
+  const selectedLead = useMemo(
+    () => (selectedLeadId ? leads.find((l) => l.id === selectedLeadId) ?? null : null),
+    [leads, selectedLeadId]
+  );
+  const leadToQualify = useMemo(
+    () => (leadToQualifyId ? leads.find((l) => l.id === leadToQualifyId) ?? null : null),
+    [leads, leadToQualifyId]
+  );
+
+  useEffect(() => {
+    setPrimaryAction({
+      label: "Novo Lead",
+      onClick: () => setNovoLeadOpen(true),
+    });
+    return () => setPrimaryAction(null);
+  }, [setPrimaryAction]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const data = await loadBootstrap();
+        if (!active) return;
+        setColumns(applyPersistedOrder(columnsFromLeads(data.leads ?? [])));
+        setClientes(data.clientes ?? []);
+      } catch {
+        if (!active) return;
+        showErrorToast("Falha ao carregar dados reais do Comercial.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [loadBootstrap, applyPersistedOrder]);
+
+  useEffect(() => {
+    if (loading) return;
+    const lid = searchParams.get("leadId")?.trim();
+    if (!lid) return;
+    const found = leads.some((l) => l.id === lid);
+    if (found) {
+      setSelectedLeadId(lid);
+      setDetailOpen(true);
+    }
+  }, [loading, searchParams, leads]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/configuracoes/bootstrap", { cache: "no-store" });
+        if (!res.ok) return;
+        const payload = (await res.json()) as { data?: { usuarios?: UsuarioSistema[] } };
+        if (!active) return;
+        setUsuarios(payload?.data?.usuarios ?? []);
+      } catch {
+        // noop
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadAlertMarkers = async () => {
+      try {
+        const res = await fetch("/api/alertas/bootstrap", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          data?: { alertas?: Array<{ titulo: string; descricao: string; modulo: string; lida: boolean }> };
+        };
+        if (!active) return;
+        const rows = (data?.data?.alertas ?? []).filter((a) => !a.lida && a.modulo === "comercial");
+        setPendingLeadCountById((prev) => {
+          const next: Record<string, number> = {};
+          for (const lead of leads) {
+            const count = rows.filter((a) => `${a.titulo} ${a.descricao}`.toLowerCase().includes(lead.name.toLowerCase())).length;
+            if (count > 0) next[lead.id] = count;
+          }
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+      } catch {
+        // noop
+      }
+    };
+    void loadAlertMarkers();
+    const timer = window.setInterval(() => void loadAlertMarkers(), 30000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [leads]);
+
+  useEffect(() => {
+    const next: Partial<Record<PipelineStageId, number>> = {};
+    for (const lead of leads) {
+      const count = pendingLeadCountById[lead.id] ?? 0;
+      if (count > 0) {
+        next[lead.stageId] = (next[lead.stageId] ?? 0) + count;
+      }
+    }
+    setPendingStageCountById(next);
+  }, [leads, pendingLeadCountById]);
+
+  useEffect(() => {
+    if (detailOpen) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const data = await loadBootstrap();
+          setColumns(applyPersistedOrder(columnsFromLeads(data.leads ?? [])));
+          setClientes(data.clientes ?? []);
+        } catch {
+          // No-op para não poluir UX com toasts de polling.
+        }
+      })();
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [loadBootstrap, applyPersistedOrder, detailOpen]);
+
+  const openDetail = useCallback((lead: Lead) => {
+    setSelectedLeadId(lead.id);
+    setDetailOpen(true);
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    setSelectedLeadId(null);
+  }, []);
+
+  const onDragEnd = useCallback((result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+
+    const sourceId = source.droppableId as PipelineStageId;
+    const destId = destination.droppableId as PipelineStageId;
+    if (sourceId === destId && source.index === destination.index) return;
+    let movedLeadForFechado: Lead | undefined;
+    let movedLeadPersist: Lead | undefined;
+    let motivoPerdaKanban: string | null = null;
+    let gateMessage: string | null = null;
+
+    setColumns((prev) => {
+      const next: ColumnsState = {
+        prospecao: [...(prev.prospecao ?? [])],
+        qualificacao: [...(prev.qualificacao ?? [])],
+        proposta: [...(prev.proposta ?? [])],
+        contratacao: [...(prev.contratacao ?? [])],
+        fechado: [...(prev.fechado ?? [])],
+        perdido: [...(prev.perdido ?? [])],
+      };
+      const sourceList = next[sourceId];
+      const [removed] = sourceList.splice(source.index, 1);
+      if (!removed) return prev;
+      if (removed.financeiroFluxo?.bloqueadoEdicao) {
+        sourceList.splice(source.index, 0, removed);
+        gateMessage = "Lead bloqueado pelo Financeiro. Solicite liberação para editar ou mover.";
+        return prev;
+      }
+      if (destId === "perdido") {
+        const motivo = window.prompt("Informe o motivo da perda para mover este lead para Perdido:");
+        if (!motivo || !motivo.trim()) {
+          sourceList.splice(source.index, 0, removed);
+          gateMessage = "Ação bloqueada. Informe o motivo da perda para mover para Perdido.";
+          return prev;
+        }
+        motivoPerdaKanban = motivo.trim();
+      }
+      const gate = canTransitionStage(removed, sourceId, destId);
+      if (!gate.allowed) {
+        sourceList.splice(source.index, 0, removed);
+        gateMessage = `Ação bloqueada. Pendências:\n${gate.reasons.join("\n")}`;
+        return prev;
+      }
+      movedLeadForFechado = removed;
+
+      const updated: Lead = {
+        ...removed,
+        stageId: destId,
+        enteredStageAt: sourceId === destId ? removed.enteredStageAt : new Date().toISOString(),
+        financeiroFluxo:
+          destId === "fechado"
+            ? {
+                ...(removed.financeiroFluxo ?? { status: "nenhum", bloqueadoEdicao: false }),
+                status: "pendente_aprovacao",
+                bloqueadoEdicao: false,
+                solicitadoEm: new Date().toISOString(),
+              }
+            : removed.financeiroFluxo,
+        interactions:
+          destId === "perdido" && motivoPerdaKanban
+            ? [
+                ...(removed.interactions ?? []),
+                createSystemLog(
+                  { nome: currentUserName, userId: session.userId },
+                  `Lead marcado como Perdido. Motivo: ${motivoPerdaKanban}`
+                ),
+              ]
+            : removed.interactions,
+      };
+      movedLeadPersist = withAudit(removed, updated, { nome: currentUserName, userId: session.userId });
+      next[destId].splice(destination.index, 0, movedLeadPersist);
+      persistOrder(next);
+      return next;
+    });
+
+    if (gateMessage) {
+      showErrorToast(gateMessage, 10000);
+      return;
+    }
+
+    if (destId === "fechado" && movedLeadForFechado) {
+      const valorTotal = movedLeadForFechado.valorTotal ?? movedLeadForFechado.value;
+      setFechadoCelebration({ show: true, valorTotal });
+    }
+    if (movedLeadPersist && sourceId !== destId) {
+      void persistLead(movedLeadPersist).catch(() => {
+        void rollbackFromServer();
+        showErrorToast("Não foi possível salvar a movimentação. Os dados foram recarregados.");
+      });
+    }
+  }, [currentUserName, session.userId, persistLead, rollbackFromServer, persistOrder, showErrorToast]);
+
+  const handleNovoLeadSubmit = useCallback(
+    (raw: Partial<Lead> & Pick<Lead, "name" | "value" | "stageId" | "priority">) => {
+      try {
+        const lead: Lead = {
+          origem: "outro",
+          clienteId: null,
+          solucoes: [],
+          valorTotal: raw.valorTotal ?? raw.value,
+          checklistProgress: {},
+          ...raw,
+          id: String(Date.now()),
+          enteredStageAt: new Date().toISOString(),
+          criadoPorId: session.userId ?? null,
+          interactions: [
+            createLeadCreatedLog({ nome: currentUserName, userId: session.userId }),
+            createInitialOwnershipInteraction(session.userId, currentUserName),
+          ],
+        };
+        setColumns((prev) => ({
+          ...prev,
+          prospecao: [...(prev.prospecao ?? []), lead],
+        }));
+        void createLead(lead).catch(() => {
+          void rollbackFromServer();
+          showErrorToast("Não foi possível criar o lead no banco. Os dados foram recarregados.");
+        });
+        setToastSave({ visible: true, message: "Lead salvo com sucesso!" });
+        setNovoLeadOpen(false);
+      } catch {
+        showErrorToast("Erro ao salvar lead.");
+      }
+    },
+    [currentUserName, session.userId, createLead, rollbackFromServer, showErrorToast]
+  );
+
+  const handleUpdateLead = useCallback(
+    (
+      updates: Partial<Lead>,
+      opts?: { allowWhileFinanceiroLocked?: boolean; skipSuccessToast?: boolean }
+    ) => {
+    if (!selectedLeadId) return;
+    if (
+      selectedLead?.financeiroFluxo?.bloqueadoEdicao &&
+      !opts?.allowWhileFinanceiroLocked
+    ) {
+      showErrorToast("Lead bloqueado pelo Financeiro. Solicite liberação na aba Ações.");
+      return;
+    }
+    try {
+      let saved = false;
+      let updatedLeadPersist: Lead | null = null;
+      setColumns((prev) => {
+        const next = { ...prev };
+        for (const id of Object.keys(next) as PipelineStageId[]) {
+          const list = next[id];
+          const idx = list.findIndex((l) => l.id === selectedLeadId);
+          if (idx === -1) continue;
+          next[id] = list.slice();
+          const current = list[idx];
+          const updated = { ...current, ...updates } as Lead;
+          updatedLeadPersist = withAudit(current, updated, {
+            nome: currentUserName,
+            userId: session.userId,
+          });
+          next[id][idx] = updatedLeadPersist;
+          saved = true;
+          return next;
+        }
+        return prev;
+      });
+      if (saved && updatedLeadPersist) {
+        void persistLead(updatedLeadPersist).catch(() => {
+          void rollbackFromServer();
+          showErrorToast("Não foi possível salvar a alteração. Os dados foram recarregados.");
+        });
+        if (!opts?.skipSuccessToast) {
+          setToastSave({ visible: true, message: "Salvo com sucesso!" });
+        }
+      }
+    } catch {
+      showErrorToast("Erro ao salvar alterações.");
+    }
+  },
+  [
+    selectedLeadId,
+    selectedLead,
+    currentUserName,
+    session.userId,
+    persistLead,
+    rollbackFromServer,
+    showErrorToast,
+  ]);
+
+  const handleMudarEtapa = useCallback(
+    (stageId: PipelineStageId, options?: { motivoPerda?: string }) => {
+      if (!selectedLeadId || !selectedLead) return;
+      if (selectedLead.financeiroFluxo?.bloqueadoEdicao) {
+        showErrorToast("Lead bloqueado pelo Financeiro. Solicite liberação na aba Ações.");
+        return;
+      }
+      if (stageId === "perdido" && !options?.motivoPerda?.trim()) {
+        showErrorToast("Informe o motivo da perda para mover para Perdido.");
+        return;
+      }
+      const gate = canTransitionStage(selectedLead, selectedLead.stageId, stageId);
+      if (!gate.allowed) {
+        showErrorToast(`Ação bloqueada. Pendências:\n${gate.reasons.join("\n")}`, 10000);
+        return;
+      }
+      const updated = withAudit(
+        selectedLead,
+        {
+          ...selectedLead,
+          stageId,
+          enteredStageAt: new Date().toISOString(),
+          financeiroFluxo:
+            stageId === "fechado"
+              ? {
+                  ...(selectedLead.financeiroFluxo ?? { status: "nenhum", bloqueadoEdicao: false }),
+                  status: "pendente_aprovacao",
+                  bloqueadoEdicao: false,
+                  solicitadoEm: new Date().toISOString(),
+                }
+              : selectedLead.financeiroFluxo,
+          interactions:
+            stageId === "perdido" && options?.motivoPerda?.trim()
+              ? [
+                  ...(selectedLead.interactions ?? []),
+                  createSystemLog(
+                    { nome: currentUserName, userId: session.userId },
+                    `Lead marcado como Perdido. Motivo: ${options.motivoPerda.trim()}`
+                  ),
+                ]
+              : selectedLead.interactions,
+        },
+        { nome: currentUserName, userId: session.userId }
+      );
+      setColumns((prev) => {
+        const next: ColumnsState = {
+          prospecao: (prev.prospecao ?? []).filter((l) => l.id !== selectedLeadId),
+          qualificacao: (prev.qualificacao ?? []).filter((l) => l.id !== selectedLeadId),
+          proposta: (prev.proposta ?? []).filter((l) => l.id !== selectedLeadId),
+          contratacao: (prev.contratacao ?? []).filter((l) => l.id !== selectedLeadId),
+          fechado: (prev.fechado ?? []).filter((l) => l.id !== selectedLeadId),
+          perdido: (prev.perdido ?? []).filter((l) => l.id !== selectedLeadId),
+        };
+        next[stageId] = [...(next[stageId] ?? []), updated];
+        return next;
+      });
+      void persistLead(updated).catch(() => {
+        void rollbackFromServer();
+        showErrorToast("Não foi possível salvar a etapa. Os dados foram recarregados.");
+      });
+      if (stageId === "fechado") {
+        const valorTotal = updated.valorTotal ?? updated.value;
+        setFechadoCelebration({ show: true, valorTotal });
+      } else {
+        setToastSave({ visible: true, message: "Etapa atualizada com sucesso!" });
+      }
+    },
+    [selectedLeadId, selectedLead, currentUserName, session.userId, persistLead, rollbackFromServer, showErrorToast]
+  );
+
+  /** Move o lead para a coluna Qualificação e aplica updates (ex.: clienteId) */
+  const moveLeadToQualificacao = useCallback((leadId: string, updates: Partial<Lead> = {}) => {
+    let updatedPersist: Lead | null = null;
+    setColumns((prev) => {
+      let originalLead: Lead | null = null;
+      let updatedLead: Lead | null = null;
+      const stageIds: PipelineStageId[] = ["prospecao", "qualificacao", "proposta", "contratacao", "fechado", "perdido"];
+      const next: ColumnsState = {
+        prospecao: [],
+        qualificacao: [...(prev.qualificacao ?? [])],
+        proposta: [],
+        contratacao: [],
+        fechado: [],
+        perdido: [],
+      };
+      for (const id of stageIds) {
+        const list = prev[id] ?? [];
+        for (const lead of list) {
+          if (lead.id === leadId) {
+            originalLead = lead;
+            const clienteLog =
+              updates.clienteId &&
+              String(updates.clienteId) !== String(lead.clienteId ?? "") &&
+              updates.clienteId
+                ? [
+                    createSystemLog(
+                      { nome: currentUserName, userId: session.userId },
+                      "Cliente vinculado à oportunidade ao avançar para Qualificação."
+                    ),
+                  ]
+                : [];
+            updatedLead = {
+              ...lead,
+              ...updates,
+              stageId: "qualificacao",
+              enteredStageAt: new Date().toISOString(),
+              interactions: [...(lead.interactions ?? []), ...clienteLog],
+            };
+          } else {
+            next[id].push(lead);
+          }
+        }
+      }
+      if (originalLead && updatedLead) {
+        updatedPersist = withAudit(originalLead, updatedLead, {
+          nome: currentUserName,
+          userId: session.userId,
+        });
+        next.qualificacao.push(updatedPersist);
+      }
+      return next;
+    });
+    if (updatedPersist) {
+      void persistLead(updatedPersist).catch(() => {
+        void rollbackFromServer();
+        showErrorToast("Não foi possível mover para Qualificação. Os dados foram recarregados.");
+      });
+    }
+    setLeadToQualifyId(null);
+  }, [currentUserName, session.userId, persistLead, rollbackFromServer, showErrorToast]);
+
+  const handleQualificarComExistente = useCallback((leadId: string, clienteId: string) => {
+    moveLeadToQualificacao(leadId, { clienteId });
+  }, [moveLeadToQualificacao]);
+
+  const handleQualificarComNovo = useCallback(
+    (leadId: string, cliente: Omit<Cliente, "id">, contatos: Contato[]) => {
+      void (async () => {
+        try {
+          const savedCliente = await createCliente({ ...cliente, contatos });
+          setClientes((prev) => [...prev, savedCliente]);
+          moveLeadToQualificacao(leadId, { clienteId: savedCliente.id });
+        } catch {
+          showErrorToast("Não foi possível cadastrar cliente no banco.");
+        }
+      })();
+    },
+    [moveLeadToQualificacao, createCliente, showErrorToast]
+  );
+
+  /** Só adiciona cliente ao catálogo quando cadastrado no modal (persistência do lead é no Salvar). */
+  const handleClienteRegistrado = useCallback(
+    (novo: Cliente) => {
+      if (clientes.some((c) => c.id === novo.id)) return;
+      if (novo.id.startsWith("cli-local")) {
+        void (async () => {
+          try {
+            const saved = await createCliente({ ...novo, contatos: novo.contatos });
+            setClientes((prev) => (prev.some((c) => c.id === saved.id) ? prev : [...prev, saved]));
+            if (selectedLeadId && selectedLead?.clienteId === novo.id) {
+              handleUpdateLead({ clienteId: saved.id }, { skipSuccessToast: true });
+            }
+          } catch {
+            showErrorToast("Cliente criado localmente, mas falhou ao persistir no banco.");
+            setClientes((prev) => [...prev, novo]);
+          }
+        })();
+        return;
+      }
+      setClientes((prev) => (prev.some((c) => c.id === novo.id) ? prev : [...prev, novo]));
+    },
+    [clientes, createCliente, selectedLeadId, selectedLead?.clienteId, handleUpdateLead, showErrorToast]
+  );
+
+  const handleAtualizarContatosCliente = useCallback((clienteId: string, contatos: Contato[]) => {
+    setClientes((prev) =>
+      prev.map((c) => (c.id === clienteId ? { ...c, contatos } : c))
+    );
+    void persistClienteContatos(clienteId, contatos).catch(() => {
+      showErrorToast("Contatos atualizados na tela, mas falhou ao salvar no banco.");
+    });
+  }, [persistClienteContatos, showErrorToast]);
+
+  const handleSolicitarLiberacaoFinanceiro = useCallback(
+    (motivo: string) => {
+      if (!selectedLeadId || !selectedLead) return;
+      if (!motivo.trim()) {
+        showErrorToast("Informe o motivo para solicitar liberação ao Financeiro.");
+        return;
+      }
+      handleUpdateLead(
+        {
+          financeiroFluxo: {
+            ...(selectedLead.financeiroFluxo ?? { status: "nenhum", bloqueadoEdicao: false }),
+            liberacaoSolicitadaEm: new Date().toISOString(),
+            motivoSolicitacaoLiberacao: motivo.trim(),
+          },
+          interactions: [
+            ...(selectedLead.interactions ?? []),
+            createSystemLog(
+              { nome: currentUserName, userId: session.userId },
+              `Comercial solicitou liberação ao Financeiro. Motivo: ${motivo.trim()}`
+            ),
+          ],
+        },
+        { allowWhileFinanceiroLocked: true }
+      );
+      setToastSave({ visible: true, message: "Solicitação de liberação enviada ao Financeiro." });
+    },
+    [selectedLeadId, selectedLead, handleUpdateLead, currentUserName, session.userId, showErrorToast]
+  );
+
+  return (
+    <section className="w-full min-w-0 space-y-6">
+      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:gap-3">
+        <TabsView value={viewMode} onChange={setViewMode} />
+      </div>
+
+      {viewMode === "kanban" ? (
+        <div className="w-full min-w-0 max-w-full overflow-x-hidden">
+          <ComercialKanban
+            columns={columns}
+            clientes={clientes}
+            onDragEnd={onDragEnd}
+            selectedLeadId={selectedLeadId}
+            onSelectLead={openDetail}
+            isLoading={loading}
+            pendingLeadCountById={pendingLeadCountById}
+            pendingStageCountById={pendingStageCountById}
+          />
+        </div>
+      ) : (
+        <div className="w-full min-w-0 max-w-full">
+          <LeadList
+            leads={leads}
+            clientes={clientes}
+            stages={PIPELINE_STAGES}
+            selectedLeadId={selectedLeadId}
+            onSelectLead={openDetail}
+            isLoading={loading}
+          />
+        </div>
+      )}
+
+      <LeadDetailPanel
+        lead={selectedLead}
+        stages={PIPELINE_STAGES}
+        open={detailOpen}
+        onClose={closeDetail}
+        onUpdateLead={handleUpdateLead}
+        onMudarEtapa={handleMudarEtapa}
+        onGerarPdfSuccess={() =>
+          setToastPdfSuccess({ visible: true, message: "Proposta PDF gerada com sucesso!" })
+        }
+        clientes={clientes}
+        onClienteRegistrado={handleClienteRegistrado}
+        onAtualizarContatosCliente={handleAtualizarContatosCliente}
+        onSolicitarLiberacaoFinanceiro={handleSolicitarLiberacaoFinanceiro}
+        usuarios={usuarios}
+      />
+
+      <NovoLeadPanel
+        open={novoLeadOpen}
+        onClose={() => setNovoLeadOpen(false)}
+        onSubmit={handleNovoLeadSubmit}
+      />
+
+      <QualificarOportunidadeSheet
+        open={!!leadToQualifyId}
+        onClose={() => setLeadToQualifyId(null)}
+        lead={leadToQualify}
+        clientes={clientes}
+        onVincularExistente={handleQualificarComExistente}
+        onCadastrarEVincular={handleQualificarComNovo}
+      />
+
+      <Toast
+        message={toastError.message}
+        visible={toastError.visible}
+        onDismiss={() => setToastError((e) => ({ ...e, visible: false }))}
+        variant="error"
+        duration={toastError.duration > 0 ? toastError.duration : 12000}
+        closeButton
+      />
+      <Toast
+        message={toastPdfSuccess.message}
+        visible={toastPdfSuccess.visible}
+        onDismiss={() => setToastPdfSuccess((t) => ({ ...t, visible: false }))}
+        variant="success"
+        duration={4000}
+      />
+      <Toast
+        message={toastSave.message}
+        visible={toastSave.visible}
+        onDismiss={() => setToastSave((t) => ({ ...t, visible: false }))}
+        variant="success"
+        duration={2500}
+      />
+      <FechadoCelebrationModal
+        open={fechadoCelebration.show}
+        valorTotal={fechadoCelebration.valorTotal}
+        onClose={() => setFechadoCelebration((c) => ({ ...c, show: false }))}
+      />
+    </section>
+  );
+}
+
+export default function ComercialPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center text-slate-500 dark:text-slate-400">
+          Carregando Comercial…
+        </div>
+      }
+    >
+      <ComercialPageContent />
+    </Suspense>
+  );
+}

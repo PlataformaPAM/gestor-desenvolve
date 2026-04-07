@@ -1,0 +1,108 @@
+import type { Cliente } from "@/lib/clientes/types";
+import { prisma } from "@/lib/prisma";
+import { mapClienteFromDb, toDateOrUndefined } from "@/app/api/comercial/_shared";
+import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
+import { writeAuditLog } from "@/lib/server/audit-log";
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const parsed = await parseJsonSafe<{ cliente?: Cliente }>(req);
+  if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
+  const cliente = parsed.value.cliente;
+  if (!cliente || cliente.id !== id) {
+    return fail("BAD_REQUEST", "Payload inválido.", 400);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.cliente.update({
+      where: { id },
+      data: {
+        nome: cliente.nome,
+        empresa: cliente.empresa,
+        cpfCnpj: cliente.cpfCnpj,
+        status: cliente.status,
+        valorMensal: cliente.valorMensal,
+        segmento: cliente.segmento,
+        email: cliente.email ?? null,
+        telefone: cliente.telefone ?? null,
+        urlSiteOficial: cliente.urlSiteOficial ?? null,
+        dataFechamento: toDateOrUndefined(cliente.dataFechamento),
+      },
+    });
+
+    if (cliente.endereco) {
+      await tx.clienteEndereco.upsert({
+        where: { clienteId: id },
+        create: {
+          clienteId: id,
+          logradouro: cliente.endereco.logradouro,
+          numero: cliente.endereco.numero,
+          complemento: cliente.endereco.complemento ?? null,
+          bairro: cliente.endereco.bairro,
+          cidade: cliente.endereco.cidade,
+          uf: cliente.endereco.uf,
+          cep: cliente.endereco.cep,
+        },
+        update: {
+          logradouro: cliente.endereco.logradouro,
+          numero: cliente.endereco.numero,
+          complemento: cliente.endereco.complemento ?? null,
+          bairro: cliente.endereco.bairro,
+          cidade: cliente.endereco.cidade,
+          uf: cliente.endereco.uf,
+          cep: cliente.endereco.cep,
+        },
+      });
+    } else {
+      await tx.clienteEndereco.deleteMany({ where: { clienteId: id } });
+    }
+
+    await tx.clienteContatoPapel.deleteMany({ where: { clienteContato: { clienteId: id } } });
+    await tx.clienteContato.deleteMany({ where: { clienteId: id } });
+    for (const c of cliente.contatos ?? []) {
+      await tx.clienteContato.create({
+        data: {
+          id: c.id,
+          clienteId: id,
+          nome: c.nome,
+          email: c.email,
+          telefone: c.telefone,
+          setor: c.setor ?? null,
+          cargo: c.cargo ?? null,
+          papeis: { create: (c.papeis ?? []).map((p) => ({ papel: p })) },
+        },
+      });
+    }
+  });
+
+  const saved = await prisma.cliente.findUniqueOrThrow({
+    where: { id },
+    include: {
+      endereco: true,
+      contatos: { include: { papeis: true } },
+      propostas: true,
+      faturas: true,
+      ticketsResumo: true,
+    },
+  });
+  await writeAuditLog(prisma, {
+    acao: "Cliente atualizado",
+    modulo: "clientes",
+    detalhes: `Cliente ${saved.nome} (${saved.id})`,
+  });
+  return ok({ cliente: mapClienteFromDb(saved) });
+}
+
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const existing = await prisma.cliente.findUnique({ where: { id }, select: { id: true, nome: true } });
+  if (!existing) return fail("NOT_FOUND", "Cliente não encontrado.", 404);
+  await prisma.cliente.delete({ where: { id } });
+  await writeAuditLog(prisma, {
+    acao: "Cliente excluído",
+    modulo: "clientes",
+    detalhes: `Cliente ${existing.nome} (${existing.id})`,
+  });
+  return ok({ deleted: true });
+}
+
