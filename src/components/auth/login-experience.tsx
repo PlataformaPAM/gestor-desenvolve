@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -108,6 +107,23 @@ export function LoginExperience() {
   const [showPassword, setShowPassword] = useState(false);
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"login" | "forgot" | "reset">("login");
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmNovaSenha, setConfirmNovaSenha] = useState("");
+  const [resetToken, setResetToken] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const modeParam = (url.searchParams.get("mode") || "").toLowerCase();
+    const tokenParam = (url.searchParams.get("token") || "").trim();
+    if (modeParam === "forgot") setMode("forgot");
+    if (modeParam === "reset" || tokenParam) {
+      setMode("reset");
+      if (tokenParam) setResetToken(tokenParam);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +150,62 @@ export function LoginExperience() {
       router.refresh();
     } catch {
       setErro("Falha ao autenticar. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErro("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailRecuperacao.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+      if (!res.ok) {
+        setErro(data?.error?.message || "Não foi possível enviar o e-mail de recuperação.");
+        return;
+      }
+      setErro("Se o e-mail existir e estiver ativo, enviaremos um link de redefinição.");
+      setMode("login");
+      setEmailRecuperacao("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErro("");
+    if (!resetToken.trim()) {
+      setErro("Token inválido.");
+      return;
+    }
+    if (novaSenha !== confirmNovaSenha) {
+      setErro("A confirmação da senha não confere.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: resetToken.trim(), novaSenha }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+      if (!res.ok) {
+        setErro(data?.error?.message || "Não foi possível redefinir a senha.");
+        return;
+      }
+      setErro("Senha redefinida com sucesso. Faça login com a nova senha.");
+      setMode("login");
+      setNovaSenha("");
+      setConfirmNovaSenha("");
+      setResetToken("");
     } finally {
       setLoading(false);
     }
@@ -307,7 +379,13 @@ export function LoginExperience() {
             </div>
 
             <motion.form
-              onSubmit={(e) => void handleSubmit(e)}
+              onSubmit={
+                mode === "login"
+                  ? (e) => void handleSubmit(e)
+                  : mode === "forgot"
+                    ? (e) => void handleForgotSubmit(e)
+                    : (e) => void handleResetSubmit(e)
+              }
               className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-2xl shadow-violet-950/50 backdrop-blur-xl sm:p-8 lg:border-slate-200/80 lg:bg-white/90 lg:shadow-xl lg:shadow-slate-900/10 dark:lg:border-slate-700/90 dark:lg:bg-slate-900/95 dark:lg:shadow-black/40"
               animate={erro ? { x: [0, -10, 10, -8, 8, 0] } : { x: 0 }}
               transition={{ duration: 0.45 }}
@@ -317,12 +395,17 @@ export function LoginExperience() {
               <div className="relative space-y-3 sm:space-y-5">
                 <div className="space-y-1.5 border-b border-white/10 pb-3 text-center sm:space-y-2 sm:pb-5 lg:border-slate-200/80 dark:lg:border-slate-600/80">
                   <h2 className="text-lg font-bold text-white sm:text-xl lg:text-2xl lg:text-slate-900 dark:lg:text-slate-100">
-                    Acesso seguro
+                    {mode === "login" ? "Acesso seguro" : mode === "forgot" ? "Recuperar senha" : "Redefinir senha"}
                   </h2>
                   <p className="text-xs text-slate-400 sm:text-sm lg:text-slate-600 dark:lg:text-slate-400">
-                    Use seu CPF e senha corporativos
+                    {mode === "login"
+                      ? "Use seu CPF e senha corporativos"
+                      : mode === "forgot"
+                        ? "Informe seu e-mail para receber o link"
+                        : "Defina sua nova senha"}
                   </p>
                 </div>
+                {mode === "login" && (
                 <div>
                   <label htmlFor="login-cpf" className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400 lg:text-slate-600 dark:lg:text-slate-400">
                     CPF
@@ -338,7 +421,9 @@ export function LoginExperience() {
                     className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
                   />
                 </div>
+                )}
 
+                {mode === "login" && (
                 <div>
                   <label htmlFor="login-senha" className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400 lg:text-slate-600 dark:lg:text-slate-400">
                     <Lock className="h-3.5 w-3.5" />
@@ -364,14 +449,74 @@ export function LoginExperience() {
                     </button>
                   </div>
                   <div className="mt-2 flex justify-end">
-                    <Link
-                      href="/forgot-password"
+                    <button
+                      type="button"
+                      onClick={() => setMode("forgot")}
                       className="cursor-pointer text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800 dark:lg:text-violet-300 dark:lg:hover:text-violet-200"
                     >
                       Esqueceu a senha?
-                    </Link>
+                    </button>
                   </div>
                 </div>
+                )}
+
+                {mode === "forgot" && (
+                  <div className="space-y-3">
+                    <input
+                      type="email"
+                      value={emailRecuperacao}
+                      onChange={(e) => setEmailRecuperacao(e.target.value)}
+                      placeholder="seu@email.com"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMode("login")}
+                      className="text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800"
+                    >
+                      Voltar ao login
+                    </button>
+                  </div>
+                )}
+
+                {mode === "reset" && (
+                  <div className="space-y-3">
+                    {!resetToken && (
+                      <input
+                        type="text"
+                        value={resetToken}
+                        onChange={(e) => setResetToken(e.target.value)}
+                        placeholder="Token de recuperação"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
+                        required
+                      />
+                    )}
+                    <input
+                      type="password"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                      placeholder="Nova senha"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
+                      required
+                    />
+                    <input
+                      type="password"
+                      value={confirmNovaSenha}
+                      onChange={(e) => setConfirmNovaSenha(e.target.value)}
+                      placeholder="Confirmar nova senha"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMode("login")}
+                      className="text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800"
+                    >
+                      Voltar ao login
+                    </button>
+                  </div>
+                )}
 
                 <AnimatePresence>
                   {erro && (
@@ -396,7 +541,15 @@ export function LoginExperience() {
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 transition-opacity hover:opacity-100" />
                   <Zap className="relative h-4 w-4" />
-                  <span className="relative">{loading ? "Entrando…" : "Entrar na Central"}</span>
+                  <span className="relative">
+                    {loading
+                      ? "Processando..."
+                      : mode === "login"
+                        ? "Entrar na Central"
+                        : mode === "forgot"
+                          ? "Enviar link de recuperação"
+                          : "Redefinir senha"}
+                  </span>
                 </motion.button>
               </div>
             </motion.form>

@@ -7,6 +7,13 @@ import { DashboardShell } from "./dashboard-shell";
 /** Envolve com DashboardShell apenas em rotas de dashboard. /login e /acesso-negado renderizam só a página. */
 export function ConditionalDashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/login" || pathname === "/acesso-negado") return <>{children}</>;
+  if (
+    pathname === "/login" ||
+    pathname === "/acesso-negado" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/redefinir-senha/")
+  )
+    return <>{children}</>;
   return <DashboardShell>{children}</DashboardShell>;
 }
