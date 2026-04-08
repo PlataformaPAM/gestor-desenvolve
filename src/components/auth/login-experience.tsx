@@ -366,7 +366,7 @@ export function LoginExperience() {
                   <div className="mt-2 flex justify-end">
                     <Link
                       href="/forgot-password"
-                      className="text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800 dark:lg:text-violet-300 dark:lg:hover:text-violet-200"
+                      className="cursor-pointer text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800 dark:lg:text-violet-300 dark:lg:hover:text-violet-200"
                     >
                       Esqueceu a senha?
                     </Link>

@@ -4,6 +4,11 @@ import { getSessionFromCookieHeader, hasModuleAccess } from "@/lib/auth";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isPublicPath =
+    pathname === "/login" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
+  if (isPublicPath) return NextResponse.next();
   const cookieHeader = request.headers.get("cookie");
   const session = getSessionFromCookieHeader(cookieHeader);
 
@@ -19,6 +24,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|_next/static|_next/image|api|favicon|desenvolve_).*)"],
+  matcher: ["/((?!login|forgot-password|reset-password|_next/static|_next/image|api|favicon|desenvolve_).*)"],
 };
 
