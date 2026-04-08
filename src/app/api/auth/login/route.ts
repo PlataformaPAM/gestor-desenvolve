@@ -18,6 +18,12 @@ function normalizeCpf(cpf: string): string {
   return cpf.replace(/\D/g, "");
 }
 
+function maskCpfDigits(digits: string): string {
+  const d = digits.slice(0, 11);
+  if (d.length !== 11) return digits;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
 export async function POST(req: Request) {
   try {
     const parsed = await parseJsonSafe<Payload>(req);
@@ -47,7 +53,7 @@ export async function POST(req: Request) {
       where: {
         ativo: true,
         senhaHash: { not: null },
-        OR: [{ cpf }, { cpf: cpfInput }],
+        OR: [{ cpf }, { cpf: cpfInput }, { cpf: maskCpfDigits(cpf) }],
       },
       select: { id: true, perfilId: true, senhaHash: true, nomeExibicao: true, cpf: true, email: true, telefone: true },
     });

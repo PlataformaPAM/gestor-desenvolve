@@ -108,6 +108,8 @@ export function LoginExperience() {
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
   const [recuperando, setRecuperando] = useState(false);
+  const [showRecuperarSenha, setShowRecuperarSenha] = useState(false);
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,21 +142,27 @@ export function LoginExperience() {
   };
 
   const handleForgotPassword = async () => {
-    const email = window.prompt("Informe seu e-mail para recuperação de senha:");
-    if (!email?.trim()) return;
+    const email = emailRecuperacao.trim();
+    if (!email) {
+      setErro("Informe o e-mail para recuperação de senha.");
+      return;
+    }
     setRecuperando(true);
+    setErro("");
     try {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        alert(data?.error?.message || "Não foi possível enviar o e-mail de recuperação.");
+        setErro(data?.error?.message || "Não foi possível enviar o e-mail de recuperação.");
         return;
       }
-      alert("Se o e-mail existir e estiver ativo, enviaremos um link de redefinição.");
+      setErro("Se o e-mail existir e estiver ativo, enviaremos um link de redefinição.");
+      setShowRecuperarSenha(false);
+      setEmailRecuperacao("");
     } finally {
       setRecuperando(false);
     }
@@ -387,13 +395,32 @@ export function LoginExperience() {
                   <div className="mt-2 flex justify-end">
                     <button
                       type="button"
-                      onClick={() => void handleForgotPassword()}
-                      disabled={recuperando}
+                      onClick={() => setShowRecuperarSenha((v) => !v)}
+                      disabled={loading || recuperando}
                       className="text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800 dark:lg:text-violet-300 dark:lg:hover:text-violet-200"
                     >
-                      {recuperando ? "Enviando..." : "Esqueceu a senha?"}
+                      Esqueceu a senha?
                     </button>
                   </div>
+                  {showRecuperarSenha && (
+                    <div className="mt-2 space-y-2 rounded-lg border border-white/10 bg-white/5 p-3 lg:border-slate-200 lg:bg-slate-50 dark:lg:border-slate-700 dark:lg:bg-slate-800/60">
+                      <input
+                        type="email"
+                        value={emailRecuperacao}
+                        onChange={(e) => setEmailRecuperacao(e.target.value)}
+                        placeholder="Informe seu e-mail"
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 dark:lg:border-slate-600 dark:lg:bg-slate-800 dark:lg:text-slate-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleForgotPassword()}
+                        disabled={recuperando}
+                        className="w-full rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
+                      >
+                        {recuperando ? "Enviando..." : "Enviar link de recuperação"}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <AnimatePresence>
