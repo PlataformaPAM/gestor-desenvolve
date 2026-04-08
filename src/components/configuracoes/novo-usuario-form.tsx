@@ -6,6 +6,7 @@ import type { PerfilAcesso } from "@/lib/configuracoes/types";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { validatePasswordPolicy } from "@/lib/password-policy";
+import { Eye, EyeOff } from "lucide-react";
 
 export type UsuarioFormPayload = Omit<UsuarioSistema, "id" | "criadoEm" | "atualizadoEm"> & {
   id?: string;
@@ -81,6 +82,10 @@ export function NovoUsuarioForm({
   const [novaSenha, setNovaSenha] = useState("");
   const [novaSenhaConfirm, setNovaSenhaConfirm] = useState("");
   const [erroSenha, setErroSenha] = useState("");
+  const [showSenhaInicial, setShowSenhaInicial] = useState(false);
+  const [showSenhaConfirm, setShowSenhaConfirm] = useState(false);
+  const [showNovaSenha, setShowNovaSenha] = useState(false);
+  const [showNovaSenhaConfirm, setShowNovaSenhaConfirm] = useState(false);
 
   useEffect(() => {
     if (initialUsuario) {
@@ -259,16 +264,26 @@ export function NovoUsuarioForm({
             >
               Senha inicial *
             </label>
-            <input
-              id="cfg-senha"
-              type="password"
-              autoComplete="new-password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="Mín. 8 caracteres, maiúscula, minúscula e número"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              required
-            />
+            <div className="relative">
+              <input
+                id="cfg-senha"
+                type={showSenhaInicial ? "text" : "password"}
+                autoComplete="new-password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Mín. 8 caracteres, maiúscula, minúscula e número"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenhaInicial((v) => !v)}
+                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                aria-label={showSenhaInicial ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showSenhaInicial ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label
@@ -277,15 +292,25 @@ export function NovoUsuarioForm({
             >
               Confirmar senha *
             </label>
-            <input
-              id="cfg-senha-confirm"
-              type="password"
-              autoComplete="new-password"
-              value={senhaConfirm}
-              onChange={(e) => setSenhaConfirm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              required
-            />
+            <div className="relative">
+              <input
+                id="cfg-senha-confirm"
+                type={showSenhaConfirm ? "text" : "password"}
+                autoComplete="new-password"
+                value={senhaConfirm}
+                onChange={(e) => setSenhaConfirm(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenhaConfirm((v) => !v)}
+                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                aria-label={showSenhaConfirm ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}
+              >
+                {showSenhaConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -307,22 +332,42 @@ export function NovoUsuarioForm({
               Alterar senha (opcional)
             </p>
             <div className="space-y-2">
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={novaSenha}
-                onChange={(e) => setNovaSenha(e.target.value)}
-                placeholder="Nova senha"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={novaSenhaConfirm}
-                onChange={(e) => setNovaSenhaConfirm(e.target.value)}
-                placeholder="Confirmar nova senha"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
+              <div className="relative">
+                <input
+                  type={showNovaSenha ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  placeholder="Nova senha"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNovaSenha((v) => !v)}
+                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  aria-label={showNovaSenha ? "Ocultar nova senha" : "Mostrar nova senha"}
+                >
+                  {showNovaSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showNovaSenhaConfirm ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={novaSenhaConfirm}
+                  onChange={(e) => setNovaSenhaConfirm(e.target.value)}
+                  placeholder="Confirmar nova senha"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNovaSenhaConfirm((v) => !v)}
+                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  aria-label={showNovaSenhaConfirm ? "Ocultar confirmação da nova senha" : "Mostrar confirmação da nova senha"}
+                >
+                  {showNovaSenhaConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
         </>

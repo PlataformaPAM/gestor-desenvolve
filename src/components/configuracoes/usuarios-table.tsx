@@ -28,7 +28,6 @@ type UsuariosTableProps = {
   /** Fallback para resolver nome quando a API ainda não enviou `nome` no vínculo. */
   pessoasVinculo?: PessoaParaVinculo[];
   onEditar?: (u: UsuarioSistema) => void;
-  onToggleAtivo?: (u: UsuarioSistema) => void;
 };
 
 export function UsuariosTable({
@@ -36,7 +35,6 @@ export function UsuariosTable({
   perfis,
   pessoasVinculo,
   onEditar,
-  onToggleAtivo,
 }: UsuariosTableProps) {
   const statusButtonClass = (ativo: boolean) =>
     ativo
@@ -92,19 +90,14 @@ export function UsuariosTable({
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">{vinculo}</td>
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleAtivo?.(u);
-                        }}
+                      <span
                         className={clsx(
-                          "rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors",
+                          "inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold",
                           statusButtonClass(u.ativo)
                         )}
                       >
                         {u.ativo ? "Ativo" : "Inativo"}
-                      </button>
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -144,19 +137,14 @@ export function UsuariosTable({
                   <p className="text-xs text-slate-500 mt-1">{perfil?.nome ?? u.perfilId} • {vinculo}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleAtivo?.(u);
-                    }}
+                  <span
                     className={clsx(
-                      "rounded-lg border px-2 py-1 text-xs font-semibold transition-colors",
+                      "inline-flex rounded-lg border px-2 py-1 text-xs font-semibold",
                       statusButtonClass(u.ativo)
                     )}
                   >
                     {u.ativo ? "Ativo" : "Inativo"}
-                  </button>
+                  </span>
                 </div>
               </div>
               <div className="mt-2 flex justify-end">

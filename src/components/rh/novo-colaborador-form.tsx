@@ -148,6 +148,7 @@ export function NovoColaboradorForm({
   const isEquipeInterna = tipo === "equipe_interna";
   const docDigits = cpfCnpj.replace(/\D/g, "");
   const isCnpj = docDigits.length === 14;
+  const mostrarAbaContatos = isB2bTabs && isCnpj;
   const opcoesContratoB2b = isFornecedor
     ? TIPO_CONTRATO_OPCOES_FORNECEDOR
     : TIPO_CONTRATO_OPCOES_CONSULTOR;
@@ -215,10 +216,17 @@ export function NovoColaboradorForm({
     if (docDigits.length === 14 && docDigits !== lastFetchedCnpjRef.current) {
       lastFetchedCnpjRef.current = docDigits;
       const cargoPadrao = isFornecedor ? "Fornecedor" : "Consultor";
+      setActiveTab("dados");
       void fetchByCnpj(docDigits, cargoPadrao);
     }
     if (docDigits.length < 14) lastFetchedCnpjRef.current = "";
   }, [isB2bTabs, isFornecedor, initialValues?.id, docDigits, fetchByCnpj]);
+
+  useEffect(() => {
+    if (!mostrarAbaContatos && activeTab === "contatos") {
+      setActiveTab("dados");
+    }
+  }, [mostrarAbaContatos, activeTab]);
 
   const addContato = () => setContatos((prev) => [...prev, emptyContato()]);
   const updateContato = (contatoId: string, patch: Partial<Contato>) => {
@@ -285,52 +293,57 @@ export function NovoColaboradorForm({
     });
   };
 
-  const tabsFornecedor: { id: "dados" | "contatos"; label: string; icon: typeof Building2 }[] = [
-    { id: "dados", label: "Dados", icon: Building2 },
-    { id: "contatos", label: "Contatos", icon: Users },
-  ];
+  const tabsFornecedor: { id: "dados" | "contatos"; label: string; icon: typeof Building2 }[] =
+    mostrarAbaContatos
+      ? [
+          { id: "dados", label: "Dados", icon: Building2 },
+          { id: "contatos", label: "Contatos", icon: Users },
+        ]
+      : [{ id: "dados", label: "Dados", icon: Building2 }];
 
   if (isB2bTabs) {
     return (
       <>
         <form onSubmit={handleSubmit} className="flex flex-col">
-          <div
-            role="tablist"
-            aria-label="Seções do cadastro"
-            className="flex flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
-          >
-            {tabsFornecedor.map((t) => {
-              const Icon = t.icon;
-              const isActive = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  id={`${fornecedorTabListId}-tab-${t.id}`}
-                  aria-selected={isActive}
-                  aria-controls={`${fornecedorTabListId}-${t.id}-panel`}
-                  onClick={() => setActiveTab(t.id)}
-                  className={clsx(
-                    "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors sm:px-4",
-                    isActive
-                      ? "text-[#6D28D9] dark:text-violet-400"
-                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                  )}
-                >
-                  {isActive && (
-                    <motion.span
-                      layoutId={`rh-fornecedor-form-tab-${fornecedorTabListId}`}
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.3 }}
-                    />
-                  )}
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {mostrarAbaContatos && (
+            <div
+              role="tablist"
+              aria-label="Seções do cadastro"
+              className="flex flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
+            >
+              {tabsFornecedor.map((t) => {
+                const Icon = t.icon;
+                const isActive = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    id={`${fornecedorTabListId}-tab-${t.id}`}
+                    aria-selected={isActive}
+                    aria-controls={`${fornecedorTabListId}-${t.id}-panel`}
+                    onClick={() => setActiveTab(t.id)}
+                    className={clsx(
+                      "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors sm:px-4",
+                      isActive
+                        ? "text-[#6D28D9] dark:text-violet-400"
+                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    )}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId={`rh-fornecedor-form-tab-${fornecedorTabListId}`}
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.3 }}
+                      />
+                    )}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div className="flex-1 space-y-4 p-4 lg:p-6">
             {activeTab === "dados" && (
@@ -353,11 +366,6 @@ export function NovoColaboradorForm({
                     required
                     autoComplete="off"
                   />
-                  <p className="mt-1 text-xs text-slate-500">
-                    Com 14 dígitos (CNPJ), os dados da PJ são preenchidos pela consulta pública; complete o cadastro nesta
-                    aba e cadastre ao menos um contato na aba Contatos antes de salvar. CPF (pessoa física): preenchimento
-                    manual; contatos são opcionais.
-                  </p>
                 </div>
                 <div>
                   <label htmlFor="rh-forn-nome" className={labelClass}>
@@ -437,8 +445,10 @@ export function NovoColaboradorForm({
                   <input
                     id="rh-forn-tel"
                     type="text"
+                    inputMode="tel"
                     value={telefone}
                     onChange={(e) => setTelefone(formatPhoneInput(e.target.value))}
+                    placeholder="(00) 00000-0000"
                     className={inputClass}
                   />
                 </div>
@@ -506,7 +516,9 @@ export function NovoColaboradorForm({
                           </label>
                           <input
                             value={c.telefone}
+                            inputMode="tel"
                             onChange={(e) => updateContato(c.id, { telefone: formatPhoneInput(e.target.value) })}
+                            placeholder="(00) 00000-0000"
                             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                           />
                         </div>

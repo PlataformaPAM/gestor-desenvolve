@@ -18,6 +18,14 @@ function isContatosFornecedorColumnError(error: unknown): boolean {
   return msg.includes("contatosFornecedor");
 }
 
+function isTipoContratoEnumError(error: unknown): boolean {
+  const msg = String((error as { message?: string } | null)?.message ?? "").toLowerCase();
+  return (
+    msg.includes("tipocontrato") &&
+    (msg.includes("invalid input value for enum") || msg.includes("provided value"))
+  );
+}
+
 export async function POST(req: Request) {
   const body = await parseJsonSafe<{ colaborador?: ColaboradorParceiro }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
@@ -100,8 +108,15 @@ export async function POST(req: Request) {
       detalhes: `Colaborador ${created.nome} (${created.id})`,
     });
     return ok({ colaborador: mapColaborador(created) }, 201);
-  } catch {
-    return fail("INTERNAL_ERROR", "Não foi possível salvar o fornecedor. Tente novamente.", 500);
+  } catch (error) {
+    if (isTipoContratoEnumError(error)) {
+      return fail(
+        "BAD_REQUEST",
+        "Tipo de contrato indisponível no banco atual. Atualize as migrations e tente novamente.",
+        400
+      );
+    }
+    return fail("INTERNAL_ERROR", "Não foi possível salvar a pessoa. Tente novamente.", 500);
   }
 }
 

@@ -22,14 +22,12 @@ type ColaboradoresTableProps = {
   /** Na aba Equipe, CPF/CNPJ é exibido com máscara. */
   variant?: "equipe" | "default";
   onSelecionar: (c: ColaboradorParceiro) => void;
-  onToggleStatus?: (c: ColaboradorParceiro) => void;
 };
 
 export function ColaboradoresTable({
   lista,
   variant = "default",
   onSelecionar,
-  onToggleStatus,
 }: ColaboradoresTableProps) {
   const docCell = (c: ColaboradorParceiro) =>
     variant === "equipe" ? formatDocumentoColunaEquipe(c.cpfCnpj) : (c.cpfCnpj ?? "—");
@@ -77,19 +75,14 @@ export function ColaboradoresTable({
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{c.cargoOuFuncao}</td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleStatus?.(c);
-                      }}
+                    <span
                       className={clsx(
-                        "rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors",
+                        "inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold",
                         STATUS_BADGE[c.status]
                       )}
                     >
                       {STATUS_LABELS[c.status]}
-                    </button>
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -135,19 +128,14 @@ export function ColaboradoresTable({
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleStatus?.(c);
-                  }}
+                <span
                   className={clsx(
-                    "rounded-lg border px-2 py-1 text-xs font-semibold transition-colors",
+                    "inline-flex rounded-lg border px-2 py-1 text-xs font-semibold",
                     STATUS_BADGE[c.status]
                   )}
                 >
                   {STATUS_LABELS[c.status]}
-                </button>
+                </span>
               </div>
             </div>
               <div className="mt-2 flex justify-end">

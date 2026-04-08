@@ -159,20 +159,6 @@ export default function RHPage() {
     setDrawerOpen(true);
   };
 
-  const handleToggleStatus = async (colaborador: ColaboradorParceiro) => {
-    const nextStatus: ColaboradorParceiro["status"] =
-      colaborador.status === "inativo" ? "ativo" : "inativo";
-    const atualizado: ColaboradorParceiro = { ...colaborador, status: nextStatus };
-    setColaboradores((prev) => prev.map((c) => (c.id === colaborador.id ? atualizado : c)));
-    const res = await fetch(`/api/rh/colaboradores/${colaborador.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ colaborador: atualizado }),
-    });
-    if (res.ok) return;
-    setColaboradores((prev) => prev.map((c) => (c.id === colaborador.id ? colaborador : c)));
-  };
-
   const handleSalvarEdicao = async (payload: NovoColaboradorPayload) => {
     if (!selected) return;
     const atualizado: ColaboradorParceiro = {
@@ -267,7 +253,6 @@ export default function RHPage() {
         lista={lista}
         variant={tab === "equipe_interna" ? "equipe" : "default"}
         onSelecionar={abrirPerfil}
-        onToggleStatus={handleToggleStatus}
       />
 
       <DrawerSheet

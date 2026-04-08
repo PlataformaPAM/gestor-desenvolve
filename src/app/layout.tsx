@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Gestor Desenvolve - Sistema Integrado de Gestão",
   description: "Sistema Integrado de Gestão - Gestor Desenvolve.",
-  icons: { icon: "/desenvolve_icone-f.png" },
+  icons: { icon: "/favicon.png" },
 };
 
 export const viewport = {
@@ -39,7 +39,7 @@ export default function RootLayout({
     <html lang="pt-BR" className="h-full" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        <link rel="icon" type="image/png" href="/desenvolve_icone-f.png" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex min-h-screen w-full min-w-0 overflow-x-hidden overflow-y-auto bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100`}

@@ -169,18 +169,6 @@ export default function ConfiguracoesPage() {
     })();
   };
 
-  const handleToggleAtivoUsuario = (u: UsuarioSistema) => {
-    const updated = { ...u, ativo: !u.ativo };
-    setUsuarios((prev) =>
-      prev.map((x) => (x.id === u.id ? updated : x))
-    );
-    void fetch(`/api/configuracoes/usuarios/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuario: { ...updated, atualizadoEm: new Date().toISOString() } }),
-    });
-  };
-
   const handleEditarUsuario = (u: UsuarioSistema) => {
     setUsuarioEmEdicao(u);
     setDrawerEditarUsuarioOpen(true);
@@ -327,7 +315,6 @@ export default function ConfiguracoesPage() {
             perfis={perfis}
             pessoasVinculo={pessoasVinculo}
             onEditar={handleEditarUsuario}
-            onToggleAtivo={handleToggleAtivoUsuario}
           />
         </div>
       )}

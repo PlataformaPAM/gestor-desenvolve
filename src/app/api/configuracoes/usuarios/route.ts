@@ -1,5 +1,6 @@
 import type { UsuarioSistema } from "@/lib/configuracoes/types";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { mapUsuario } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
@@ -24,6 +25,13 @@ export async function POST(req: Request) {
   const senhaHash = hashPassword(senha);
 
   const cpfUsuario = u.cpf.replace(/\D/g, "");
+  if (cpfUsuario.length !== 11) {
+    return fail("BAD_REQUEST", "CPF inválido. Informe 11 dígitos.", 400);
+  }
+  const emailUsuario = u.email.trim().toLowerCase();
+  if (!emailUsuario) {
+    return fail("BAD_REQUEST", "E-mail é obrigatório.", 400);
+  }
   const isCpf = (doc?: string | null) => (doc ?? "").replace(/\D/g, "").length === 11;
   const vinculos = (u.vinculos?.length ? u.vinculos : u.vinculacao ? [u.vinculacao] : []).filter(
     (v): v is { tipo: "rh" | "cliente"; id: string } => Boolean(v?.tipo && v?.id)
@@ -55,44 +63,61 @@ export async function POST(req: Request) {
     }
   }
 
+  const [existingCpf, existingEmail] = await Promise.all([
+    prisma.usuario.findUnique({ where: { cpf: cpfUsuario }, select: { id: true } }),
+    prisma.usuario.findFirst({
+      where: { email: { equals: emailUsuario, mode: "insensitive" } },
+      select: { id: true },
+    }),
+  ]);
+  if (existingCpf) return fail("BAD_REQUEST", "Já existe um usuário com este CPF.", 400);
+  if (existingEmail) return fail("BAD_REQUEST", "Já existe um usuário com este e-mail.", 400);
+
   let created = null as Awaited<ReturnType<typeof prisma.usuario.create>> | null;
   try {
-    created = await prisma.usuario.create({
-      data: {
-        cpf: cpfUsuario,
-        email: u.email.trim(),
-        nomeExibicao: u.nomeExibicao ?? null,
-        senhaHash,
-        perfilId: u.perfilId,
-        ativo: u.ativo ?? true,
-        vinculacaoTipo: vinculos[0]?.tipo ?? null,
-        vinculacaoPessoaId: vinculos[0]?.id ?? null,
-        vinculos: vinculos.length
-          ? {
-              createMany: {
-                data: vinculos.map((v) => ({ tipo: v.tipo, pessoaId: v.id })),
-              },
-            }
-          : undefined,
-        criadoEm: u.criadoEm ? new Date(u.criadoEm) : new Date(),
-        atualizadoEmSistema: new Date(),
-      },
-    });
-  } catch {
-    created = await prisma.usuario.create({
-      data: {
-        cpf: cpfUsuario,
-        email: u.email.trim(),
-        nomeExibicao: u.nomeExibicao ?? null,
-        senhaHash,
-        perfilId: u.perfilId,
-        ativo: u.ativo ?? true,
-        vinculacaoTipo: vinculos[0]?.tipo ?? null,
-        vinculacaoPessoaId: vinculos[0]?.id ?? null,
-        criadoEm: u.criadoEm ? new Date(u.criadoEm) : new Date(),
-        atualizadoEmSistema: new Date(),
-      },
-    });
+    try {
+      created = await prisma.usuario.create({
+        data: {
+          cpf: cpfUsuario,
+          email: emailUsuario,
+          nomeExibicao: u.nomeExibicao ?? null,
+          senhaHash,
+          perfilId: u.perfilId,
+          ativo: u.ativo ?? true,
+          vinculacaoTipo: vinculos[0]?.tipo ?? null,
+          vinculacaoPessoaId: vinculos[0]?.id ?? null,
+          vinculos: vinculos.length
+            ? {
+                createMany: {
+                  data: vinculos.map((v) => ({ tipo: v.tipo, pessoaId: v.id })),
+                },
+              }
+            : undefined,
+          criadoEm: u.criadoEm ? new Date(u.criadoEm) : new Date(),
+          atualizadoEmSistema: new Date(),
+        },
+      });
+    } catch {
+      created = await prisma.usuario.create({
+        data: {
+          cpf: cpfUsuario,
+          email: emailUsuario,
+          nomeExibicao: u.nomeExibicao ?? null,
+          senhaHash,
+          perfilId: u.perfilId,
+          ativo: u.ativo ?? true,
+          vinculacaoTipo: vinculos[0]?.tipo ?? null,
+          vinculacaoPessoaId: vinculos[0]?.id ?? null,
+          criadoEm: u.criadoEm ? new Date(u.criadoEm) : new Date(),
+          atualizadoEmSistema: new Date(),
+        },
+      });
+    }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return fail("BAD_REQUEST", "CPF ou e-mail já cadastrado para outro usuário.", 400);
+    }
+    return fail("INTERNAL_ERROR", "Não foi possível criar o usuário.", 500);
   }
 
   await writeAuditLog(prisma, {
