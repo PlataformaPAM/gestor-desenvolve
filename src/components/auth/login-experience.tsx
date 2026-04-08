@@ -107,6 +107,7 @@ export function LoginExperience() {
   const [showPassword, setShowPassword] = useState(false);
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +136,27 @@ export function LoginExperience() {
       setErro("Falha ao autenticar. Tente novamente.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const email = window.prompt("Informe seu e-mail para recuperação de senha:");
+    if (!email?.trim()) return;
+    setRecuperando(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        alert(data?.error?.message || "Não foi possível enviar o e-mail de recuperação.");
+        return;
+      }
+      alert("Se o e-mail existir e estiver ativo, enviaremos um link de redefinição.");
+    } finally {
+      setRecuperando(false);
     }
   };
 
@@ -365,9 +387,11 @@ export function LoginExperience() {
                   <div className="mt-2 flex justify-end">
                     <button
                       type="button"
+                      onClick={() => void handleForgotPassword()}
+                      disabled={recuperando}
                       className="text-xs font-semibold text-violet-300 hover:text-violet-200 lg:text-[#6D28D9] lg:hover:text-violet-800 dark:lg:text-violet-300 dark:lg:hover:text-violet-200"
                     >
-                      Esqueceu a senha?
+                      {recuperando ? "Enviando..." : "Esqueceu a senha?"}
                     </button>
                   </div>
                 </div>

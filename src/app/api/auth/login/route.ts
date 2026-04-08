@@ -23,7 +23,8 @@ export async function POST(req: Request) {
     const parsed = await parseJsonSafe<Payload>(req);
     if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
     const body = parsed.value;
-    const cpf = normalizeCpf(body.cpf || "");
+    const cpfInput = (body.cpf || "").trim();
+    const cpf = normalizeCpf(cpfInput);
     const senha = (body.senha || "").trim();
     if (!cpf || !senha) {
       return fail("BAD_REQUEST", "CPF e senha são obrigatórios.", 400);
@@ -43,7 +44,11 @@ export async function POST(req: Request) {
     }
 
     const usuario = await prisma.usuario.findFirst({
-      where: { cpf: cpf, ativo: true, senhaHash: { not: null } },
+      where: {
+        ativo: true,
+        senhaHash: { not: null },
+        OR: [{ cpf }, { cpf: cpfInput }],
+      },
       select: { id: true, perfilId: true, senhaHash: true, nomeExibicao: true, cpf: true, email: true, telefone: true },
     });
 
