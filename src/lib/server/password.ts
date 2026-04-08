@@ -11,7 +11,11 @@ export function hashPassword(password: string): string {
 
 export function verifyPassword(password: string, storedHash: string): boolean {
   const parts = storedHash.split("$");
-  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  // Compatibilidade legada: bancos antigos podem ter senha em texto puro.
+  // Se não for hash scrypt, compara literal para não bloquear login após migração.
+  if (parts.length !== 3 || parts[0] !== "scrypt") {
+    return password === storedHash;
+  }
   const salt = parts[1];
   const hash = parts[2];
   const derived = scryptSync(password, salt, KEY_LEN);
