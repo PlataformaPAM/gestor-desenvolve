@@ -6,12 +6,17 @@ import { motion } from "framer-motion";
 import { Building2, Users, Plus, Trash2 } from "lucide-react";
 import type { ColaboradorParceiro, TipoPessoaRH, TipoContrato } from "@/lib/rh/types";
 import type { Contato, PapelContatoCliente } from "@/lib/clientes/types";
-import { TIPO_CONTRATO_LABELS, TIPO_PESSOA_LABELS } from "@/lib/rh/constants";
+import {
+  TIPO_CONTRATO_LABELS,
+  TIPO_CONTRATO_OPCOES_CONSULTOR,
+  TIPO_CONTRATO_OPCOES_FORNECEDOR,
+} from "@/lib/rh/constants";
 import { PAPEIS_CONTATO_CLIENTE } from "@/lib/clientes/constants";
 import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 
-const TIPOS: TipoPessoaRH[] = ["equipe_interna", "vendedor_externo", "fornecedor_parceiro"];
+/** Tipos de contrato permitidos para Equipe (PF). */
+const TIPO_CONTRATO_EQUIPE: TipoContrato[] = ["clt", "estagio", "socio"];
 
 export type NovoColaboradorPayload = Omit<ColaboradorParceiro, "id">;
 
@@ -25,6 +30,16 @@ type NovoColaboradorFormProps = {
   onSave: (payload: NovoColaboradorPayload) => void;
   onCancel: () => void;
 };
+
+function tipoContratoInicial(
+  iv: NovoColaboradorFormProps["initialValues"],
+  defaultTipo: TipoPessoaRH | undefined
+): TipoContrato {
+  if (iv?.tipoContrato) return iv.tipoContrato;
+  if (defaultTipo === "fornecedor_parceiro") return "fornecedor";
+  if (defaultTipo === "vendedor_externo") return "consultor";
+  return "clt";
+}
 
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500";
@@ -53,10 +68,13 @@ function formatCpfCnpjInput(raw: string): string {
   return maskCnpjDigits(d);
 }
 
-function formatPhone(v: string): string {
-  const d = v.replace(/\D/g, "").slice(0, 11);
-  if (d.length <= 2) return d.replace(/(\d{0,2})/, "($1");
-  return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").slice(0, 15);
+function formatPhoneInput(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
 }
 
 const emptyContato = (): Contato => ({
@@ -101,25 +119,38 @@ export function NovoColaboradorForm({
   const [tipo, setTipo] = useState<TipoPessoaRH>(
     initialValues?.tipo ?? defaultTipo ?? "equipe_interna"
   );
-  const [tipoContrato, setTipoContrato] = useState<TipoContrato>(initialValues?.tipoContrato ?? "clt");
+  const [tipoContrato, setTipoContrato] = useState<TipoContrato>(() =>
+    tipoContratoInicial(initialValues, defaultTipo)
+  );
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [telefone, setTelefone] = useState(initialValues?.telefone ?? "");
   const [status, setStatus] = useState<ColaboradorParceiro["status"]>(initialValues?.status ?? "ativo");
 
   const [activeTab, setActiveTab] = useState<"dados" | "contatos">("dados");
-  const [contatos, setContatos] = useState<Contato[]>(() =>
-    initialValues?.tipo === "fornecedor_parceiro" && initialValues?.contatos?.length
-      ? initialValues.contatos.map((c) => ({ ...c, papeis: c.papeis ?? [] }))
-      : [emptyContato()]
-  );
+  const [contatos, setContatos] = useState<Contato[]>(() => {
+    const t = initialValues?.tipo ?? defaultTipo ?? "equipe_interna";
+    if (
+      (t === "fornecedor_parceiro" || t === "vendedor_externo") &&
+      initialValues?.contatos?.length
+    ) {
+      return initialValues.contatos.map((c) => ({ ...c, papeis: c.papeis ?? [] }));
+    }
+    return [emptyContato()];
+  });
   const [contatoIdParaRemover, setContatoIdParaRemover] = useState<string | null>(null);
   const [loadingCnpj, setLoadingCnpj] = useState(false);
   const [flashCnpj, setFlashCnpj] = useState(false);
   const lastFetchedCnpjRef = useRef<string>("");
 
   const isFornecedor = tipo === "fornecedor_parceiro";
+  const isConsultor = tipo === "vendedor_externo";
+  const isB2bTabs = isFornecedor || isConsultor;
+  const isEquipeInterna = tipo === "equipe_interna";
   const docDigits = cpfCnpj.replace(/\D/g, "");
   const isCnpj = docDigits.length === 14;
+  const opcoesContratoB2b = isFornecedor
+    ? TIPO_CONTRATO_OPCOES_FORNECEDOR
+    : TIPO_CONTRATO_OPCOES_CONSULTOR;
 
   useEffect(() => {
     if (lockTipo && defaultTipo) setTipo(defaultTipo);
@@ -130,12 +161,12 @@ export function NovoColaboradorForm({
     setCargoOuFuncao(initialValues?.cargoOuFuncao ?? "");
     setCpfCnpj(initialValues?.cpfCnpj ?? "");
     setTipo(initialValues?.tipo ?? defaultTipo ?? "equipe_interna");
-    setTipoContrato(initialValues?.tipoContrato ?? "clt");
+    setTipoContrato(tipoContratoInicial(initialValues, defaultTipo));
     setEmail(initialValues?.email ?? "");
     setTelefone(initialValues?.telefone ?? "");
     setStatus(initialValues?.status ?? "ativo");
     lastFetchedCnpjRef.current = "";
-    if (initialValues?.tipo === "fornecedor_parceiro") {
+    if (initialValues?.tipo === "fornecedor_parceiro" || initialValues?.tipo === "vendedor_externo") {
       setContatos(
         initialValues.contatos?.length
           ? initialValues.contatos.map((c) => ({ ...c, papeis: c.papeis ?? [] }))
@@ -147,15 +178,28 @@ export function NovoColaboradorForm({
     }
   }, [initialValues, defaultTipo]);
 
-  const fetchByCnpj = useCallback(async (digits: string) => {
+  useEffect(() => {
+    if (!isEquipeInterna) return;
+    if (!TIPO_CONTRATO_EQUIPE.includes(tipoContrato)) {
+      setTipoContrato("clt");
+    }
+  }, [isEquipeInterna, tipoContrato]);
+
+  useEffect(() => {
+    if (!isB2bTabs) return;
+    const allowed = isFornecedor ? TIPO_CONTRATO_OPCOES_FORNECEDOR : TIPO_CONTRATO_OPCOES_CONSULTOR;
+    setTipoContrato((prev) => (allowed.includes(prev) ? prev : allowed[0]));
+  }, [isB2bTabs, isFornecedor, tipo]);
+
+  const fetchByCnpj = useCallback(async (digits: string, cargoPadrao: string) => {
     if (digits.length !== 14) return;
     setLoadingCnpj(true);
     try {
       const res = await fetchCnpjBrasilApi(digits);
       if (res) {
         setNome(res.nomeFantasia?.trim() || res.empresa || "");
-        setCargoOuFuncao((prev) => (prev.trim() ? prev : "Fornecedor"));
-        if (res.telefone) setTelefone(formatPhone(res.telefone.replace(/\D/g, "")));
+        setCargoOuFuncao((prev) => (prev.trim() ? prev : cargoPadrao));
+        if (res.telefone) setTelefone(formatPhoneInput(res.telefone.replace(/\D/g, "")));
         if (res.email) setEmail(res.email);
         setFlashCnpj(true);
         setTimeout(() => setFlashCnpj(false), 2000);
@@ -167,13 +211,14 @@ export function NovoColaboradorForm({
 
   /** Consulta automática só na criação; em edição não sobrescreve dados ao alterar o CNPJ. */
   useEffect(() => {
-    if (!isFornecedor || initialValues?.id) return;
+    if (!isB2bTabs || initialValues?.id) return;
     if (docDigits.length === 14 && docDigits !== lastFetchedCnpjRef.current) {
       lastFetchedCnpjRef.current = docDigits;
-      void fetchByCnpj(docDigits);
+      const cargoPadrao = isFornecedor ? "Fornecedor" : "Consultor";
+      void fetchByCnpj(docDigits, cargoPadrao);
     }
     if (docDigits.length < 14) lastFetchedCnpjRef.current = "";
-  }, [isFornecedor, initialValues?.id, docDigits, fetchByCnpj]);
+  }, [isB2bTabs, isFornecedor, initialValues?.id, docDigits, fetchByCnpj]);
 
   const addContato = () => setContatos((prev) => [...prev, emptyContato()]);
   const updateContato = (contatoId: string, patch: Partial<Contato>) => {
@@ -199,6 +244,10 @@ export function NovoColaboradorForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !cargoOuFuncao.trim() || !cpfCnpj.trim()) return;
+    if (isEquipeInterna && docDigits.length !== 11) {
+      alert("Informe um CPF válido (11 dígitos).");
+      return;
+    }
 
     const base: NovoColaboradorPayload = {
       nome: nome.trim(),
@@ -210,12 +259,13 @@ export function NovoColaboradorForm({
       email: email.trim() || undefined,
     };
 
-    if (isFornecedor) {
+    if (isB2bTabs) {
       const contatosSave = contatos
         .filter((c) => c.nome.trim() || c.email.trim() || c.telefone.trim())
         .map((c) => ({ ...c, papeis: c.papeis ?? [] }));
       if (isCnpj && contatosSave.length === 0) {
-        alert("Fornecedor pessoa jurídica (CNPJ): inclua pelo menos um contato na aba Contatos.");
+        const rotulo = isFornecedor ? "Fornecedor" : "Consultor";
+        alert(`${rotulo} pessoa jurídica (CNPJ): inclua pelo menos um contato na aba Contatos.`);
         setActiveTab("contatos");
         return;
       }
@@ -227,7 +277,12 @@ export function NovoColaboradorForm({
       return;
     }
 
-    onSave(base);
+    onSave({
+      ...base,
+      ...(isEquipeInterna
+        ? { telefone: telefone.replace(/\D/g, "").length > 0 ? telefone.trim() : undefined }
+        : {}),
+    });
   };
 
   const tabsFornecedor: { id: "dados" | "contatos"; label: string; icon: typeof Building2 }[] = [
@@ -235,13 +290,13 @@ export function NovoColaboradorForm({
     { id: "contatos", label: "Contatos", icon: Users },
   ];
 
-  if (isFornecedor) {
+  if (isB2bTabs) {
     return (
       <>
         <form onSubmit={handleSubmit} className="flex flex-col">
           <div
             role="tablist"
-            aria-label="Seções do fornecedor"
+            aria-label="Seções do cadastro"
             className="flex flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
           >
             {tabsFornecedor.map((t) => {
@@ -330,25 +385,6 @@ export function NovoColaboradorForm({
                     required
                   />
                 </div>
-                {!lockTipo && (
-                  <div>
-                    <label htmlFor="rh-forn-tipo" className={labelClass}>
-                      Tipo (categoria)
-                    </label>
-                    <select
-                      id="rh-forn-tipo"
-                      value={tipo}
-                      onChange={(e) => setTipo(e.target.value as TipoPessoaRH)}
-                      className={inputClass}
-                    >
-                      {TIPOS.map((t) => (
-                        <option key={t} value={t}>
-                          {TIPO_PESSOA_LABELS[t]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
                 <div>
                   <label htmlFor="rh-forn-contrato" className={labelClass}>
                     Tipo de contrato
@@ -359,9 +395,9 @@ export function NovoColaboradorForm({
                     onChange={(e) => setTipoContrato(e.target.value as TipoContrato)}
                     className={inputClass}
                   >
-                    {(Object.entries(TIPO_CONTRATO_LABELS) as [TipoContrato, string][]).map(([k, v]) => (
+                    {opcoesContratoB2b.map((k) => (
                       <option key={k} value={k}>
-                        {v}
+                        {TIPO_CONTRATO_LABELS[k]}
                       </option>
                     ))}
                   </select>
@@ -402,7 +438,7 @@ export function NovoColaboradorForm({
                     id="rh-forn-tel"
                     type="text"
                     value={telefone}
-                    onChange={(e) => setTelefone(formatPhone(e.target.value))}
+                    onChange={(e) => setTelefone(formatPhoneInput(e.target.value))}
                     className={inputClass}
                   />
                 </div>
@@ -470,7 +506,7 @@ export function NovoColaboradorForm({
                           </label>
                           <input
                             value={c.telefone}
-                            onChange={(e) => updateContato(c.id, { telefone: formatPhone(e.target.value) })}
+                            onChange={(e) => updateContato(c.id, { telefone: formatPhoneInput(e.target.value) })}
                             className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                           />
                         </div>
@@ -596,36 +632,23 @@ export function NovoColaboradorForm({
       </div>
       <div>
         <label htmlFor="rh-cpf-cnpj" className={labelClass}>
-          CPF/CNPJ *
+          {isEquipeInterna ? "CPF *" : "CPF/CNPJ *"}
         </label>
         <input
           id="rh-cpf-cnpj"
           type="text"
+          inputMode={isEquipeInterna ? "numeric" : "text"}
           value={cpfCnpj}
-          onChange={(e) => setCpfCnpj(e.target.value)}
+          onChange={(e) =>
+            isEquipeInterna
+              ? setCpfCnpj(maskCpfDigits(e.target.value.replace(/\D/g, "")))
+              : setCpfCnpj(e.target.value)
+          }
+          placeholder={isEquipeInterna ? "000.000.000-00" : undefined}
           className={inputClass}
           required
         />
       </div>
-      {!lockTipo && (
-        <div>
-          <label htmlFor="rh-tipo" className={labelClass}>
-            Tipo (categoria)
-          </label>
-          <select
-            id="rh-tipo"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoPessoaRH)}
-            className={inputClass}
-          >
-            {TIPOS.map((t) => (
-              <option key={t} value={t}>
-                {TIPO_PESSOA_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
       <div>
         <label htmlFor="rh-contrato" className={labelClass}>
           Tipo de contrato
@@ -636,11 +659,13 @@ export function NovoColaboradorForm({
           onChange={(e) => setTipoContrato(e.target.value as TipoContrato)}
           className={inputClass}
         >
-          {(Object.entries(TIPO_CONTRATO_LABELS) as [TipoContrato, string][]).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
+          {(isEquipeInterna ? TIPO_CONTRATO_EQUIPE : (Object.keys(TIPO_CONTRATO_LABELS) as TipoContrato[])).map(
+            (k) => (
+              <option key={k} value={k}>
+                {TIPO_CONTRATO_LABELS[k]}
+              </option>
+            )
+          )}
         </select>
       </div>
       <div>
@@ -671,7 +696,24 @@ export function NovoColaboradorForm({
           className={inputClass}
         />
       </div>
-      <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
+      {isEquipeInterna && (
+        <div>
+          <label htmlFor="rh-tel-equipe" className={labelClass}>
+            Telefone
+          </label>
+          <input
+            id="rh-tel-equipe"
+            type="text"
+            inputMode="tel"
+            value={telefone}
+            onChange={(e) => setTelefone(formatPhoneInput(e.target.value))}
+            placeholder="(00) 00000-0000"
+            className={inputClass}
+            autoComplete="tel"
+          />
+        </div>
+      )}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         <button
           type="button"
           onClick={onCancel}

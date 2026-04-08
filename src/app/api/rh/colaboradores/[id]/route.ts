@@ -26,12 +26,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!c || c.id !== id) return fail("BAD_REQUEST", "Payload inválido.", 400);
 
   const doc = digitsOnly(c.cpfCnpj);
-  if (c.tipo === "fornecedor_parceiro" && doc.length === 14 && c.contatos !== undefined) {
+  const b2bCnpjComContatosNoPatch =
+    (c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo") &&
+    doc.length === 14 &&
+    c.contatos !== undefined;
+  if (b2bCnpjComContatosNoPatch) {
     const temContato = (c.contatos ?? []).some(
       (ct) => (ct.nome?.trim() || ct.email?.trim() || ct.telefone?.trim()) ?? false
     );
     if (!temContato) {
-      return fail("BAD_REQUEST", "Fornecedor PJ (CNPJ): informe pelo menos um contato.", 400);
+      return fail("BAD_REQUEST", "Pessoa jurídica (CNPJ): informe pelo menos um contato.", 400);
     }
   }
 
@@ -54,7 +58,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             ...(persistirContatos && c.contatos !== undefined
               ? {
                   contatosFornecedor:
-                    c.tipo === "fornecedor_parceiro" && c.contatos.length
+                    (c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo") &&
+                    c.contatos.length
                       ? (c.contatos as unknown as Prisma.InputJsonValue)
                       : Prisma.JsonNull,
                 }

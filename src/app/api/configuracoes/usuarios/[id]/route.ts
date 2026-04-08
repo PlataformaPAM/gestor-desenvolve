@@ -3,10 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { mapUsuario } from "../../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { hashPassword, validatePasswordPolicy } from "@/lib/server/password";
+
+type UsuarioPatchBody = UsuarioSistema & { senha?: string };
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const body = await parseJsonSafe<{ usuario?: UsuarioSistema }>(req);
+  const body = await parseJsonSafe<{ usuario?: UsuarioPatchBody }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const u = body.value.usuario;
   if (!u || u.id !== id) {
@@ -18,6 +21,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const vinculos = (u.vinculos?.length ? u.vinculos : u.vinculacao ? [u.vinculacao] : []).filter(
     (v): v is { tipo: "rh" | "cliente"; id: string } => Boolean(v?.tipo && v?.id)
   );
+  const novaSenhaRaw = typeof u.senha === "string" ? u.senha.trim() : "";
+  const novaSenha = novaSenhaRaw.length > 0 ? novaSenhaRaw : null;
+  if (novaSenha) {
+    const policy = validatePasswordPolicy(novaSenha);
+    if (!policy.valid) return fail("BAD_REQUEST", policy.message, 400);
+  }
+  const senhaHash = novaSenha ? hashPassword(novaSenha) : undefined;
+
   for (const vinculo of vinculos) {
     if (vinculo.tipo === "rh") {
       const pessoa = await prisma.colaboradorRH.findUnique({
@@ -53,6 +64,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         cpf: cpfUsuario,
         email: u.email.trim(),
         nomeExibicao: u.nomeExibicao ?? null,
+        ...(senhaHash ? { senhaHash } : {}),
         perfilId: u.perfilId,
         ativo: u.ativo,
         vinculacaoTipo: vinculos[0]?.tipo ?? null,
@@ -73,6 +85,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         cpf: cpfUsuario,
         email: u.email.trim(),
         nomeExibicao: u.nomeExibicao ?? null,
+        ...(senhaHash ? { senhaHash } : {}),
         perfilId: u.perfilId,
         ativo: u.ativo,
         vinculacaoTipo: vinculos[0]?.tipo ?? null,

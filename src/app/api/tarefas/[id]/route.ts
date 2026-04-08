@@ -58,6 +58,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           tarefaId: id,
           data: new Date(h.data),
           acao: h.acao,
+          autorId: h.autorId?.trim() ? h.autorId.trim() : null,
           anexos: {
             create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
           },

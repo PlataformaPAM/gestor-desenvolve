@@ -5,11 +5,17 @@ export type TipoContrato =
   | "pj"
   | "estagio"
   | "parceiro"
-  | "fornecedor";
+  | "fornecedor"
+  | "socio"
+  | "consultor"
+  | "especialista"
+  | "vendedor"
+  | "prestador_servico"
+  | "profissional_liberal";
 
 export type StatusColaborador = "ativo" | "inativo" | "ferias" | "afastado";
 
-/** Tab: Equipe Interna | Vendedores/Externos | Fornecedores/Parceiros */
+/** Tab: Equipe | Consultores | Fornecedores */
 export type TipoPessoaRH = "equipe_interna" | "vendedor_externo" | "fornecedor_parceiro";
 
 export type DadosBancarios = {

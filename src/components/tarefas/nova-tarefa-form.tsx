@@ -67,6 +67,8 @@ export function NovaTarefaForm({
       .filter(Boolean) as UsuarioTarefa[];
     const now = new Date().toISOString();
     const fim = dataFim.trim() ? new Date(dataFim.trim()).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const quemCriou =
+      (currentUserId ? usuarios.find((u) => u.id === currentUserId) : undefined) ?? responsavel;
     onSave({
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
@@ -79,7 +81,13 @@ export function NovaTarefaForm({
       anexos: arquivos.map((f) => f.name),
       arquivos,
       historico: [
-        { id: `h-${Date.now()}`, data: now, acao: "Tarefa criada", autor: responsavel.nome },
+        {
+          id: `h-${Date.now()}`,
+          data: now,
+          acao: "Tarefa criada",
+          autor: quemCriou.nome,
+          autorId: quemCriou.id,
+        },
       ],
     });
   };

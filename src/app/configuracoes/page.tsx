@@ -13,6 +13,7 @@ import type { UsuarioSistema, PerfilAcesso, LogSistema } from "@/lib/configuraco
 import type { PessoaParaVinculo } from "@/lib/configuracoes/types";
 import type { UsuarioFormPayload } from "@/components/configuracoes/novo-usuario-form";
 import type { PerfilFormPayload } from "@/components/configuracoes/perfil-form";
+import { enrichUsuarioVinculos } from "@/lib/configuracoes/enrich-usuario-vinculos";
 
 type TabConfig = "usuarios" | "perfis" | "logs";
 const TAB_LABELS_MOBILE: Record<TabConfig, string> = {
@@ -77,10 +78,13 @@ export default function ConfiguracoesPage() {
           };
         };
         if (!active) return;
-        setUsuarios(data?.data?.usuarios ?? []);
+        const pv = data?.data?.pessoasVinculo ?? [];
+        setUsuarios(
+          (data?.data?.usuarios ?? []).map((u) => enrichUsuarioVinculos(u, pv))
+        );
         setPerfis(data?.data?.perfis ?? []);
         setLogs(data?.data?.logs ?? []);
-        setPessoasVinculo(data?.data?.pessoasVinculo ?? []);
+        setPessoasVinculo(pv);
       } catch {
         // noop
       }
@@ -91,22 +95,12 @@ export default function ConfiguracoesPage() {
   }, []);
 
   const handleSalvarUsuario = (payload: UsuarioFormPayload) => {
-    if (payload.id) {
-      const next = usuarios.find((u) => u.id === payload.id);
-      setUsuarios((prev) =>
-        prev.map((u) =>
-          u.id === payload.id
-            ? {
-                ...u,
-                ...payload,
-                criadoEm: u.criadoEm,
-                atualizadoEm: payload.atualizadoEm ?? new Date().toISOString(),
-              }
-            : u
-        )
-      );
-      if (next) {
-        void fetch(`/api/configuracoes/usuarios/${payload.id}`, {
+    void (async () => {
+      if (payload.id) {
+        const next = usuarios.find((u) => u.id === payload.id);
+        if (!next) return;
+        const { senha: _omitSenha, ...withoutSenha } = payload;
+        const res = await fetch(`/api/configuracoes/usuarios/${payload.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -117,27 +111,62 @@ export default function ConfiguracoesPage() {
             },
           }),
         });
+        const json = (await res.json().catch(() => ({}))) as {
+          data?: { usuario?: UsuarioSistema };
+          error?: { message?: string };
+        };
+        if (!res.ok) {
+          alert(json?.error?.message ?? "Não foi possível atualizar o usuário.");
+          return;
+        }
+        const servidor = json?.data?.usuario;
+        setUsuarios((prev) =>
+          prev.map((u) =>
+            u.id === payload.id
+              ? enrichUsuarioVinculos(servidor ?? { ...next, ...withoutSenha }, pessoasVinculo)
+              : u
+          )
+        );
+        setDrawerEditarUsuarioOpen(false);
+        setUsuarioEmEdicao(null);
+        return;
       }
-      setDrawerEditarUsuarioOpen(false);
-      setUsuarioEmEdicao(null);
-    } else {
-      const created: UsuarioSistema = {
-        ...payload,
-        id: generateUserId(),
-        criadoEm: new Date().toISOString(),
-        atualizadoEm: new Date().toISOString(),
-      } as UsuarioSistema;
-      setUsuarios((prev) => [
-        created,
-        ...prev,
-      ]);
-      void fetch("/api/configuracoes/usuarios", {
+
+      const { senha, ...rest } = payload;
+      const tempId = generateUserId();
+      const optimistic = enrichUsuarioVinculos(
+        {
+          ...rest,
+          id: tempId,
+          criadoEm: new Date().toISOString(),
+          atualizadoEm: new Date().toISOString(),
+        } as UsuarioSistema,
+        pessoasVinculo
+      );
+      setUsuarios((prev) => [optimistic, ...prev]);
+      setDrawerNovoUsuarioOpen(false);
+
+      const res = await fetch("/api/configuracoes/usuarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario: created }),
+        body: JSON.stringify({ usuario: { ...rest, senha } }),
       });
-      setDrawerNovoUsuarioOpen(false);
-    }
+      const json = (await res.json().catch(() => ({}))) as {
+        data?: { usuario?: UsuarioSistema };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        setUsuarios((prev) => prev.filter((u) => u.id !== tempId));
+        alert(json?.error?.message ?? "Não foi possível criar o usuário.");
+        return;
+      }
+      const servidor = json?.data?.usuario;
+      if (servidor) {
+        setUsuarios((prev) =>
+          prev.map((u) => (u.id === tempId ? enrichUsuarioVinculos(servidor, pessoasVinculo) : u))
+        );
+      }
+    })();
   };
 
   const handleToggleAtivoUsuario = (u: UsuarioSistema) => {
@@ -296,6 +325,7 @@ export default function ConfiguracoesPage() {
           <UsuariosTable
             usuarios={usuariosFiltrados}
             perfis={perfis}
+            pessoasVinculo={pessoasVinculo}
             onEditar={handleEditarUsuario}
             onToggleAtivo={handleToggleAtivoUsuario}
           />

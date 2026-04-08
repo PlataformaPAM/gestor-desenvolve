@@ -21,11 +21,13 @@ function generateId(): string {
   return `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function formatDataBr(iso: string): string {
-  return new Date(iso).toLocaleDateString("pt-BR", {
+function formatDataHoraBr(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -72,6 +74,12 @@ export default function TarefasPage() {
     usuarios.forEach((u) => m.set(u.id, u));
     return m;
   }, [usuarios]);
+
+  /** Quem registra edições/comentários no app (demo: `CURRENT_USER_ID`). */
+  const autorEdicao = useMemo(() => {
+    const u = usuariosMap.get(CURRENT_USER_ID);
+    return { id: CURRENT_USER_ID, nome: u?.nome ?? "Usuário" };
+  }, [usuariosMap]);
 
   const RESPONSAVEL_OPTIONS: { value: string; label: string }[] = useMemo(
     () => [{ value: "", label: "Todos" }, ...usuarios.map((u) => ({ value: u.id, label: u.nome }))],
@@ -145,29 +153,28 @@ export default function TarefasPage() {
     if (sourceStatus === destStatus) return;
     const id = result.draggableId;
     const historicoEntry = {
-      id: `h-${Date.now()}`,
+      id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       data: new Date().toISOString(),
       acao: `Status alterado de ${STATUS_LABELS[sourceStatus]} para ${STATUS_LABELS[destStatus]} via Kanban`,
-      autor: undefined as string | undefined,
+      autor: autorEdicao.nome,
+      autorId: autorEdicao.id,
     };
     setTarefas((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t;
-        historicoEntry.autor = t.responsavel.nome;
         return {
           ...t,
           status: destStatus,
-          historico: [...t.historico, { ...historicoEntry }],
+          historico: [...t.historico, historicoEntry],
         };
       })
     );
     setSelectedTarefa((t) => {
       if (t?.id !== id) return t;
-      historicoEntry.autor = t.responsavel.nome;
       return {
         ...t,
         status: destStatus,
-        historico: [...t.historico, { ...historicoEntry }],
+        historico: [...t.historico, historicoEntry],
       };
     });
     const changed = tarefas.find((t) => t.id === id);
@@ -175,11 +182,11 @@ export default function TarefasPage() {
       const updated = {
         ...changed,
         status: destStatus,
-        historico: [...changed.historico, { ...historicoEntry }],
+        historico: [...changed.historico, historicoEntry],
       };
       void saveTarefa(updated).catch(() => undefined);
     }
-  }, [tarefas, saveTarefa]);
+  }, [tarefas, saveTarefa, autorEdicao]);
 
   const handleSalvarTarefa = useCallback(
     (tarefaId: string, payload: TarefaSalvarPayload) => {
@@ -193,8 +200,16 @@ export default function TarefasPage() {
       const current = selectedTarefa?.id === tarefaId ? selectedTarefa : tarefas.find((t) => t.id === tarefaId);
       if (!current) return;
 
-      const entries: { id: string; data: string; acao: string; autor?: string; anexos?: string[] }[] = [];
-      const autor = responsavel.nome;
+      const entries: {
+        id: string;
+        data: string;
+        acao: string;
+        autor?: string;
+        autorId?: string;
+        anexos?: string[];
+      }[] = [];
+      const autor = autorEdicao.nome;
+      const autorId = autorEdicao.id;
       const now = new Date().toISOString();
 
       if (current.titulo.trim() !== payload.titulo.trim()) {
@@ -203,6 +218,7 @@ export default function TarefasPage() {
           data: now,
           acao: `Título alterado de "${current.titulo}" para "${payload.titulo.trim()}"`,
           autor,
+          autorId,
         });
       }
       const currDesc = (current.descricao ?? "").trim();
@@ -211,30 +227,67 @@ export default function TarefasPage() {
         entries.push({
           id: `h-${Date.now()}-de`,
           data: now,
-          acao: "Descrição do ticket atualizada".replace("ticket", "tarefa"),
+          acao: "Descrição da tarefa atualizada",
           autor,
+          autorId,
         });
       }
       if (current.status !== payload.status) {
-        entries.push({ id: `h-${Date.now()}-s`, data: now, acao: `Status alterado de ${STATUS_LABELS[current.status]} para ${STATUS_LABELS[payload.status]}`, autor });
+        entries.push({
+          id: `h-${Date.now()}-s`,
+          data: now,
+          acao: `Status alterado de ${STATUS_LABELS[current.status]} para ${STATUS_LABELS[payload.status]}`,
+          autor,
+          autorId,
+        });
       }
       if (current.prioridade !== payload.prioridade) {
-        entries.push({ id: `h-${Date.now()}-p`, data: now, acao: `Prioridade alterada de ${PRIORIDADE_LABELS[current.prioridade]} para ${PRIORIDADE_LABELS[payload.prioridade]}`, autor });
+        entries.push({
+          id: `h-${Date.now()}-p`,
+          data: now,
+          acao: `Prioridade alterada de ${PRIORIDADE_LABELS[current.prioridade]} para ${PRIORIDADE_LABELS[payload.prioridade]}`,
+          autor,
+          autorId,
+        });
       }
       if (current.responsavel.id !== payload.responsavelId) {
-        entries.push({ id: `h-${Date.now()}-r`, data: now, acao: `Responsabilidade transferida de ${current.responsavel.nome} para ${responsavel.nome}`, autor });
+        entries.push({
+          id: `h-${Date.now()}-r`,
+          data: now,
+          acao: `Responsável alterado de ${current.responsavel.nome} para ${responsavel.nome}`,
+          autor,
+          autorId,
+        });
       }
       if (current.dataInicio !== payload.dataInicio) {
-        entries.push({ id: `h-${Date.now()}-di`, data: now, acao: `Data de início alterada de ${formatDataBr(current.dataInicio)} para ${formatDataBr(payload.dataInicio)}`, autor });
+        entries.push({
+          id: `h-${Date.now()}-di`,
+          data: now,
+          acao: `Data de início alterada de ${formatDataHoraBr(current.dataInicio)} para ${formatDataHoraBr(payload.dataInicio)}`,
+          autor,
+          autorId,
+        });
       }
       if (current.dataFim !== payload.dataFim) {
-        entries.push({ id: `h-${Date.now()}-df`, data: now, acao: `Prazo limite alterado de ${formatDataBr(current.dataFim)} para ${formatDataBr(payload.dataFim)}`, autor });
+        entries.push({
+          id: `h-${Date.now()}-df`,
+          data: now,
+          acao: `Prazo final alterado de ${formatDataHoraBr(current.dataFim)} para ${formatDataHoraBr(payload.dataFim)}`,
+          autor,
+          autorId,
+        });
       }
       const currentColIds = (current.colaboradores ?? []).map((c) => c.id).sort().join(",");
       const newColIds = [...payload.colaboradorIds].filter((id) => id !== payload.responsavelId).sort().join(",");
       if (currentColIds !== newColIds) {
         const nomes = colaboradores.map((c) => c.nome).join(", ") || "Nenhum";
-        entries.push({ id: `h-${Date.now()}-c`, data: now, acao: `Colaboradores alterados para: ${nomes}`, autor });
+        entries.push({
+          id: `h-${Date.now()}-c`,
+          data: now,
+          acao: `Colaboradores alterados para: ${nomes}`,
+          autor,
+          autorId,
+        });
       }
 
       const novos = payload.novosArquivos ?? [];
@@ -245,6 +298,7 @@ export default function TarefasPage() {
           data: now,
           acao: `Novos anexos adicionados: ${anexosAdicionados.join(", ")}`,
           autor,
+          autorId,
           anexos: anexosAdicionados,
         });
       }
@@ -268,7 +322,7 @@ export default function TarefasPage() {
       setSelectedTarefa((prev) => (prev?.id === tarefaId ? updated : prev));
       void saveTarefa(updated).catch(() => undefined);
     },
-    [usuariosMap, selectedTarefa, tarefas, saveTarefa]
+    [usuariosMap, selectedTarefa, tarefas, saveTarefa, autorEdicao]
   );
 
   const handleExcluirClick = useCallback((t: Tarefa) => {
@@ -370,7 +424,8 @@ export default function TarefasPage() {
                   id: `h-${Date.now()}`,
                   data: new Date().toISOString(),
                   acao,
-                  autor: selectedTarefa?.responsavel.nome,
+                  autor: autorEdicao.nome,
+                  autorId: autorEdicao.id,
                   anexos: anexos?.length ? anexos : undefined,
                 };
                 let updatedForPersist: Tarefa | null = null;

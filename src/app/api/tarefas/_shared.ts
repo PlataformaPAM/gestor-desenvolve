@@ -18,6 +18,7 @@ export function mapTarefaFromDb(
       id: string;
       data: Date;
       acao: string;
+      autorId: string | null;
       autor: PrismaUsuario | null;
       anexos: Array<{ nomeArquivo: string }>;
     }>;
@@ -41,6 +42,7 @@ export function mapTarefaFromDb(
       data: h.data.toISOString(),
       acao: h.acao,
       autor: h.autor ? mapUsuarioTarefaFromDb(h.autor).nome : undefined,
+      autorId: h.autorId ?? undefined,
       anexos: h.anexos.map((a) => a.nomeArquivo),
     })),
     registroCriadoPorNome: t.criadoPor?.nomeExibicao?.trim() || null,

@@ -181,6 +181,12 @@ enum TipoContrato {
   estagio
   parceiro
   fornecedor
+  socio
+  consultor
+  especialista
+  vendedor
+  prestador_servico
+  profissional_liberal
 }
 
 enum StatusColaborador {

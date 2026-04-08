@@ -1,4 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { validatePasswordPolicy as validatePasswordPolicyImpl } from "@/lib/password-policy";
 
 const KEY_LEN = 64;
 
@@ -19,11 +20,5 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return timingSafeEqual(derived, target);
 }
 
-export function validatePasswordPolicy(password: string): { valid: true } | { valid: false; message: string } {
-  if (password.length < 8) return { valid: false, message: "A senha deve ter no mínimo 8 caracteres." };
-  if (!/[A-Z]/.test(password)) return { valid: false, message: "A senha deve conter ao menos 1 letra maiúscula." };
-  if (!/[a-z]/.test(password)) return { valid: false, message: "A senha deve conter ao menos 1 letra minúscula." };
-  if (!/[0-9]/.test(password)) return { valid: false, message: "A senha deve conter ao menos 1 número." };
-  return { valid: true };
-}
+export const validatePasswordPolicy = validatePasswordPolicyImpl;
 

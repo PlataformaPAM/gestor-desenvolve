@@ -9,17 +9,17 @@ function contatosFromJson(raw: unknown): Contato[] | undefined {
 
 export function mapColaborador(
   c: ColaboradorRH & {
-    dadosBancarios: {
+    dadosBancarios?: {
       banco: string | null;
       agencia: string | null;
       conta: string | null;
       tipoConta: string | null;
       pix: string | null;
     } | null;
-    documentos: Array<{ nome: string; url: string | null }>;
+    documentos?: Array<{ nome: string; url: string | null }>;
   }
 ): ColaboradorParceiro {
-  const contatos = contatosFromJson(c.contatosFornecedor);
+  const contatos = contatosFromJson((c as ColaboradorRH & { contatosFornecedor?: unknown }).contatosFornecedor);
   return {
     id: c.id,
     nome: c.nome,
@@ -41,7 +41,7 @@ export function mapColaborador(
           pix: c.dadosBancarios.pix ?? undefined,
         }
       : undefined,
-    documentos: c.documentos.map((d) => ({ nome: d.nome, url: d.url ?? undefined })),
+    documentos: (c.documentos ?? []).map((d) => ({ nome: d.nome, url: d.url ?? undefined })),
     contatos: contatos?.length ? contatos : undefined,
   };
 }

@@ -27,13 +27,15 @@ export async function POST(req: Request) {
   }
 
   const doc = digitsOnly(c.cpfCnpj);
-  if (c.tipo === "fornecedor_parceiro" && doc.length === 14) {
+  const b2bComContatosCnpj =
+    (c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo") && doc.length === 14;
+  if (b2bComContatosCnpj) {
     const contatos = c.contatos ?? [];
     const temContato = contatos.some(
       (ct) => (ct.nome?.trim() || ct.email?.trim() || ct.telefone?.trim()) ?? false
     );
     if (!temContato) {
-      return fail("BAD_REQUEST", "Fornecedor PJ (CNPJ): informe pelo menos um contato.", 400);
+      return fail("BAD_REQUEST", "Pessoa jurídica (CNPJ): informe pelo menos um contato.", 400);
     }
   }
 
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
     const include = { dadosBancarios: true, documentos: true };
     const dataComContatos = {
       ...baseData,
-      ...(c.tipo === "fornecedor_parceiro"
+      ...(c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo"
         ? {
             contatosFornecedor: c.contatos?.length
               ? (c.contatos as unknown as Prisma.InputJsonValue)
@@ -84,7 +86,11 @@ export async function POST(req: Request) {
     try {
       created = await prisma.colaboradorRH.create({ data: dataComContatos, include });
     } catch (error) {
-      if (!(c.tipo === "fornecedor_parceiro" && isContatosFornecedorColumnError(error))) throw error;
+      if (
+        !((c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo") &&
+          isContatosFornecedorColumnError(error))
+      )
+        throw error;
       created = await prisma.colaboradorRH.create({ data: baseData, include });
     }
 

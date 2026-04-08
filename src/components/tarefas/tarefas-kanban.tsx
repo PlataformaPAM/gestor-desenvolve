@@ -11,7 +11,6 @@ import { Search, ListTodo } from "lucide-react";
 import clsx from "clsx";
 import type { Tarefa, StatusTarefa } from "@/lib/tarefas/types";
 import { STATUS_LABELS, PRIORIDADE_LABELS, getSlaTarefa } from "@/lib/tarefas/constants";
-import { EntityMetaStrip } from "@/components/ui/entity-meta-strip";
 
 const COLUNAS_ORDER: StatusTarefa[] = [
   "a_fazer",
@@ -54,16 +53,28 @@ const PRIORIDADE_BADGE: Record<Tarefa["prioridade"], string> = {
   urgente: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-700/50",
 };
 
-function dataFimLabel(dataFim: string, status: Tarefa["status"]): string {
-  const d = new Date(dataFim);
-  const sla = getSlaTarefa(dataFim, status);
-  const data = d.toLocaleDateString("pt-BR", {
+function formatDataHora(iso?: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
-  if (sla === "atrasado") return `Atrasado · ${data}`;
-  if (sla === "atencao") return `Vence em breve · ${data}`;
-  return data;
+}
+
+function prazoDiasLabel(dataFim: string, status: Tarefa["status"]): string {
+  if (status === "concluido") return "Concluída";
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const d = new Date(dataFim);
+  d.setHours(0, 0, 0, 0);
+  const diffMs = d.getTime() - hoje.getTime();
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) return `${Math.abs(diffDays)} dia(s) em atraso`;
+  if (diffDays === 0) return "Vence hoje";
+  return `${diffDays} dia(s) restantes`;
 }
 
 type TarefasKanbanProps = {
@@ -151,7 +162,50 @@ export function TarefasKanban({
                             )}
                           >
                             <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{dataFimLabel(t.dataFim, t.status)}</p>
+                            <div className="mt-2 space-y-2">
+                              <div className="min-w-0">
+                                <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                  Responsável:
+                                </p>
+                                <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  {t.responsavel.nome}
+                                </p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                  Prazo:
+                                </p>
+                                <p
+                                  className={clsx(
+                                    "text-xs font-semibold",
+                                    getSlaTarefa(t.dataFim, t.status) === "atrasado" &&
+                                      "text-red-600 dark:text-red-300",
+                                    getSlaTarefa(t.dataFim, t.status) === "atencao" &&
+                                      "text-amber-700 dark:text-amber-300",
+                                    getSlaTarefa(t.dataFim, t.status) === "no_prazo" &&
+                                      "text-[#6D28D9] dark:text-violet-300"
+                                  )}
+                                >
+                                  {prazoDiasLabel(t.dataFim, t.status)}
+                                </p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                  Criado:
+                                </p>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  {formatDataHora(t.createdAt)}
+                                </p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                  Última alteração:
+                                </p>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  {formatDataHora(t.updatedAt)}
+                                </p>
+                              </div>
+                            </div>
                             <span
                               className={clsx(
                                 "mt-2.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
@@ -160,12 +214,6 @@ export function TarefasKanban({
                             >
                               {PRIORIDADE_LABELS[t.prioridade]}
                             </span>
-                            <EntityMetaStrip
-                              className="mt-2"
-                              criadoPorNome={t.registroCriadoPorNome}
-                              criadoEm={t.createdAt}
-                              atualizadoEm={t.updatedAt}
-                            />
                           </div>
                         )}
                       </Draggable>

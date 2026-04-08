@@ -50,14 +50,16 @@ export async function GET() {
     );
     const mappedUsuarios = usuarios.map((u) => {
       const mapped = mapUsuario(u);
-      const vinculos = mapped.vinculos?.map((v) => ({
+      const listaVinculos =
+        mapped.vinculos?.length ? mapped.vinculos : mapped.vinculacao ? [mapped.vinculacao] : [];
+      const vinculos = listaVinculos.map((v) => ({
         ...v,
         nome: nomeByTipoId.get(`${v.tipo}:${v.id}`),
       }));
       return {
         ...mapped,
-        vinculos,
-        vinculacao: vinculos?.[0] ?? mapped.vinculacao,
+        vinculos: vinculos.length ? vinculos : undefined,
+        vinculacao: vinculos[0] ?? mapped.vinculacao,
       };
     });
     const mappedPerfis = perfis.map(mapPerfil);

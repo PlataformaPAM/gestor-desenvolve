@@ -411,9 +411,7 @@ export function TarefaDetalheDrawer({
                       </div>
                       <div>
                         <p className="text-xs text-slate-400 dark:text-slate-500">
-                          {entrada.autor ?? "Sistema"}
-                          {" · "}
-                          {formatHistoricoData(entrada.data)}
+                          {formatHistoricoData(entrada.data)} - {entrada.autor ?? "Sistema"}
                         </p>
                         <p className="mt-0.5 whitespace-pre-wrap text-sm font-medium text-slate-900 dark:text-slate-100">
                           {entrada.acao}

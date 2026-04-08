@@ -1,4 +1,4 @@
-import type { ColaboradorParceiro } from "./types";
+import type { ColaboradorParceiro, TipoContrato } from "./types";
 
 export const TIPO_CONTRATO_LABELS: Record<ColaboradorParceiro["tipoContrato"], string> = {
   clt: "CLT",
@@ -6,7 +6,31 @@ export const TIPO_CONTRATO_LABELS: Record<ColaboradorParceiro["tipoContrato"], s
   estagio: "Estágio",
   parceiro: "Parceiro",
   fornecedor: "Fornecedor",
+  socio: "Sócio",
+  consultor: "Consultor",
+  especialista: "Especialista",
+  vendedor: "Vendedor",
+  prestador_servico: "Prestador de Serviço",
+  profissional_liberal: "Profissional Liberal",
 };
+
+/** Ordem alfabética por rótulo em pt-BR (aba Consultores / modal B2B consultor). */
+export const TIPO_CONTRATO_OPCOES_CONSULTOR: TipoContrato[] = [
+  "consultor",
+  "especialista",
+  "parceiro",
+  "pj",
+  "vendedor",
+];
+
+/** Ordem alfabética por rótulo em pt-BR (aba Fornecedores / modal B2B fornecedor). */
+export const TIPO_CONTRATO_OPCOES_FORNECEDOR: TipoContrato[] = [
+  "fornecedor",
+  "parceiro",
+  "pj",
+  "prestador_servico",
+  "profissional_liberal",
+];
 
 export const STATUS_LABELS: Record<ColaboradorParceiro["status"], string> = {
   ativo: "Ativo",
@@ -16,8 +40,8 @@ export const STATUS_LABELS: Record<ColaboradorParceiro["status"], string> = {
 };
 
 export const TIPO_PESSOA_LABELS: Record<ColaboradorParceiro["tipo"], string> = {
-  equipe_interna: "Equipe Interna",
-  vendedor_externo: "Vendedor/Externo",
+  equipe_interna: "Equipe",
+  vendedor_externo: "Consultor",
   fornecedor_parceiro: "Fornecedor/Parceiro",
 };
 

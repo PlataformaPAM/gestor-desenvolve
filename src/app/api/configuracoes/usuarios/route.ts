@@ -3,15 +3,25 @@ import { prisma } from "@/lib/prisma";
 import { mapUsuario } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { hashPassword, validatePasswordPolicy } from "@/lib/server/password";
+
+type UsuarioCreateBody = UsuarioSistema & { senha?: string };
 
 export async function POST(req: Request) {
-  const body = await parseJsonSafe<{ usuario?: UsuarioSistema }>(req);
+  const body = await parseJsonSafe<{ usuario?: UsuarioCreateBody }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const payload = body.value;
   const u = payload.usuario;
   if (!u?.cpf || !u.email || !u.perfilId) {
     return fail("BAD_REQUEST", "Usuário inválido.", 400);
   }
+  const senha = typeof u.senha === "string" ? u.senha : "";
+  if (!senha) {
+    return fail("BAD_REQUEST", "Senha inicial é obrigatória.", 400);
+  }
+  const policy = validatePasswordPolicy(senha);
+  if (!policy.valid) return fail("BAD_REQUEST", policy.message, 400);
+  const senhaHash = hashPassword(senha);
 
   const cpfUsuario = u.cpf.replace(/\D/g, "");
   const isCpf = (doc?: string | null) => (doc ?? "").replace(/\D/g, "").length === 11;
@@ -52,6 +62,7 @@ export async function POST(req: Request) {
         cpf: cpfUsuario,
         email: u.email.trim(),
         nomeExibicao: u.nomeExibicao ?? null,
+        senhaHash,
         perfilId: u.perfilId,
         ativo: u.ativo ?? true,
         vinculacaoTipo: vinculos[0]?.tipo ?? null,
@@ -73,6 +84,7 @@ export async function POST(req: Request) {
         cpf: cpfUsuario,
         email: u.email.trim(),
         nomeExibicao: u.nomeExibicao ?? null,
+        senhaHash,
         perfilId: u.perfilId,
         ativo: u.ativo ?? true,
         vinculacaoTipo: vinculos[0]?.tipo ?? null,

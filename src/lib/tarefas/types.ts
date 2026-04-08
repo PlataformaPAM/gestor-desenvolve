@@ -16,7 +16,10 @@ export type HistoricoTarefa = {
   id: string;
   data: string; // ISO
   acao: string;
+  /** Nome de exibição de quem registrou o evento (edição/comentário). */
   autor?: string;
+  /** Usuário que registrou (persistido em `TarefaHistorico.autorId`). */
+  autorId?: string;
   /** Nomes dos arquivos anexados */
   anexos?: string[];
 };

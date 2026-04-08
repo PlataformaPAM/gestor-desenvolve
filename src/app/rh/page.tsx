@@ -11,18 +11,46 @@ import type { ColaboradorParceiro, TipoPessoaRH } from "@/lib/rh/types";
 import type { NovoColaboradorPayload } from "@/components/rh/novo-colaborador-form";
 
 const TAB_LABELS: Record<TipoPessoaRH, string> = {
-  equipe_interna: "Equipe Interna (CLT/PJ)",
-  vendedor_externo: "Vendedores/Externos",
+  equipe_interna: "Equipe",
+  vendedor_externo: "Consultores",
   fornecedor_parceiro: "Fornecedores",
 };
 const TAB_LABELS_MOBILE: Record<TipoPessoaRH, string> = {
   equipe_interna: "Equipe",
-  vendedor_externo: "Vendedores",
+  vendedor_externo: "Consultores",
   fornecedor_parceiro: "Fornecedores",
 };
 
 function generateRhId(): string {
   return `rh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Resposta de `/api/rh/bootstrap`: `data` pode trazer `colaboradores` no nível principal ou só dentro de `data.data`. */
+function extrairRhBootstrap(json: unknown): {
+  colaboradores: ColaboradorParceiro[];
+  usuarios: { id: string; cpf: string; email?: string; nomeExibicao?: string; perfilId?: string }[];
+} {
+  const root = json as {
+    data?: {
+      colaboradores?: ColaboradorParceiro[];
+      usuarios?: { id: string; cpf: string; email?: string; nomeExibicao?: string; perfilId?: string }[];
+      data?: {
+        colaboradores?: ColaboradorParceiro[];
+        usuarios?: { id: string; cpf: string; email?: string; nomeExibicao?: string; perfilId?: string }[];
+      };
+    };
+  };
+  const p = root?.data;
+  const nested = p?.data;
+  const colaboradores =
+    (Array.isArray(p?.colaboradores) ? p.colaboradores : null) ??
+    (Array.isArray(nested?.colaboradores) ? nested.colaboradores : null) ??
+    [];
+  const usuarios =
+    (Array.isArray(p?.usuarios) ? p.usuarios : null) ??
+    (Array.isArray(nested?.usuarios) ? nested.usuarios : null) ??
+    [];
+  return { colaboradores, usuarios };
 }
 
 export default function RHPage() {
@@ -38,6 +66,7 @@ export default function RHPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [erroCarregarRh, setErroCarregarRh] = useState<string | null>(null);
 
   const lista = useMemo(() => {
     let items = colaboradores.filter(
@@ -75,18 +104,24 @@ export default function RHPage() {
     void (async () => {
       try {
         const res = await fetch("/api/rh/bootstrap", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          data?: {
-            colaboradores?: ColaboradorParceiro[];
-            usuarios?: { id: string; cpf: string; email?: string; nomeExibicao?: string; perfilId?: string }[];
-          };
-        };
         if (!active) return;
-        setColaboradores(data?.data?.colaboradores ?? []);
-        setUsuariosParaVinculo(data?.data?.usuarios ?? []);
+        if (!res.ok) {
+          setErroCarregarRh("Não foi possível carregar as pessoas do RH. Atualize a página ou tente novamente.");
+          setColaboradores([]);
+          setUsuariosParaVinculo([]);
+          return;
+        }
+        setErroCarregarRh(null);
+        const json = await res.json();
+        if (!active) return;
+        const { colaboradores: c, usuarios: u } = extrairRhBootstrap(json);
+        setColaboradores(c);
+        setUsuariosParaVinculo(u);
       } catch {
-        // noop
+        if (!active) return;
+        setErroCarregarRh("Falha ao carregar o RH. Verifique a conexão e atualize a página.");
+        setColaboradores([]);
+        setUsuariosParaVinculo([]);
       }
     })();
     return () => {
@@ -112,14 +147,9 @@ export default function RHPage() {
     }
     const bootstrap = await fetch("/api/rh/bootstrap", { cache: "no-store" });
     if (bootstrap.ok) {
-      const data = (await bootstrap.json()) as {
-        data?: {
-          colaboradores?: ColaboradorParceiro[];
-          usuarios?: { id: string; cpf: string; email?: string; nomeExibicao?: string; perfilId?: string }[];
-        };
-      };
-      setColaboradores(data?.data?.colaboradores ?? []);
-      setUsuariosParaVinculo(data?.data?.usuarios ?? []);
+      const { colaboradores: c, usuarios: u } = extrairRhBootstrap(await bootstrap.json());
+      setColaboradores(c);
+      setUsuariosParaVinculo(u);
     }
     setIsCreateOpen(false);
   };
@@ -217,8 +247,25 @@ export default function RHPage() {
         </nav>
       </div>
 
+      {erroCarregarRh && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          {erroCarregarRh}
+        </div>
+      )}
+      {lista.length === 0 && colaboradores.length > 0 && !erroCarregarRh && (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+          Nenhuma pessoa nesta aba. As listas de <strong className="font-medium text-slate-800 dark:text-slate-100">Equipe</strong>,{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-100">Consultores</strong> e{" "}
+          <strong className="font-medium text-slate-800 dark:text-slate-100">Fornecedores</strong> são separadas — troque de aba para
+          encontrar o cadastro.
+        </p>
+      )}
       <ColaboradoresTable
         lista={lista}
+        variant={tab === "equipe_interna" ? "equipe" : "default"}
         onSelecionar={abrirPerfil}
         onToggleStatus={handleToggleStatus}
       />
@@ -250,7 +297,9 @@ export default function RHPage() {
           <NovoColaboradorForm
             key={`create-${tab}`}
             defaultTipo={tab}
-            lockTipo={tab === "fornecedor_parceiro"}
+            lockTipo={
+              tab === "fornecedor_parceiro" || tab === "equipe_interna" || tab === "vendedor_externo"
+            }
             onSave={handleNovoColaborador}
             onCancel={() => setIsCreateOpen(false)}
           />

@@ -25,6 +25,9 @@
 # production
 /build
 
+# backups locais (não versionar zips)
+/backups/*.zip
+
 # misc
 .DS_Store
 *.pem

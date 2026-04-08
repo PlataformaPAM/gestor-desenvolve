@@ -1,13 +1,32 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
-import type { UsuarioSistema } from "@/lib/configuracoes/types";
-import type { PerfilAcesso } from "@/lib/configuracoes/types";
+import type { UsuarioSistema, PerfilAcesso, PessoaParaVinculo } from "@/lib/configuracoes/types";
 import clsx from "clsx";
+
+function labelVinculo(
+  u: UsuarioSistema,
+  pessoasVinculo: PessoaParaVinculo[] | undefined
+): string {
+  const lista = u.vinculos?.length ? u.vinculos : u.vinculacao ? [u.vinculacao] : [];
+  if (!lista.length) return "—";
+  return (
+    lista
+      .map((v) => {
+        const nome =
+          ("nome" in v ? (v as { nome?: string }).nome : undefined) ??
+          pessoasVinculo?.find((p) => p.id === v.id && p.tipo === v.tipo)?.nome;
+        return `${v.tipo === "rh" ? "RH" : "Cliente"} - ${nome ?? v.id}`;
+      })
+      .join(" | ") || "—"
+  );
+}
 
 type UsuariosTableProps = {
   usuarios: UsuarioSistema[];
   perfis: PerfilAcesso[];
+  /** Fallback para resolver nome quando a API ainda não enviou `nome` no vínculo. */
+  pessoasVinculo?: PessoaParaVinculo[];
   onEditar?: (u: UsuarioSistema) => void;
   onToggleAtivo?: (u: UsuarioSistema) => void;
 };
@@ -15,6 +34,7 @@ type UsuariosTableProps = {
 export function UsuariosTable({
   usuarios,
   perfis,
+  pessoasVinculo,
   onEditar,
   onToggleAtivo,
 }: UsuariosTableProps) {
@@ -53,9 +73,7 @@ export function UsuariosTable({
             <tbody className="divide-y divide-slate-200 bg-white">
               {usuarios.map((u) => {
                 const perfil = perfis.find((p) => p.id === u.perfilId);
-                const vinculo = (u.vinculos?.length ? u.vinculos : u.vinculacao ? [u.vinculacao] : [])
-                  .map((v) => `${v.tipo === "rh" ? "RH" : "Cliente"} - ${(v as { nome?: string }).nome ?? v.id}`)
-                  .join(" | ") || "—";
+                const vinculo = labelVinculo(u, pessoasVinculo);
                 return (
                   <tr
                     key={u.id}
@@ -103,9 +121,7 @@ export function UsuariosTable({
       <div className="md:hidden space-y-2">
         {usuarios.map((u) => {
           const perfil = perfis.find((p) => p.id === u.perfilId);
-          const vinculo = (u.vinculos?.length ? u.vinculos : u.vinculacao ? [u.vinculacao] : [])
-            .map((v) => `${v.tipo === "rh" ? "RH" : "Cliente"} - ${(v as { nome?: string }).nome ?? v.id}`)
-            .join(" | ") || "—";
+          const vinculo = labelVinculo(u, pessoasVinculo);
           return (
             <div
               key={u.id}

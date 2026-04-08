@@ -2,7 +2,8 @@
 
 import { ChevronRight } from "lucide-react";
 import type { ColaboradorParceiro } from "@/lib/rh/types";
-import { TIPO_CONTRATO_LABELS, STATUS_LABELS, iniciais } from "@/lib/rh/constants";
+import { STATUS_LABELS, iniciais } from "@/lib/rh/constants";
+import { formatDocumentoColunaEquipe } from "@/lib/rh/format-documento";
 import clsx from "clsx";
 
 const STATUS_BADGE: Record<ColaboradorParceiro["status"], string> = {
@@ -18,11 +19,20 @@ const STATUS_BADGE: Record<ColaboradorParceiro["status"], string> = {
 
 type ColaboradoresTableProps = {
   lista: ColaboradorParceiro[];
+  /** Na aba Equipe, CPF/CNPJ é exibido com máscara. */
+  variant?: "equipe" | "default";
   onSelecionar: (c: ColaboradorParceiro) => void;
   onToggleStatus?: (c: ColaboradorParceiro) => void;
 };
 
-export function ColaboradoresTable({ lista, onSelecionar, onToggleStatus }: ColaboradoresTableProps) {
+export function ColaboradoresTable({
+  lista,
+  variant = "default",
+  onSelecionar,
+  onToggleStatus,
+}: ColaboradoresTableProps) {
+  const docCell = (c: ColaboradorParceiro) =>
+    variant === "equipe" ? formatDocumentoColunaEquipe(c.cpfCnpj) : (c.cpfCnpj ?? "—");
   return (
     <>
       <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
@@ -34,7 +44,7 @@ export function ColaboradoresTable({ lista, onSelecionar, onToggleStatus }: Cola
                   Nome
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">
-                  CPF/CNPJ
+                  {variant === "equipe" ? "CPF" : "CPF/CNPJ"}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">
                   Cargo / Função
@@ -63,7 +73,7 @@ export function ColaboradoresTable({ lista, onSelecionar, onToggleStatus }: Cola
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-sm text-slate-600 dark:text-slate-400">
-                    {c.cpfCnpj ?? "—"}
+                    {docCell(c)}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{c.cargoOuFuncao}</td>
                   <td className="px-4 py-3">
