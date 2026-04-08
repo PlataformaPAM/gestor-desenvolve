@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import type { ModuloPermissao } from "@/lib/configuracoes/types";
 import { verifyPassword } from "@/lib/server/password";
 import { COOKIE_NAME, encodeSession } from "@/lib/auth";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
-import type { ModuloPermissao } from "@/lib/configuracoes/types";
 
 type Payload = {
   cpf: string;
@@ -16,12 +16,6 @@ const IS_PROD = process.env.NODE_ENV === "production";
 
 function normalizeCpf(cpf: string): string {
   return cpf.replace(/\D/g, "");
-}
-
-function maskCpfDigits(digits: string): string {
-  const d = digits.slice(0, 11);
-  if (d.length !== 11) return digits;
-  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
 export async function POST(req: Request) {
@@ -49,14 +43,26 @@ export async function POST(req: Request) {
       return fail("FORBIDDEN", "Muitas tentativas. Aguarde alguns minutos.", 429);
     }
 
-    const usuario = await prisma.usuario.findFirst({
-      where: {
-        ativo: true,
-        senhaHash: { not: null },
-        OR: [{ cpf }, { cpf: cpfInput }, { cpf: maskCpfDigits(cpf) }],
-      },
-      select: { id: true, perfilId: true, senhaHash: true, nomeExibicao: true, cpf: true, email: true, telefone: true },
-    });
+    // Busca robusta por CPF ignorando qualquer máscara/pontuação salva no banco.
+    const usuarios = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        perfilId: string;
+        senhaHash: string | null;
+        nomeExibicao: string | null;
+        cpf: string;
+        email: string;
+        telefone: string | null;
+        ativo: boolean;
+      }>
+    >`SELECT id, "perfilId", "senhaHash", "nomeExibicao", cpf, email, telefone, ativo
+       FROM "Usuario"
+      WHERE regexp_replace(cpf, '[^0-9]', '', 'g') = ${cpf}
+      LIMIT 1`;
+    const usuario = usuarios[0];
+    if (usuario && !usuario.ativo) {
+      return fail("FORBIDDEN", "Usuário inativo. Solicite reativação ao administrador.", 403);
+    }
 
     if (!usuario?.senhaHash || !verifyPassword(senha, usuario.senhaHash)) {
       await writeAuditLog(prisma, {
