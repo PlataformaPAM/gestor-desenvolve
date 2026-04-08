@@ -19,13 +19,14 @@ export async function POST(req: Request) {
   // Resposta neutra para não vazar existência do e-mail.
   if (!usuario) return ok({ sent: true });
 
-  const token = createResetToken(usuario.id, usuario.email);
+  const token = createResetToken(usuario.id);
   const baseUrl =
+    process.env.GESTOR_APP_URL ||
     process.env.APP_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.RAILWAY_PUBLIC_DOMAIN?.replace(/\/$/, "") ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : undefined) ||
     "http://localhost:3000";
-  const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+  const resetUrl = `${baseUrl.replace(/\/$/, "")}/redefinir-senha/${encodeURIComponent(token)}`;
   await sendResetEmail(usuario.email, resetUrl);
   await writeAuditLog(prisma, {
     usuarioId: usuario.id,

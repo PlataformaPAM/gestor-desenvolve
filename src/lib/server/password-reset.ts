@@ -3,7 +3,6 @@ import nodemailer from "nodemailer";
 
 type ResetPayload = {
   sub: string;
-  email: string;
   exp: number;
 };
 
@@ -20,8 +19,8 @@ function getSecret(): string {
   );
 }
 
-export function createResetToken(userId: string, email: string, ttlMs = 15 * 60 * 1000): string {
-  const payload: ResetPayload = { sub: userId, email, exp: Date.now() + ttlMs };
+export function createResetToken(userId: string, ttlMs = 15 * 60 * 1000): string {
+  const payload: ResetPayload = { sub: userId, exp: Date.now() + ttlMs };
   const payloadPart = b64url(JSON.stringify(payload));
   const sig = createHmac("sha256", getSecret()).update(payloadPart).digest("base64url");
   return `${payloadPart}.${sig}`;
@@ -34,7 +33,7 @@ export function verifyResetToken(token: string): ResetPayload | null {
   const ok = timingSafeEqual(Buffer.from(sigPart), Buffer.from(expected));
   if (!ok) return null;
   const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString("utf8")) as ResetPayload;
-  if (!payload?.sub || !payload?.email || !payload?.exp) return null;
+  if (!payload?.sub || !payload?.exp) return null;
   if (Date.now() > payload.exp) return null;
   return payload;
 }

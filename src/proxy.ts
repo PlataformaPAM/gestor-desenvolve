@@ -7,7 +7,8 @@ export function proxy(request: NextRequest) {
   const isPublicPath =
     pathname === "/login" ||
     pathname === "/forgot-password" ||
-    pathname === "/reset-password";
+    pathname === "/reset-password" ||
+    pathname.startsWith("/redefinir-senha/");
   if (isPublicPath) return NextResponse.next();
   const cookieHeader = request.headers.get("cookie");
   const session = getSessionFromCookieHeader(cookieHeader);
@@ -24,6 +25,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|forgot-password|reset-password|_next/static|_next/image|api|favicon|desenvolve_).*)"],
+  matcher: ["/((?!login|forgot-password|reset-password|redefinir-senha|_next/static|_next/image|api|favicon|desenvolve_).*)"],
 };
 
