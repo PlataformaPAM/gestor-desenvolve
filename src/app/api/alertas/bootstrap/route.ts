@@ -2,6 +2,7 @@ import type { Alerta } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/server/api-response";
 import { getSessionFromCookieHeader } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 
 const MODULE_TO_PERMISSION: Record<string, string | null> = {
   sistema: null,
@@ -57,11 +58,21 @@ export async function GET(req: Request) {
     ? { OR: [{ usuarioId: null }, { usuarioId: session.userId }] }
     : { usuarioId: null as string | null };
 
-  const mapped = (await prisma.alerta.findMany({
-    where: { ...whereUsuario, modulo: { in: [...allowed] } },
-    orderBy: { data: "desc" },
-    take: 200,
-  })).map((a: Alerta) => {
+  let rows: Alerta[] = [];
+  try {
+    rows = await prisma.alerta.findMany({
+      where: { ...whereUsuario, modulo: { in: [...allowed] } },
+      orderBy: { data: "desc" },
+      take: 200,
+    });
+  } catch (error) {
+    // Produção antiga sem tabela Alerta: não derruba página, retorna lista vazia.
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021")) {
+      throw error;
+    }
+  }
+
+  const mapped = rows.map((a: Alerta) => {
     const descricaoLimpa = cleanUserDescription(a.descricao);
     const texto = `${a.titulo} ${descricaoLimpa}`;
     return {

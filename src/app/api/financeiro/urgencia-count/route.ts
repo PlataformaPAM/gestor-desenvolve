@@ -13,6 +13,6 @@ export async function GET() {
     const count = mapped.filter(lancamentoVencidoOuVenceLogo).length;
     return ok({ count });
   } catch {
-    return fail("INTERNAL_ERROR", "Falha ao contar urgências financeiras.", 500);
+    return ok({ count: 0 });
   }
 }

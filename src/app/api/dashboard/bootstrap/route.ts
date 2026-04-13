@@ -2,6 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/server/api-response";
 import { PIPELINE_STAGES } from "@/lib/comercial/constants";
 
+async function querySafe<T>(run: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await run();
+  } catch {
+    return fallback;
+  }
+}
+
 function weekLabel(date: Date): string {
   const d = new Date(date);
   const day = d.getDate();
@@ -20,11 +28,11 @@ type UpcomingItem = {
 export async function GET() {
   try {
     const [leads, lancamentos, tickets, clientes, tarefas] = await Promise.all([
-      prisma.lead.findMany(),
-      prisma.lancamento.findMany(),
-      prisma.helpdeskTicket.findMany(),
-      prisma.cliente.findMany(),
-      prisma.tarefa.findMany(),
+      querySafe(() => prisma.lead.findMany(), []),
+      querySafe(() => prisma.lancamento.findMany(), []),
+      querySafe(() => prisma.helpdeskTicket.findMany(), []),
+      querySafe(() => prisma.cliente.findMany(), []),
+      querySafe(() => prisma.tarefa.findMany(), []),
     ]);
 
     const now = new Date();

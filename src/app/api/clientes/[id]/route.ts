@@ -83,6 +83,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return fail("BAD_REQUEST", "Já existe cliente com este CPF/CNPJ.", 400);
     }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2021" || error.code === "P2022")
+    ) {
+      return fail(
+        "INTERNAL_ERROR",
+        "Banco de dados em produção está desatualizado para o cadastro de clientes. Aplique as migrações pendentes.",
+        500
+      );
+    }
     return fail("INTERNAL_ERROR", "Não foi possível salvar o cliente.", 500);
   }
 
