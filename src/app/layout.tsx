@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Gestor Desenvolve - Sistema Integrado de Gestão",
-  description: "Sistema Integrado de Gestão - Gestor Desenvolve.",
+  description: "Desenvolve Tecnologia, Consultoria e Capacitação Ltda",
   icons: { icon: "/favicon.png" },
 };
 
