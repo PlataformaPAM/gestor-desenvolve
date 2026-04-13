@@ -52,11 +52,6 @@ const RECORRENCIA_LABELS: Record<RecorrenciaSolucao, string> = {
   parcelado: "Parcelado",
 };
 
-const TIPO_LABELS: Record<TipoSolucao, string> = {
-  produto: "Produto",
-  servico: "Serviço",
-};
-
 /** Categorias fixas para o select na aba Dados Básicos */
 const CATEGORIAS_SOLUCAO = ["Software", "Consultoria", "Capacitação"] as const;
 export type CategoriaSolucao = (typeof CATEGORIAS_SOLUCAO)[number];
@@ -217,7 +212,9 @@ export default function SolucoesPage() {
                   <p className="mt-1 text-lg font-bold text-[#6D28D9]">
                     {formatCurrency(sol.valorVenda)}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{TIPO_LABELS[sol.tipo]}</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Categoria: {sol.categoria || "Não informada"}
+                  </p>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     {RECORRENCIA_LABELS[sol.recorrencia]}
                     {sol.recorrencia === "parcelado"

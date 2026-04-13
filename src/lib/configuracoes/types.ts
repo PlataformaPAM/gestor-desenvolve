@@ -60,4 +60,5 @@ export type PessoaParaVinculo = {
   cpfCnpj: string;
   tipo: "rh" | "cliente";
   subtitulo?: string; // ex: cargo ou empresa
+  rhTipo?: "equipe_interna" | "vendedor_externo" | "fornecedor_parceiro";
 };

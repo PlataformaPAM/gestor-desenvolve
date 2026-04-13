@@ -316,6 +316,41 @@ model LogSistema {
   updatedAt          DateTime               @updatedAt
 }
 
+/** Configurações globais (chave-valor em JSON). */
+model ConfiguracaoSistema {
+  id                 String                 @id @default(uuid())
+  chave              String                 @unique
+  valor              Json
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+}
+
+/** Modelos reutilizáveis do Construtor de Documentos (Propostas, Ofícios, etc.). */
+enum DocumentoModeloTipo {
+  proposta_comercial
+  oficio
+  prestacao_contas
+  relatorio
+}
+
+model DocumentoModelo {
+  id             String              @id @default(uuid())
+  nome           String
+  tipo           DocumentoModeloTipo
+  descricao      String              @default("")
+  assunto        String              @default("")
+  /** URL pública da logo (botão “Inserir logo” coloca &lt;img&gt; no cabeçalho). */
+  logoUrl        String              @default("")
+  cabecalhoHtml  String              @default("") @db.Text
+  corpo          String              @db.Text
+  rodapeHtml     String              @default("") @db.Text
+  ativo          Boolean             @default(true)
+  /** Incrementa a cada alteração persistida (auditoria simples). */
+  versao         Int                 @default(1)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+}
+
 model Alerta {
   id                 String                 @id @default(uuid())
   modulo             String

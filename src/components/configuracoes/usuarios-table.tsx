@@ -4,6 +4,19 @@ import { ChevronRight } from "lucide-react";
 import type { UsuarioSistema, PerfilAcesso, PessoaParaVinculo } from "@/lib/configuracoes/types";
 import clsx from "clsx";
 
+function formatCpf(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length !== 11) return value;
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+}
+
+function labelTipoRh(rhTipo?: PessoaParaVinculo["rhTipo"]): string {
+  if (rhTipo === "equipe_interna") return "Equipe";
+  if (rhTipo === "vendedor_externo") return "Consultor";
+  if (rhTipo === "fornecedor_parceiro") return "Fornecedor";
+  return "Equipe";
+}
+
 function labelVinculo(
   u: UsuarioSistema,
   pessoasVinculo: PessoaParaVinculo[] | undefined
@@ -13,10 +26,10 @@ function labelVinculo(
   return (
     lista
       .map((v) => {
-        const nome =
-          ("nome" in v ? (v as { nome?: string }).nome : undefined) ??
-          pessoasVinculo?.find((p) => p.id === v.id && p.tipo === v.tipo)?.nome;
-        return `${v.tipo === "rh" ? "RH" : "Cliente"} - ${nome ?? v.id}`;
+        const pessoa = pessoasVinculo?.find((p) => p.id === v.id && p.tipo === v.tipo);
+        const nome = ("nome" in v ? (v as { nome?: string }).nome : undefined) ?? pessoa?.nome;
+        if (v.tipo === "rh") return `${labelTipoRh(pessoa?.rhTipo)} - ${nome ?? v.id}`;
+        return `Cliente - ${nome ?? v.id}`;
       })
       .join(" | ") || "—"
   );
@@ -84,7 +97,7 @@ export function UsuariosTable({
                       </div>
                       <div className="text-sm text-slate-500">{u.email}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">{u.cpf}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700">{formatCpf(u.cpf)}</td>
                     <td className="px-4 py-3 text-sm text-slate-700">
                       {perfil?.nome ?? u.perfilId}
                     </td>
@@ -133,7 +146,7 @@ export function UsuariosTable({
                 <div className="min-w-0">
                   <p className="font-medium text-slate-900 truncate">{u.nomeExibicao || u.email}</p>
                   <p className="text-sm text-slate-500 truncate">{u.email}</p>
-                  <p className="text-xs font-mono text-slate-500 mt-1">{u.cpf}</p>
+                  <p className="text-xs font-mono text-slate-500 mt-1">{formatCpf(u.cpf)}</p>
                   <p className="text-xs text-slate-500 mt-1">{perfil?.nome ?? u.perfilId} • {vinculo}</p>
                 </div>
                 <div className="text-right shrink-0">

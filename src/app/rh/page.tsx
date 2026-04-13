@@ -190,26 +190,28 @@ export default function RHPage() {
   return (
     <section className="w-full min-w-0 space-y-6">
       {/* Header: título, busca, botão (botão principal fica no GlobalHeader) */}
-      <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-between sm:gap-3">
-        <div className="relative min-w-0 flex-1 sm:max-w-lg">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, CPF/CNPJ ou cargo..."
-            className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto sm:max-w-lg sm:flex-row sm:items-center">
+          <div className="relative min-w-0 w-full sm:w-[520px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, CPF/CNPJ ou cargo..."
+              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
+          </div>
+          <label className="inline-flex shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={mostrarInativos}
+              onChange={(e) => setMostrarInativos(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
+            />
+            Mostrar pessoas inativas
+          </label>
         </div>
-        <label className="inline-flex shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-          <input
-            type="checkbox"
-            checked={mostrarInativos}
-            onChange={(e) => setMostrarInativos(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
-          />
-          Mostrar pessoas inativas
-        </label>
       </div>
 
       {/* Tabs */}

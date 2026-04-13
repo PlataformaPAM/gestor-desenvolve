@@ -1,0 +1,41 @@
+.documento-editor-content .tiptap {
+  min-height: inherit;
+}
+
+.documento-editor-content .tiptap p {
+  margin: 0.35em 0;
+}
+
+.documento-editor-content .tiptap h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0.5em 0 0.25em;
+}
+
+.documento-editor-content .tiptap h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+
+.documento-editor-content .tiptap h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+
+.documento-editor-content .ProseMirror-focused {
+  outline: none;
+}
+
+.documento-editor-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #94a3b8;
+  pointer-events: none;
+  height: 0;
+}
+
+.dark .documento-editor-content .tiptap p.is-editor-empty:first-child::before {
+  color: #64748b;
+}

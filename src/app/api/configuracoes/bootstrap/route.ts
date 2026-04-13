@@ -18,7 +18,7 @@ export async function GET() {
     ]);
     const [colaboradores, clientes] = await Promise.all([
       prisma.colaboradorRH.findMany({
-        select: { id: true, nome: true, cpfCnpj: true, cargoOuFuncao: true },
+        select: { id: true, nome: true, cpfCnpj: true, cargoOuFuncao: true, tipoPessoa: true },
         orderBy: { nome: "asc" },
       }),
       prisma.cliente.findMany({
@@ -36,6 +36,7 @@ export async function GET() {
           cpfCnpj: c.cpfCnpj as string,
           tipo: "rh" as const,
           subtitulo: c.cargoOuFuncao ?? undefined,
+          rhTipo: c.tipoPessoa,
         })),
       ...clientes.map((c) => ({
         id: c.id,

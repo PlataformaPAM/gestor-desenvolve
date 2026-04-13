@@ -132,6 +132,7 @@ export function LeadDetailTabs({
             lead={lead}
             onUpdateLead={onUpdateLead}
             onGerarPdfSuccess={onGerarPdfSuccess}
+            clientes={clientes}
           />
         )}
         {activeTab === "contrato" && (

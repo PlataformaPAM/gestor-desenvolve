@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileDown, Search, Trash2 } from "lucide-react";
+import { FileDown, FileText, Search, Trash2 } from "lucide-react";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { DrawerSheet } from "@/components/comercial/drawer-sheet";
+import { Toast } from "@/components/ui/toast";
 import type {
   Lead,
   LeadInteraction,
   LeadRecorrenciaPagamento,
   LeadSolucaoRef,
 } from "@/lib/comercial/types";
+import type { Cliente } from "@/lib/clientes/types";
 import { useAuth } from "@/contexts/auth-context";
 
 type LeadDetailPropostaProps = {
@@ -18,6 +21,8 @@ type LeadDetailPropostaProps = {
     opts?: { skipSuccessToast?: boolean; allowWhileFinanceiroLocked?: boolean }
   ) => void;
   onGerarPdfSuccess: () => void;
+  /** Para listar contatos do cliente vinculado (envio por e-mail / WhatsApp). */
+  clientes?: Cliente[];
 };
 type CatalogSolucao = {
   id: string;
@@ -33,6 +38,125 @@ const REC_COMERCIAL_LABEL: Record<LeadRecorrenciaPagamento, string> = {
   unica: "Única",
   parcelado: "Parcelado",
 };
+
+const TIPO_MODELO_DOC_LABEL: Record<string, string> = {
+  proposta_comercial: "Proposta",
+  oficio: "Ofício",
+  prestacao_contas: "Prestação de contas",
+  relatorio: "Relatório",
+};
+
+const PREVIEW_DOC_CLASS =
+  "max-w-none text-sm text-slate-800 dark:text-slate-100 [&_a]:text-[#6D28D9] [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_hr]:my-4 [&_img]:max-h-28 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6";
+
+type ModeloDocumentoLista = { id: string; nome: string; tipo: string; ativo: boolean };
+type DocumentoGeradoListaItem = {
+  id: string;
+  date: string;
+  modelo: { id: string; nome: string; tipo: string; versao: number | null };
+  assunto: string;
+};
+
+function sanitizeTelefoneWhatsapp(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  return digits;
+}
+
+type DocDestinatario = {
+  key: string;
+  nome: string;
+  email: string;
+  telefone: string;
+  origemLabel: string;
+};
+
+function emailValido(raw: string): boolean {
+  const e = raw.trim().toLowerCase();
+  return Boolean(e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+}
+
+/** Contatos do cliente cadastrado + contatos da oportunidade; remove duplicatas por e-mail ou telefone. */
+function mergeDocDestinatarios(lead: Lead, clientes: Cliente[] | undefined): DocDestinatario[] {
+  const list: DocDestinatario[] = [];
+  const seen = new Set<string>();
+  const push = (nome: string, email: string, telefone: string, origemLabel: string) => {
+    const e = email.trim().toLowerCase();
+    const p = sanitizeTelefoneWhatsapp(telefone);
+    if (!emailValido(email) && !p) return;
+    const dedupe = emailValido(email) ? `e:${e}` : `p:${p}`;
+    if (seen.has(dedupe)) return;
+    seen.add(dedupe);
+    list.push({
+      key: dedupe,
+      nome: nome.trim() || "(sem nome)",
+      email: email.trim(),
+      telefone: telefone.trim(),
+      origemLabel,
+    });
+  };
+
+  if (lead.clienteId && clientes?.length) {
+    const cli = clientes.find((c) => c.id === lead.clienteId);
+    for (const ct of cli?.contatos ?? []) {
+      push(ct.nome, ct.email, ct.telefone, "Cliente");
+    }
+  }
+  for (const ct of lead.contatosOportunidade ?? []) {
+    push(ct.nome, ct.email, ct.telefone, "Oportunidade");
+  }
+
+  if (list.length === 0) {
+    push(lead.contact?.trim() || lead.name, lead.email ?? "", lead.phone ?? "", "Lead");
+  }
+  return list;
+}
+
+function montarMensagemWhatsappDocumento(params: {
+  nomeContato: string;
+  leadNome: string;
+  clienteNome: string;
+  modeloNome: string;
+  assunto: string;
+  dataIso: string;
+  valorTotal: number;
+  prazoValidade: string;
+  pdfUrl: string;
+}): string {
+  const dataFmt = new Date(params.dataIso).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  const valorFmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    params.valorTotal || 0
+  );
+  const saudacao = params.nomeContato.trim()
+    ? `Prezado(a) *${params.nomeContato.trim()}*,`
+    : "Prezado(a) cliente,";
+  return [
+    saudacao,
+    "",
+    "Conforme combinado, segue o *documento comercial em PDF* para sua análise.",
+    "Acesse pelo link abaixo (abre no navegador; é possível baixar o arquivo a partir da visualização):",
+    "",
+    params.pdfUrl,
+    "",
+    "*Resumo da proposta*",
+    `• *Cliente / referência:* ${params.clienteNome || params.leadNome}`,
+    `• *Assunto:* ${params.assunto || "(sem assunto)"}`,
+    `• *Modelo:* ${params.modeloNome}`,
+    `• *Oportunidade:* ${params.leadNome}`,
+    `• *Valor total:* ${valorFmt}`,
+    `• *Validade:* ${params.prazoValidade}`,
+    `• *Emitido em:* ${dataFmt}`,
+    "",
+    "Qualquer ajuste em condições, prazo ou escopo, estamos à disposição.",
+    "",
+    "Atenciosamente,",
+    "*Equipe comercial*",
+  ].join("\n");
+}
 
 function createSolucaoLineId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -80,6 +204,7 @@ export function LeadDetailProposta({
   lead,
   onUpdateLead,
   onGerarPdfSuccess,
+  clientes = [],
 }: LeadDetailPropostaProps) {
   const { session } = useAuth();
   const currentUserName = session.userName ?? "Usuário";
@@ -91,9 +216,38 @@ export function LeadDetailProposta({
   const [condicoesStr, setCondicoesStr] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [solucaoIdxParaRemover, setSolucaoIdxParaRemover] = useState<number | null>(null);
+  const [modelosDocumento, setModelosDocumento] = useState<ModeloDocumentoLista[]>([]);
+  const [modeloDocumentoId, setModeloDocumentoId] = useState("");
+  const [docPreviewOpen, setDocPreviewOpen] = useState(false);
+  const [docPreviewLoading, setDocPreviewLoading] = useState(false);
+  const [docGerarLoading, setDocGerarLoading] = useState(false);
+  const [docPreview, setDocPreview] = useState<{
+    assunto: string;
+    cabecalhoHtml: string;
+    corpoHtml: string;
+    rodapeHtml: string;
+  } | null>(null);
+  const [docsGerados, setDocsGerados] = useState<DocumentoGeradoListaItem[]>([]);
+  const [docsGeradosLoading, setDocsGeradosLoading] = useState(false);
+  const [enviandoEmailKey, setEnviandoEmailKey] = useState<string | null>(null);
+  const [whatsConfirm, setWhatsConfirm] = useState<{
+    doc: DocumentoGeradoListaItem;
+    dest: DocDestinatario;
+  } | null>(null);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; variant: "success" | "error" }>({
+    visible: false,
+    message: "",
+    variant: "success",
+  });
 
   const selectedCatalog = addingId ? catalogoSolucoes.find((s) => s.id === addingId) : undefined;
   const { display: valorMasked, onChangeDigits, getValorReais, setCentavos } = useBrlCentavosInput();
+  const docDestinatarios = useMemo(() => mergeDocDestinatarios(lead, clientes), [lead, clientes]);
+
+  const showToast = (message: string, variant: "success" | "error" = "success") => {
+    setToast({ visible: false, message: "", variant });
+    window.requestAnimationFrame(() => setToast({ visible: true, message, variant }));
+  };
 
   useEffect(() => {
     let active = true;
@@ -114,11 +268,56 @@ export function LeadDetailProposta({
   }, []);
 
   useEffect(() => {
+    let active = true;
+    setDocsGeradosLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/comercial/leads/${encodeURIComponent(lead.id)}/documentos-gerados`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: { documentos?: DocumentoGeradoListaItem[] };
+        };
+        if (!active || !json.success || !Array.isArray(json.data?.documentos)) return;
+        setDocsGerados(json.data.documentos);
+      } finally {
+        if (active) setDocsGeradosLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [lead.id]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/configuracoes/documentos-modelos", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: { modelos?: ModeloDocumentoLista[] };
+        };
+        if (!active || !json.success || !Array.isArray(json.data?.modelos)) return;
+        setModelosDocumento(json.data.modelos.filter((m) => m.ativo));
+      } catch {
+        // noop
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (addingId && selectedCatalog) {
       setCentavos(Math.round(selectedCatalog.valorVenda * 100));
       setCondicoesStr("");
     }
-  }, [addingId, selectedCatalog?.id, setCentavos]);
+  }, [addingId, selectedCatalog, setCentavos]);
 
   useEffect(() => {
     if (!addingId) {
@@ -127,7 +326,7 @@ export function LeadDetailProposta({
     }
   }, [addingId, setCentavos]);
 
-  const solucoesNaOportunidade = lead.solucoes ?? [];
+  const solucoesNaOportunidade = useMemo(() => lead.solucoes ?? [], [lead.solucoes]);
   const disponiveis = useMemo(() => {
     const catalogIdsNaProposta = new Set(
       solucoesNaOportunidade.map((s) => s.solucaoCatalogoId).filter(Boolean) as string[]
@@ -221,6 +420,181 @@ export function LeadDetailProposta({
     setPdfLoading(false);
     onUpdateLead({ propostaGeradaEm: new Date().toISOString() });
     onGerarPdfSuccess();
+  };
+
+  const visualizarDocumentoModelo = async () => {
+    if (!modeloDocumentoId) {
+      showToast("Selecione um modelo de documento.", "error");
+      return;
+    }
+    setDocPreviewLoading(true);
+    try {
+      const res = await fetch(`/api/comercial/leads/${encodeURIComponent(lead.id)}/documento-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modeloId: modeloDocumentoId }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: {
+          preview?: { assunto: string; cabecalhoHtml: string; corpoHtml: string; rodapeHtml: string };
+        };
+        error?: { message?: string };
+      };
+      if (!res.ok || !json.success || !json.data?.preview) {
+        showToast(json.error?.message ?? "Não foi possível gerar a visualização.", "error");
+        return;
+      }
+      setDocPreview(json.data.preview);
+      setDocPreviewOpen(true);
+    } finally {
+      setDocPreviewLoading(false);
+    }
+  };
+
+  const gerarDocumentoModelo = async () => {
+    if (!modeloDocumentoId) {
+      showToast("Selecione um modelo de documento.", "error");
+      return;
+    }
+    setDocGerarLoading(true);
+    try {
+      const res = await fetch(`/api/comercial/leads/${encodeURIComponent(lead.id)}/documento-gerado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modeloId: modeloDocumentoId }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: {
+          preview?: { assunto: string; cabecalhoHtml: string; corpoHtml: string; rodapeHtml: string };
+        };
+        error?: { message?: string };
+      };
+      if (!res.ok || !json.success || !json.data?.preview) {
+        showToast(json.error?.message ?? "Não foi possível gerar e registrar o documento.", "error");
+        return;
+      }
+      setDocPreview(json.data.preview);
+      setDocPreviewOpen(true);
+      onGerarPdfSuccess();
+      const docsRes = await fetch(`/api/comercial/leads/${encodeURIComponent(lead.id)}/documentos-gerados`, {
+        cache: "no-store",
+      });
+      const docsJson = (await docsRes.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: { documentos?: DocumentoGeradoListaItem[] };
+      };
+      if (docsRes.ok && docsJson.success && Array.isArray(docsJson.data?.documentos)) {
+        setDocsGerados(docsJson.data.documentos);
+      }
+      showToast("Documento gerado e registrado com sucesso.", "success");
+    } finally {
+      setDocGerarLoading(false);
+    }
+  };
+
+  const abrirDocumentoPdf = (docId: string) => {
+    window.open(
+      `/api/comercial/leads/${encodeURIComponent(lead.id)}/documentos-gerados/${encodeURIComponent(docId)}/pdf`,
+      "_blank"
+    );
+  };
+
+  const baixarDocumentoPdf = (docId: string) => {
+    window.open(
+      `/api/comercial/leads/${encodeURIComponent(lead.id)}/documentos-gerados/${encodeURIComponent(docId)}/pdf?download=1`,
+      "_blank"
+    );
+  };
+
+  const enviarDocumentoPorEmail = async (docId: string, toEmail: string) => {
+    const dest = toEmail.trim().toLowerCase();
+    if (!emailValido(dest)) {
+      showToast("E-mail do contato inválido para envio.", "error");
+      return;
+    }
+    const key = `${docId}|${dest}`;
+    setEnviandoEmailKey(key);
+    try {
+      const res = await fetch(
+        `/api/comercial/leads/${encodeURIComponent(lead.id)}/documentos-gerados/${encodeURIComponent(docId)}/enviar-email`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ toEmail: dest }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
+      if (!res.ok || !json.success) {
+        showToast(json.error?.message ?? "Não foi possível enviar o documento por e-mail.", "error");
+        return;
+      }
+      showToast(
+        "E-mail enviado com anexo em PDF. Se o destino for Gmail, verifique também o spam nas primeiras remessas.",
+        "success"
+      );
+    } finally {
+      setEnviandoEmailKey(null);
+    }
+  };
+
+  const confirmarAbrirWhatsapp = () => {
+    const ctx = whatsConfirm;
+    if (!ctx) return;
+    const { doc, dest } = ctx;
+    const tel = sanitizeTelefoneWhatsapp(dest.telefone);
+    if (!tel) {
+      showToast("Este contato não possui telefone válido para WhatsApp.", "error");
+      setWhatsConfirm(null);
+      return;
+    }
+    const pdfUrl = `${window.location.origin}/api/comercial/leads/${encodeURIComponent(lead.id)}/documentos-gerados/${encodeURIComponent(doc.id)}/pdf`;
+    const clienteNome =
+      lead.company?.trim() ||
+      lead.entidade?.trim() ||
+      lead.contact?.trim() ||
+      lead.name?.trim() ||
+      "";
+    const prazoValidade = lead.previsaoFechamento
+      ? new Date(`${lead.previsaoFechamento}T12:00:00`).toLocaleDateString("pt-BR")
+      : new Date(new Date(doc.date).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR");
+    const mensagem = montarMensagemWhatsappDocumento({
+      nomeContato: dest.nome,
+      leadNome: lead.name ?? "Lead",
+      clienteNome,
+      modeloNome: doc.modelo.nome,
+      assunto: doc.assunto,
+      dataIso: doc.date,
+      valorTotal: lead.valorTotal ?? lead.value ?? 0,
+      prazoValidade,
+      pdfUrl,
+    });
+    const url = `https://wa.me/${tel}?text=${encodeURIComponent(mensagem)}`;
+    const log: LeadInteraction = {
+      id: createLogId(),
+      date: new Date().toISOString(),
+      user: currentUserName,
+      userId: currentUserId,
+      type: "proposta",
+      action: "UPDATE",
+      description: `Abertura do WhatsApp para envio do documento "${doc.assunto || doc.modelo.nome}" para ${dest.nome} (${dest.telefone}).`,
+      field: "documentoEnvioWhatsapp",
+      fieldKey: doc.id,
+      newValue: {
+        canal: "whatsapp",
+        status: "abertura_solicitada",
+        toTelefone: dest.telefone,
+        docId: doc.id,
+        contatoNome: dest.nome,
+      },
+    };
+    onUpdateLead({
+      interactions: [...(lead.interactions ?? []), log],
+    });
+    window.open(url, "_blank");
+    showToast("WhatsApp aberto com mensagem e link único do PDF.", "success");
+    setWhatsConfirm(null);
   };
 
   const nomeSolucaoRemocao =
@@ -456,7 +830,184 @@ export function LeadDetailProposta({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+      {modelosDocumento.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-600 dark:bg-slate-800/30">
+          <h3 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            Documento a partir de modelo
+          </h3>
+          <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
+            Usa os dados desta oportunidade e do cliente vinculado (quando houver) para preencher as variáveis do
+            modelo criado em Configurações → Construtor de Documentos.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[200px] flex-1">
+              <label className="mb-0.5 block text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                Modelo ativo
+              </label>
+              <select
+                value={modeloDocumentoId}
+                onChange={(e) => setModeloDocumentoId(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option value="">Selecione…</option>
+                {modelosDocumento.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome} ({TIPO_MODELO_DOC_LABEL[m.tipo] ?? m.tipo})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => void visualizarDocumentoModelo()}
+              disabled={docPreviewLoading || !modeloDocumentoId}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#6D28D9] bg-white px-4 py-2 text-sm font-medium text-[#6D28D9] hover:bg-violet-50 disabled:opacity-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
+            >
+              {docPreviewLoading ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              Visualizar com dados do lead
+            </button>
+            <button
+              type="button"
+              onClick={() => void gerarDocumentoModelo()}
+              disabled={docGerarLoading || !modeloDocumentoId}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-medium text-white hover:bg-[#5B21B6] disabled:opacity-50"
+            >
+              {docGerarLoading ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
+              Gerar e registrar no histórico
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Documentos já gerados</h3>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+          Lista persistida no banco. Cada documento é disponibilizado em PDF: abrir no navegador (visualização) ou baixar o
+          arquivo. O envio por e-mail também leva o PDF em anexo. Use os contatos do cliente e da oportunidade abaixo
+          para escolher o destinatário.
+        </p>
+        {docDestinatarios.length === 0 && docsGerados.length > 0 ? (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+            Nenhum contato com e-mail ou telefone encontrado. Cadastre contatos no cliente (aba Dados gerais) ou na
+            oportunidade.
+          </p>
+        ) : null}
+        {docsGeradosLoading ? (
+          <p className="mt-3 text-sm text-slate-500">Carregando documentos…</p>
+        ) : docsGerados.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">Nenhum documento gerado ainda para este lead.</p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {docsGerados.map((d) => (
+              <li
+                key={d.id}
+                className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-800/40"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-600/80">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {d.assunto || "(sem assunto)"}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {d.modelo.nome} ({TIPO_MODELO_DOC_LABEL[d.modelo.tipo] ?? d.modelo.tipo}) ·{" "}
+                      {new Date(d.date).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => abrirDocumentoPdf(d.id)}
+                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Abrir PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => baixarDocumentoPdf(d.id)}
+                      className="rounded border border-[#6D28D9] bg-white px-2 py-1 text-xs text-[#6D28D9] hover:bg-violet-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
+                    >
+                      Baixar PDF
+                    </button>
+                  </div>
+                </div>
+                <p className="mb-2 mt-3 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Enviar este documento
+                </p>
+                <div className="overflow-x-auto rounded border border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-900">
+                  <table className="w-full min-w-[520px] text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/80">
+                        <th className="px-2 py-1.5 font-medium text-slate-600 dark:text-slate-300">Contato</th>
+                        <th className="px-2 py-1.5 font-medium text-slate-600 dark:text-slate-300">Origem</th>
+                        <th className="px-2 py-1.5 font-medium text-slate-600 dark:text-slate-300">E-mail</th>
+                        <th className="px-2 py-1.5 font-medium text-slate-600 dark:text-slate-300">Telefone</th>
+                        <th className="px-2 py-1.5 font-medium text-slate-600 dark:text-slate-300">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docDestinatarios.map((ct) => {
+                        const emailKey = `${d.id}|${ct.email.trim().toLowerCase()}`;
+                        const sending = enviandoEmailKey === emailKey;
+                        return (
+                          <tr
+                            key={`${d.id}-${ct.key}`}
+                            className="border-b border-slate-100 last:border-0 dark:border-slate-700/80"
+                          >
+                            <td className="px-2 py-1.5 font-medium text-slate-800 dark:text-slate-100">{ct.nome}</td>
+                            <td className="px-2 py-1.5 text-slate-600 dark:text-slate-400">{ct.origemLabel}</td>
+                            <td className="px-2 py-1.5 text-slate-700 dark:text-slate-300">
+                              {ct.email.trim() || "—"}
+                            </td>
+                            <td className="px-2 py-1.5 text-slate-700 dark:text-slate-300">
+                              {ct.telefone.trim() || "—"}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <div className="flex flex-wrap gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => void enviarDocumentoPorEmail(d.id, ct.email)}
+                                  disabled={!emailValido(ct.email) || sending}
+                                  className="rounded border border-emerald-300 bg-white px-2 py-0.5 text-[11px] text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 dark:hover:bg-slate-800"
+                                >
+                                  {sending ? "Enviando…" : "E-mail"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!sanitizeTelefoneWhatsapp(ct.telefone)) {
+                                      showToast("Telefone inválido para WhatsApp neste contato.", "error");
+                                      return;
+                                    }
+                                    setWhatsConfirm({ doc: d, dest: ct });
+                                  }}
+                                  disabled={!sanitizeTelefoneWhatsapp(ct.telefone)}
+                                  className="rounded border border-green-300 bg-white px-2 py-0.5 text-[11px] text-green-800 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-green-800 dark:bg-slate-900 dark:text-green-200 dark:hover:bg-slate-800"
+                                >
+                                  WhatsApp
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4 dark:border-slate-600">
         <button
           type="button"
           onClick={gerarPdf}
@@ -477,6 +1028,73 @@ export function LeadDetailProposta({
         </button>
       </div>
     </div>
+    <DrawerSheet
+      open={docPreviewOpen}
+      onClose={() => {
+        setDocPreviewOpen(false);
+        setDocPreview(null);
+      }}
+      title="Pré-visualização do documento"
+      maxWidth="sm:max-w-3xl"
+    >
+      {docPreview ? (
+        <div className="space-y-4 p-1">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Assunto</p>
+            <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">{docPreview.assunto || "(sem assunto)"}</p>
+          </div>
+          {docPreview.cabecalhoHtml?.trim() ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Cabeçalho</p>
+              <div
+                className={PREVIEW_DOC_CLASS}
+                dangerouslySetInnerHTML={{ __html: docPreview.cabecalhoHtml }}
+              />
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Corpo</p>
+            <div className={PREVIEW_DOC_CLASS} dangerouslySetInnerHTML={{ __html: docPreview.corpoHtml }} />
+          </div>
+          {docPreview.rodapeHtml?.trim() ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Rodapé</p>
+              <div
+                className={PREVIEW_DOC_CLASS}
+                dangerouslySetInnerHTML={{ __html: docPreview.rodapeHtml }}
+              />
+            </div>
+          ) : null}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Esta visualização não altera o lead. Após gerar e registrar, o PDF fica disponível na lista abaixo para envio e
+            download.
+          </p>
+        </div>
+      ) : null}
+    </DrawerSheet>
+
+    <AlertDialog
+      open={Boolean(whatsConfirm)}
+      onClose={() => setWhatsConfirm(null)}
+      onConfirm={() => confirmarAbrirWhatsapp()}
+      title="Deseja abrir o WhatsApp para envio?"
+      description={
+        whatsConfirm ? (
+          <>
+            O WhatsApp será aberto com uma mensagem comercial e{" "}
+            <strong className="text-slate-900 dark:text-slate-100">um único link em PDF</strong> para{" "}
+            <strong className="text-slate-900 dark:text-slate-100">{whatsConfirm.dest.nome}</strong>, referente ao
+            documento{" "}
+            <strong className="text-slate-900 dark:text-slate-100">
+              {whatsConfirm.doc.assunto || whatsConfirm.doc.modelo.nome}
+            </strong>
+            .
+          </>
+        ) : null
+      }
+      cancelLabel="Cancelar"
+      confirmLabel="Sim, abrir WhatsApp"
+    />
     <AlertDialog
       open={solucaoIdxParaRemover !== null}
       onClose={() => setSolucaoIdxParaRemover(null)}
@@ -496,6 +1114,13 @@ export function LeadDetailProposta({
       cancelLabel="Cancelar"
       confirmLabel="Sim, remover permanentemente"
       destructive
+    />
+    <Toast
+      visible={toast.visible}
+      message={toast.message}
+      variant={toast.variant}
+      duration={toast.variant === "error" ? 7000 : 3000}
+      onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))}
     />
     </>
   );

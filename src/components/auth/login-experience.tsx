@@ -111,6 +111,8 @@ export function LoginExperience() {
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmNovaSenha, setConfirmNovaSenha] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetPasswordConfirm, setShowResetPasswordConfirm] = useState(false);
   const [resetToken, setResetToken] = useState("");
 
   useEffect(() => {
@@ -492,22 +494,42 @@ export function LoginExperience() {
                         required
                       />
                     )}
-                    <input
-                      type="password"
-                      value={novaSenha}
-                      onChange={(e) => setNovaSenha(e.target.value)}
-                      placeholder="Nova senha"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
-                      required
-                    />
-                    <input
-                      type="password"
-                      value={confirmNovaSenha}
-                      onChange={(e) => setConfirmNovaSenha(e.target.value)}
-                      placeholder="Confirmar nova senha"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showResetPassword ? "text" : "password"}
+                        value={novaSenha}
+                        onChange={(e) => setNovaSenha(e.target.value)}
+                        placeholder="Nova senha"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-4 pr-12 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white lg:hover:bg-slate-100 lg:hover:text-slate-700 dark:lg:hover:bg-slate-700 dark:lg:hover:text-slate-200"
+                        aria-label={showResetPassword ? "Ocultar senha" : "Mostrar senha"}
+                      >
+                        {showResetPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showResetPasswordConfirm ? "text" : "password"}
+                        value={confirmNovaSenha}
+                        onChange={(e) => setConfirmNovaSenha(e.target.value)}
+                        placeholder="Confirmar nova senha"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-4 pr-12 text-white placeholder:text-slate-500 focus:border-violet-400/60 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/35 lg:border-slate-200 lg:bg-white lg:text-slate-900 lg:focus:border-[#6D28D9] lg:focus:ring-[#6D28D9]/20 dark:lg:border-slate-600 dark:lg:bg-slate-800/90 dark:lg:text-slate-100 dark:lg:placeholder:text-slate-500"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPasswordConfirm((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white lg:hover:bg-slate-100 lg:hover:text-slate-700 dark:lg:hover:bg-slate-700 dark:lg:hover:text-slate-200"
+                        aria-label={showResetPasswordConfirm ? "Ocultar senha" : "Mostrar senha"}
+                      >
+                        {showResetPasswordConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setMode("login")}
