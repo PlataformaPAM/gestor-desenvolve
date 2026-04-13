@@ -19,8 +19,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://gestor.plataformapam.com.br"),
   title: "Gestor Desenvolve - Sistema Integrado de Gestão",
   description: "Desenvolve Tecnologia, Consultoria e Capacitação Ltda",
+  openGraph: {
+    title: "Gestor Desenvolve - Sistema Integrado de Gestão",
+    description: "Desenvolve Tecnologia, Consultoria e Capacitação Ltda",
+    siteName: "Gestor Desenvolve - Sistema Integrado de Gestão",
+    images: [{ url: "/opengraph-image.png" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Gestor Desenvolve - Sistema Integrado de Gestão",
+    description: "Desenvolve Tecnologia, Consultoria e Capacitação Ltda",
+    images: ["/twitter-image.png"],
+  },
   icons: { icon: "/favicon.png" },
 };
 
