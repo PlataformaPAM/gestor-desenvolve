@@ -1,5 +1,6 @@
 import type { UsuarioSistema } from "@/lib/configuracoes/types";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { mapUsuario } from "../../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
@@ -58,52 +59,69 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   let updated = null as Awaited<ReturnType<typeof prisma.usuario.update>> | null;
   try {
-    updated = await prisma.usuario.update({
-      where: { id },
-      data: {
-        cpf: cpfUsuario,
-        email: u.email.trim(),
-        nomeExibicao: u.nomeExibicao ?? null,
-        ...(senhaHash ? { senhaHash } : {}),
-        perfilId: u.perfilId,
-        ativo: u.ativo,
-        vinculacaoTipo: vinculos[0]?.tipo ?? null,
-        vinculacaoPessoaId: vinculos[0]?.id ?? null,
-        vinculos: {
-          deleteMany: {},
-          createMany: {
-            data: vinculos.map((v) => ({ tipo: v.tipo, pessoaId: v.id })),
+    try {
+      updated = await prisma.usuario.update({
+        where: { id },
+        data: {
+          cpf: cpfUsuario,
+          email: u.email.trim(),
+          nomeExibicao: u.nomeExibicao ?? null,
+          ...(senhaHash ? { senhaHash } : {}),
+          perfilId: u.perfilId,
+          ativo: u.ativo,
+          vinculacaoTipo: vinculos[0]?.tipo ?? null,
+          vinculacaoPessoaId: vinculos[0]?.id ?? null,
+          vinculos: {
+            deleteMany: {},
+            createMany: {
+              data: vinculos.map((v) => ({ tipo: v.tipo, pessoaId: v.id })),
+            },
           },
+          atualizadoEmSistema: new Date(),
         },
-        atualizadoEmSistema: new Date(),
-      },
+      });
+    } catch {
+      updated = await prisma.usuario.update({
+        where: { id },
+        data: {
+          cpf: cpfUsuario,
+          email: u.email.trim(),
+          nomeExibicao: u.nomeExibicao ?? null,
+          ...(senhaHash ? { senhaHash } : {}),
+          perfilId: u.perfilId,
+          ativo: u.ativo,
+          vinculacaoTipo: vinculos[0]?.tipo ?? null,
+          vinculacaoPessoaId: vinculos[0]?.id ?? null,
+          atualizadoEmSistema: new Date(),
+        },
+      });
+    }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return fail("BAD_REQUEST", "CPF ou e-mail já cadastrado para outro usuário.", 400);
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      return fail("BAD_REQUEST", "Perfil ou vínculo informado não existe mais. Atualize a tela e tente novamente.", 400);
+    }
+    return fail("INTERNAL_ERROR", "Não foi possível atualizar o usuário.", 500);
+  }
+
+  try {
+    await writeAuditLog(prisma, {
+      usuarioId: updated.id,
+      acao: "Usuário atualizado",
+      modulo: "configuracoes",
+      detalhes: `Usuário ${updated.nomeExibicao ?? updated.email}`,
     });
   } catch {
-    updated = await prisma.usuario.update({
-      where: { id },
-      data: {
-        cpf: cpfUsuario,
-        email: u.email.trim(),
-        nomeExibicao: u.nomeExibicao ?? null,
-        ...(senhaHash ? { senhaHash } : {}),
-        perfilId: u.perfilId,
-        ativo: u.ativo,
-        vinculacaoTipo: vinculos[0]?.tipo ?? null,
-        vinculacaoPessoaId: vinculos[0]?.id ?? null,
-        atualizadoEmSistema: new Date(),
-      },
-    });
+    // noop
   }
-  await writeAuditLog(prisma, {
-    usuarioId: updated.id,
-    acao: "Usuário atualizado",
-    modulo: "configuracoes",
-    detalhes: `Usuário ${updated.nomeExibicao ?? updated.email}`,
-  });
-  const updatedWithVinculos = await prisma.usuario.findUnique({
-    where: { id: updated.id },
-    include: { vinculos: true },
-  });
+  const updatedWithVinculos = await prisma.usuario
+    .findUnique({
+      where: { id: updated.id },
+      include: { vinculos: true },
+    })
+    .catch(() => null);
   return ok({ usuario: mapUsuario(updatedWithVinculos ?? updated) });
 }
 

@@ -9,6 +9,7 @@ import { PerfisAcessoTable } from "@/components/configuracoes/perfis-acesso-tabl
 import { LogsTable } from "@/components/configuracoes/logs-table";
 import { NovoUsuarioForm } from "@/components/configuracoes/novo-usuario-form";
 import { PerfilForm } from "@/components/configuracoes/perfil-form";
+import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
 import type { UsuarioSistema, PerfilAcesso, LogSistema } from "@/lib/configuracoes/types";
 import type { PessoaParaVinculo } from "@/lib/configuracoes/types";
@@ -46,6 +47,16 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
   const [perfilEmEdicao, setPerfilEmEdicao] = useState<PerfilAcesso | null>(null);
   const [mostrarInativosUsuarios, setMostrarInativosUsuarios] = useState(false);
   const [filtroBusca, setFiltroBusca] = useState("");
+  const [toast, setToast] = useState<{ visible: boolean; message: string; variant: "success" | "error" }>({
+    visible: false,
+    message: "",
+    variant: "success",
+  });
+
+  const showToast = (message: string, variant: "success" | "error" = "success") => {
+    setToast({ visible: false, message: "", variant });
+    window.requestAnimationFrame(() => setToast({ visible: true, message, variant }));
+  };
 
   useEffect(() => {
     setPrimaryAction({
@@ -109,7 +120,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           error?: { message?: string };
         };
         if (!res.ok) {
-          alert(json?.error?.message ?? "Não foi possível atualizar o usuário.");
+          showToast(json?.error?.message ?? "Não foi possível atualizar o usuário.", "error");
           return;
         }
         const servidor = json?.data?.usuario;
@@ -150,7 +161,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
       };
       if (!res.ok) {
         setUsuarios((prev) => prev.filter((u) => u.id !== tempId));
-        alert(json?.error?.message ?? "Não foi possível criar o usuário.");
+        showToast(json?.error?.message ?? "Não foi possível criar o usuário.", "error");
         return;
       }
       const servidor = json?.data?.usuario;
@@ -159,6 +170,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           prev.map((u) => (u.id === tempId ? enrichUsuarioVinculos(servidor, pessoasVinculo) : u))
         );
       }
+      showToast("Usuário criado com sucesso.", "success");
     })();
   };
 
@@ -336,6 +348,13 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           />
         </div>
       </DrawerSheet>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        variant={toast.variant}
+        duration={toast.variant === "error" ? 7000 : 3000}
+        onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
     </section>
   );
 }

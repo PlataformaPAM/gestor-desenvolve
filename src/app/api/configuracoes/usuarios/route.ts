@@ -117,20 +117,30 @@ export async function POST(req: Request) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return fail("BAD_REQUEST", "CPF ou e-mail já cadastrado para outro usuário.", 400);
     }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      return fail("BAD_REQUEST", "Perfil ou vínculo informado não existe mais. Atualize a tela e tente novamente.", 400);
+    }
     return fail("INTERNAL_ERROR", "Não foi possível criar o usuário.", 500);
   }
 
-  await writeAuditLog(prisma, {
-    usuarioId: created.id,
-    acao: "Usuário criado",
-    modulo: "configuracoes",
-    detalhes: `Usuário ${created.nomeExibicao ?? created.email}`,
-  });
+  // Auditoria não pode impedir criação em produção.
+  try {
+    await writeAuditLog(prisma, {
+      usuarioId: created.id,
+      acao: "Usuário criado",
+      modulo: "configuracoes",
+      detalhes: `Usuário ${created.nomeExibicao ?? created.email}`,
+    });
+  } catch {
+    // noop
+  }
 
-  const createdWithVinculos = await prisma.usuario.findUnique({
-    where: { id: created.id },
-    include: { vinculos: true },
-  });
+  const createdWithVinculos = await prisma.usuario
+    .findUnique({
+      where: { id: created.id },
+      include: { vinculos: true },
+    })
+    .catch(() => null);
   return ok({ usuario: mapUsuario(createdWithVinculos ?? created) }, 201);
 }
 
