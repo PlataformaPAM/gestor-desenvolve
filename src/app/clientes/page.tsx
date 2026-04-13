@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { ClientesTable } from "@/components/clientes/clientes-table";
 import { ClienteFormSheet } from "@/components/clientes/cliente-form-sheet";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { STATUS_LABELS } from "@/lib/clientes/constants";
 import type { Cliente, ClienteStatus } from "@/lib/clientes/types";
@@ -33,6 +34,16 @@ export default function ClientesPage() {
   const [formSheetOpen, setFormSheetOpen] = useState(false);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; variant: "success" | "error" }>({
+    visible: false,
+    message: "",
+    variant: "success",
+  });
+
+  const showToast = (message: string, variant: "success" | "error" = "success") => {
+    setToast({ visible: false, message: "", variant });
+    window.requestAnimationFrame(() => setToast({ visible: true, message, variant }));
+  };
 
   useEffect(() => {
     let active = true;
@@ -89,6 +100,7 @@ export default function ClientesPage() {
 
   const handleSaveCliente = (cliente: Cliente) => {
     const isNew = !clientes.some((c) => c.id === cliente.id);
+    const snapshotBefore = clientes;
     setClientes((prev) => {
       const idx = prev.findIndex((c) => c.id === cliente.id);
       if (idx >= 0) {
@@ -99,19 +111,34 @@ export default function ClientesPage() {
       return [...prev, cliente];
     });
     void (async () => {
-      const url = isNew ? "/api/clientes" : `/api/clientes/${cliente.id}`;
-      const method = isNew ? "POST" : "PATCH";
-      const body = isNew ? { cliente: { ...cliente, contatos: cliente.contatos ?? [] } } : { cliente };
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) return;
-      const bootstrap = await fetch("/api/clientes/bootstrap", { cache: "no-store" });
-      if (!bootstrap.ok) return;
-      const data = (await bootstrap.json()) as { data?: { clientes?: Cliente[] } };
-      setClientes(data?.data?.clientes ?? []);
+      try {
+        const url = isNew ? "/api/clientes" : `/api/clientes/${cliente.id}`;
+        const method = isNew ? "POST" : "PATCH";
+        const body = isNew ? { cliente: { ...cliente, contatos: cliente.contatos ?? [] } } : { cliente };
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        if (!res.ok) {
+          setClientes(snapshotBefore);
+          showToast(json.error?.message ?? "Não foi possível salvar o cliente.", "error");
+          return;
+        }
+        const bootstrap = await fetch("/api/clientes/bootstrap", { cache: "no-store" });
+        if (!bootstrap.ok) {
+          setClientes(snapshotBefore);
+          showToast("Cliente salvo, mas não foi possível recarregar a lista. Atualize a página.", "error");
+          return;
+        }
+        const data = (await bootstrap.json()) as { data?: { clientes?: Cliente[] } };
+        setClientes(data?.data?.clientes ?? []);
+        showToast(isNew ? "Cliente criado com sucesso." : "Cliente atualizado com sucesso.", "success");
+      } catch {
+        setClientes(snapshotBefore);
+        showToast("Falha de conexão ao salvar o cliente.", "error");
+      }
     })();
     setFormSheetOpen(false);
     setSelectedCliente(null);
@@ -123,12 +150,28 @@ export default function ClientesPage() {
     setClientes((prev) => prev.filter((c) => c.id !== clienteToDelete.id));
     setClienteToDelete(null);
     void (async () => {
-      const res = await fetch(`/api/clientes/${id}`, { method: "DELETE" });
-      if (!res.ok) return;
-      const bootstrap = await fetch("/api/clientes/bootstrap", { cache: "no-store" });
-      if (!bootstrap.ok) return;
-      const data = (await bootstrap.json()) as { data?: { clientes?: Cliente[] } };
-      setClientes(data?.data?.clientes ?? []);
+      const snapshotBefore = clientes;
+      try {
+        const res = await fetch(`/api/clientes/${id}`, { method: "DELETE" });
+        const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        if (!res.ok) {
+          setClientes(snapshotBefore);
+          showToast(json.error?.message ?? "Não foi possível excluir o cliente.", "error");
+          return;
+        }
+        const bootstrap = await fetch("/api/clientes/bootstrap", { cache: "no-store" });
+        if (!bootstrap.ok) {
+          setClientes(snapshotBefore);
+          showToast("Cliente excluído, mas não foi possível recarregar a lista. Atualize a página.", "error");
+          return;
+        }
+        const data = (await bootstrap.json()) as { data?: { clientes?: Cliente[] } };
+        setClientes(data?.data?.clientes ?? []);
+        showToast("Cliente excluído com sucesso.", "success");
+      } catch {
+        setClientes(snapshotBefore);
+        showToast("Falha de conexão ao excluir cliente.", "error");
+      }
     })();
   };
 
@@ -215,6 +258,13 @@ export default function ClientesPage() {
         cancelLabel="Cancelar"
         confirmLabel="Sim, excluir permanentemente"
         destructive
+      />
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        variant={toast.variant}
+        duration={toast.variant === "error" ? 7000 : 3000}
+        onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
     </section>
   );
