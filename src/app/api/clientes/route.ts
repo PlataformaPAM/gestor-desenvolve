@@ -55,9 +55,6 @@ export async function POST(req: Request) {
       include: {
         endereco: true,
         contatos: { include: { papeis: true } },
-        propostas: true,
-        faturas: true,
-        ticketsResumo: true,
       },
     });
     await writeAuditLog(prisma, {
@@ -66,7 +63,17 @@ export async function POST(req: Request) {
       detalhes: `Cliente ${created.nome} (${created.id})`,
     });
 
-    return ok({ cliente: mapClienteFromDb(created) }, 201);
+    return ok(
+      {
+        cliente: mapClienteFromDb({
+          ...created,
+          propostas: [],
+          faturas: [],
+          ticketsResumo: [],
+        }),
+      },
+      201
+    );
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return fail("BAD_REQUEST", "Já existe cliente com este CPF/CNPJ.", 400);
