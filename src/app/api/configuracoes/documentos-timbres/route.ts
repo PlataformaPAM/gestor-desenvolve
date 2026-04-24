@@ -9,7 +9,7 @@ import {
 } from "@/lib/documentos/timbres-config";
 import { emptyEmpresaDocumentoConfig, normalizeEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config-schema";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "documentos-timbres");
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "documentos-timbres");
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -19,10 +19,32 @@ function extFromMime(mime: string): string {
   return ".jpg";
 }
 
+function apiUploadUrl(filename: string): string {
+  return `/api/uploads/documentos-timbres/${filename}`;
+}
+
+function normalizeLegacyUploadUrl(raw: string): string {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  if (v.startsWith("/uploads/documentos-timbres/")) {
+    const filename = v.slice("/uploads/documentos-timbres/".length);
+    return apiUploadUrl(filename);
+  }
+  return v;
+}
+
 export async function GET() {
   try {
     const config = await getDocumentoTimbresConfig();
-    return ok({ timbres: config.items });
+    const timbres = config.items.map((item) => ({
+      ...item,
+      url: normalizeLegacyUploadUrl(item.url),
+      renderConfig: {
+        ...item.renderConfig,
+        papelTimbradoUrl: normalizeLegacyUploadUrl(item.renderConfig.papelTimbradoUrl),
+      },
+    }));
+    return ok({ timbres });
   } catch {
     return fail("INTERNAL_ERROR", "Não foi possível carregar os papéis timbrados.", 500);
   }
@@ -67,12 +89,12 @@ export async function POST(req: Request) {
       papelTimbradoUrl:
         parsedRenderConfig && typeof parsedRenderConfig === "object"
           ? (parsedRenderConfig as Record<string, unknown>).papelTimbradoUrl
-          : `/uploads/documentos-timbres/${filename}`,
+          : apiUploadUrl(filename),
     });
     const item: DocumentoTimbreItem = {
       id,
       nome: nomeRaw || file.name || `Timbrado ${new Date().toLocaleDateString("pt-BR")}`,
-      url: `/uploads/documentos-timbres/${filename}`,
+      url: apiUploadUrl(filename),
       createdAt: new Date().toISOString(),
       ativo: ativoRaw ? ativoRaw === "true" || ativoRaw === "1" : true,
       renderConfig: {
@@ -86,7 +108,7 @@ export async function POST(req: Request) {
         footerHeightMm: merged.footerHeightMm,
         cabecalhoPadraoHtml: merged.cabecalhoPadraoHtml,
         rodapePadraoHtml: merged.rodapePadraoHtml,
-        papelTimbradoUrl: merged.papelTimbradoUrl || `/uploads/documentos-timbres/${filename}`,
+        papelTimbradoUrl: normalizeLegacyUploadUrl(String(merged.papelTimbradoUrl ?? "")) || apiUploadUrl(filename),
       },
     };
     const config = await getDocumentoTimbresConfig();

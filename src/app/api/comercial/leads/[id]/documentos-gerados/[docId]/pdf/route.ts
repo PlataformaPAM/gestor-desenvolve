@@ -23,6 +23,21 @@ async function toDataUrlIfPossible(assetUrl: string): Promise<string> {
   try {
     const parsed = new URL(url);
     const pathname = decodeURIComponent(parsed.pathname || "");
+    if (pathname.startsWith("/api/uploads/documentos-timbres/")) {
+      const filename = pathname.slice("/api/uploads/documentos-timbres/".length);
+      const diskPath = path.join(process.cwd(), "uploads", "documentos-timbres", filename);
+      const file = await readFile(diskPath);
+      const ext = path.extname(diskPath).toLowerCase();
+      const mime =
+        ext === ".jpg" || ext === ".jpeg"
+          ? "image/jpeg"
+          : ext === ".webp"
+            ? "image/webp"
+            : ext === ".gif"
+              ? "image/gif"
+              : "image/png";
+      return `data:${mime};base64,${file.toString("base64")}`;
+    }
     if (pathname.startsWith("/uploads/")) {
       const diskPath = path.join(process.cwd(), "public", pathname);
       const file = await readFile(diskPath);

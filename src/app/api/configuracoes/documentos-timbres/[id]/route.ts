@@ -10,7 +10,7 @@ import {
 import { normalizeEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config-schema";
 
 type PatchBody = { nome?: string; ativo?: boolean; renderConfig?: Partial<DocumentoTimbreRenderConfig> };
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "documentos-timbres");
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "documentos-timbres");
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -18,6 +18,36 @@ function extFromMime(mime: string): string {
   if (mime === "image/png") return ".png";
   if (mime === "image/webp") return ".webp";
   return ".jpg";
+}
+
+function apiUploadUrl(filename: string): string {
+  return `/api/uploads/documentos-timbres/${filename}`;
+}
+
+function normalizeLegacyUploadUrl(raw: string): string {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  if (v.startsWith("/uploads/documentos-timbres/")) {
+    const filename = v.slice("/uploads/documentos-timbres/".length);
+    return apiUploadUrl(filename);
+  }
+  return v;
+}
+
+function resolveStoredPath(uploadUrl: string): string {
+  const clean = normalizeLegacyUploadUrl(uploadUrl);
+  const marker = "/api/uploads/documentos-timbres/";
+  const oldMarker = "/uploads/documentos-timbres/";
+  if (clean.startsWith(marker)) {
+    const filename = clean.slice(marker.length);
+    return path.join(process.cwd(), "uploads", "documentos-timbres", filename);
+  }
+  if (clean.startsWith(oldMarker)) {
+    const filename = clean.slice(oldMarker.length);
+    return path.join(process.cwd(), "public", "uploads", "documentos-timbres", filename);
+  }
+  const relative = clean.startsWith("/") ? clean.slice(1) : clean;
+  return path.join(process.cwd(), "public", relative);
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -82,12 +112,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       const buf = Buffer.from(await fileToProcess.arrayBuffer());
       await writeFile(finalPath, buf);
       const oldUrl = target.url;
-      target.url = `/uploads/documentos-timbres/${filename}`;
+      target.url = apiUploadUrl(filename);
       if (!hasRenderConfig && target.renderConfig.papelTimbradoUrl === oldUrl) {
         target.renderConfig.papelTimbradoUrl = target.url;
       }
-      const relative = oldUrl.startsWith("/") ? oldUrl.slice(1) : oldUrl;
-      const oldPath = path.join(process.cwd(), "public", relative);
+      const oldPath = resolveStoredPath(oldUrl);
       await unlink(oldPath).catch(() => {});
     }
     if (hasRenderConfig) {
@@ -97,7 +126,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       });
       target.renderConfig = {
         layoutModo: merged.layoutModo,
-        papelTimbradoUrl: merged.papelTimbradoUrl || target.url,
+        papelTimbradoUrl: normalizeLegacyUploadUrl(String(merged.papelTimbradoUrl ?? "")) || target.url,
         papelTimbradoOpacity: merged.papelTimbradoOpacity,
         margemTopMm: merged.margemTopMm,
         margemRightMm: merged.margemRightMm,
@@ -131,8 +160,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     }
     await saveDocumentoTimbresConfig(config);
 
-    const relative = existing.url.startsWith("/") ? existing.url.slice(1) : existing.url;
-    const filePath = path.join(process.cwd(), "public", relative);
+    const filePath = resolveStoredPath(existing.url);
     await unlink(filePath).catch(() => {});
 
     return ok({ removed: true });
