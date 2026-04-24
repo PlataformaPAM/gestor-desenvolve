@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { fail } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto, type DocumentoSnapshot } from "@/lib/documentos/documento-html";
+import { getEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config";
 
 function parseSnapshot(newValue: unknown): { modeloNome: string; snapshot: DocumentoSnapshot } | null {
   if (!newValue || typeof newValue !== "object") return null;
@@ -13,10 +14,15 @@ function parseSnapshot(newValue: unknown): { modeloNome: string; snapshot: Docum
   const cabecalhoHtml = typeof documento.cabecalhoHtml === "string" ? documento.cabecalhoHtml : "";
   const corpoHtml = typeof documento.corpoHtml === "string" ? documento.corpoHtml : "";
   const rodapeHtml = typeof documento.rodapeHtml === "string" ? documento.rodapeHtml : "";
+  const timbreUrl = typeof documento.timbreUrl === "string" ? documento.timbreUrl : "";
+  const renderConfig =
+    documento.renderConfig && typeof documento.renderConfig === "object"
+      ? (documento.renderConfig as Record<string, unknown>)
+      : undefined;
   if (!modeloNome || !corpoHtml) return null;
   return {
     modeloNome,
-    snapshot: { assunto, cabecalhoHtml, corpoHtml, rodapeHtml },
+    snapshot: { assunto, cabecalhoHtml, corpoHtml, rodapeHtml, timbreUrl, renderConfig },
   };
 }
 
@@ -39,6 +45,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; doc
   const url = new URL(req.url);
   const download = url.searchParams.get("download") === "1";
   const autoPrint = url.searchParams.get("print") === "1";
+  const empresaConfig = await getEmpresaDocumentoConfig();
 
   const html = montarDocumentoHtmlCompleto({
     title: parsed.snapshot.assunto || "Documento gerado",
@@ -46,6 +53,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; doc
     snapshot: parsed.snapshot,
     geradoEmIso: row.date.toISOString(),
     autoPrint,
+    renderConfig: empresaConfig,
   });
 
   return new Response(html, {

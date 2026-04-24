@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { documentoModeloToDto } from "@/lib/configuracoes/documentos-modelos";
+import { getDocumentoTimbresConfig, saveDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { htmlTemTextoVisivel } from "@/lib/documentos/html-text";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
@@ -26,6 +27,7 @@ type PatchBody = {
     cabecalhoHtml?: string;
     corpo?: string;
     rodapeHtml?: string;
+    timbreId?: string;
     ativo?: boolean;
   };
 };
@@ -69,12 +71,23 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     corpo !== existing.corpo ||
     rodapeHtml !== existing.rodapeHtml ||
     ativo !== existing.ativo;
+  const nextTimbreId = m.timbreId !== undefined ? m.timbreId.trim() : undefined;
 
-  if (!contentChanged) {
+  if (!contentChanged && nextTimbreId === undefined) {
     return ok({ modelo: documentoModeloToDto(existing) });
   }
 
   try {
+    if (nextTimbreId !== undefined) {
+      const cfg = await getDocumentoTimbresConfig();
+      if (nextTimbreId && !cfg.items.some((x) => x.id === nextTimbreId)) {
+        return fail("BAD_REQUEST", "Papel timbrado selecionado não existe.", 400);
+      }
+      if (nextTimbreId) cfg.modeloTimbreById[id] = nextTimbreId;
+      else delete cfg.modeloTimbreById[id];
+      await saveDocumentoTimbresConfig(cfg);
+    }
+
     const updated = await prisma.documentoModelo.update({
       where: { id },
       data: {

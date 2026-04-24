@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { documentoModeloToDto } from "@/lib/configuracoes/documentos-modelos";
+import { getDocumentoTimbresConfig, saveDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { fail, ok } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 
@@ -28,6 +29,12 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
         versao: 1,
       },
     });
+    const cfg = await getDocumentoTimbresConfig();
+    const sourceTimbreId = cfg.modeloTimbreById[orig.id];
+    if (sourceTimbreId) {
+      cfg.modeloTimbreById[created.id] = sourceTimbreId;
+      await saveDocumentoTimbresConfig(cfg);
+    }
     await writeAuditLog(prisma, {
       acao: "Modelo de documento duplicado",
       modulo: "configuracoes",

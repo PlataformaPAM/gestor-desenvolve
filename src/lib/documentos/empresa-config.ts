@@ -1,19 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import {
+  EMPRESA_DOCUMENTO_CHAVE,
+  emptyEmpresaDocumentoConfig,
+  normalizeEmpresaDocumentoConfig,
+  type EmpresaDocumentoConfig,
+} from "@/lib/documentos/empresa-config-schema";
 
-export const EMPRESA_DOCUMENTO_CHAVE = "empresa_documento";
-
-export type EmpresaDocumentoConfig = {
-  razaoSocial: string;
-  nomeFantasia: string;
-  cnpj: string;
-  telefone: string;
-  email: string;
-  site: string;
-  endereco: string;
-  logoUrl: string;
-  cabecalhoPadraoHtml: string;
-  rodapePadraoHtml: string;
-};
+export * from "@/lib/documentos/empresa-config-schema";
 
 type ConfiguracaoSistemaDelegate = {
   findUnique?: (args: { where: { chave: string }; select: { valor: true } }) => Promise<{ valor: unknown } | null>;
@@ -27,50 +20,6 @@ type ConfiguracaoSistemaDelegate = {
 type PrismaMaybeWithConfig = {
   configuracaoSistema?: ConfiguracaoSistemaDelegate;
 };
-
-export function emptyEmpresaDocumentoConfig(): EmpresaDocumentoConfig {
-  return {
-    razaoSocial: "",
-    nomeFantasia: "",
-    cnpj: "",
-    telefone: "",
-    email: "",
-    site: "",
-    endereco: "",
-    logoUrl: "",
-    cabecalhoPadraoHtml: "",
-    rodapePadraoHtml: "",
-  };
-}
-
-export function normalizeEmpresaDocumentoConfig(raw: unknown): EmpresaDocumentoConfig {
-  const base = emptyEmpresaDocumentoConfig();
-  if (!raw) return base;
-
-  let source: unknown = raw;
-  if (typeof source === "string") {
-    try {
-      source = JSON.parse(source);
-    } catch {
-      return base;
-    }
-  }
-
-  if (typeof source !== "object") return base;
-  const o = source as Record<string, unknown>;
-  return {
-    razaoSocial: String(o.razaoSocial ?? "").trim(),
-    nomeFantasia: String(o.nomeFantasia ?? "").trim(),
-    cnpj: String(o.cnpj ?? "").trim(),
-    telefone: String(o.telefone ?? "").trim(),
-    email: String(o.email ?? "").trim(),
-    site: String(o.site ?? "").trim(),
-    endereco: String(o.endereco ?? "").trim(),
-    logoUrl: String(o.logoUrl ?? "").trim(),
-    cabecalhoPadraoHtml: String(o.cabecalhoPadraoHtml ?? ""),
-    rodapePadraoHtml: String(o.rodapePadraoHtml ?? ""),
-  };
-}
 
 export async function getEmpresaDocumentoConfig(): Promise<EmpresaDocumentoConfig> {
   const db = prisma as unknown as PrismaMaybeWithConfig;

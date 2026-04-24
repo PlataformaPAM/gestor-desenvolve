@@ -3,6 +3,7 @@ import { mapLeadFromDb } from "@/app/api/comercial/_shared";
 import { montarVariaveisDocumentoParaLead, type ClienteVariaveisCtx } from "@/lib/documentos/montar-variaveis-lead";
 import { preencherTemplateDocumento } from "@/lib/documentos/template-vars";
 import { getEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config";
+import { getDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { getSessionUserId } from "@/lib/server/request-session";
 
@@ -75,6 +76,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const lead = mapLeadFromDb(row);
   const clienteCtx = clienteDbParaCtx(row.cliente);
   const empresaConfig = await getEmpresaDocumentoConfig();
+  const timbresConfig = await getDocumentoTimbresConfig();
+  const timbreId = timbresConfig.modeloTimbreById[modelo.id] ?? "";
+  const timbre = timbresConfig.items.find((x) => x.id === timbreId);
+  const timbreUrl = timbre?.url ?? "";
   const valores = montarVariaveisDocumentoParaLead({
     lead,
     cliente: clienteCtx,
@@ -93,6 +98,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     cabecalhoHtml: preencherTemplateDocumento(modelo.cabecalhoHtml ?? "", valores),
     corpoHtml: preencherTemplateDocumento(modelo.corpo ?? "", valores),
     rodapeHtml: preencherTemplateDocumento(modelo.rodapeHtml ?? "", valores),
+    timbreUrl,
+    renderConfig: timbre?.renderConfig ?? null,
   };
 
   const now = new Date();

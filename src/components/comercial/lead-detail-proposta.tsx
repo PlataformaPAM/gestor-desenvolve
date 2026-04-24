@@ -5,6 +5,7 @@ import { FileDown, FileText, Search, Trash2 } from "lucide-react";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { Toast } from "@/components/ui/toast";
+import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 import type {
   Lead,
   LeadInteraction,
@@ -50,6 +51,27 @@ const PREVIEW_DOC_CLASS =
   "max-w-none text-sm text-slate-800 dark:text-slate-100 [&_a]:text-[#6D28D9] [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_hr]:my-4 [&_img]:max-h-28 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6";
 
 type ModeloDocumentoLista = { id: string; nome: string; tipo: string; ativo: boolean };
+type PreviewRenderConfig = {
+  layoutModo?: "none" | "background" | "header_footer" | "hybrid";
+  papelTimbradoUrl?: string;
+  papelTimbradoOpacity?: number;
+  margemTopMm?: number;
+  margemRightMm?: number;
+  margemBottomMm?: number;
+  margemLeftMm?: number;
+  headerHeightMm?: number;
+  footerHeightMm?: number;
+} | null;
+
+type DocumentoPreviewPayload = {
+  assunto: string;
+  cabecalhoHtml: string;
+  corpoHtml: string;
+  rodapeHtml: string;
+  timbreUrl?: string;
+  renderConfig?: PreviewRenderConfig;
+};
+
 type DocumentoGeradoListaItem = {
   id: string;
   date: string;
@@ -221,12 +243,7 @@ export function LeadDetailProposta({
   const [docPreviewOpen, setDocPreviewOpen] = useState(false);
   const [docPreviewLoading, setDocPreviewLoading] = useState(false);
   const [docGerarLoading, setDocGerarLoading] = useState(false);
-  const [docPreview, setDocPreview] = useState<{
-    assunto: string;
-    cabecalhoHtml: string;
-    corpoHtml: string;
-    rodapeHtml: string;
-  } | null>(null);
+  const [docPreview, setDocPreview] = useState<DocumentoPreviewPayload | null>(null);
   const [docsGerados, setDocsGerados] = useState<DocumentoGeradoListaItem[]>([]);
   const [docsGeradosLoading, setDocsGeradosLoading] = useState(false);
   const [enviandoEmailKey, setEnviandoEmailKey] = useState<string | null>(null);
@@ -437,7 +454,8 @@ export function LeadDetailProposta({
       const json = (await res.json().catch(() => ({}))) as {
         success?: boolean;
         data?: {
-          preview?: { assunto: string; cabecalhoHtml: string; corpoHtml: string; rodapeHtml: string };
+          preview?: DocumentoPreviewPayload;
+          modelo?: { id?: string; nome?: string; tipo?: string };
         };
         error?: { message?: string };
       };
@@ -445,8 +463,40 @@ export function LeadDetailProposta({
         showToast(json.error?.message ?? "Não foi possível gerar a visualização.", "error");
         return;
       }
-      setDocPreview(json.data.preview);
-      setDocPreviewOpen(true);
+      const opened = window.open("about:blank", "_blank");
+      if (!opened) {
+        setDocPreview(json.data.preview);
+        setDocPreviewOpen(true);
+        showToast("Não foi possível abrir nova aba. Exibindo pré-visualização simplificada.", "error");
+        return;
+      }
+      const p = json.data.preview;
+      const timbreRaw = p.timbreUrl?.trim() || "";
+      const timbreAbs = timbreRaw ? new URL(timbreRaw, window.location.origin).toString() : "";
+      const renderConfig = p.renderConfig
+        ? {
+            ...p.renderConfig,
+            papelTimbradoUrl: timbreAbs || p.renderConfig.papelTimbradoUrl || "",
+          }
+        : undefined;
+      const htmlFinal = montarDocumentoHtmlCompleto({
+        title: p.assunto || "Preview do documento",
+        modeloNome: json.data.modelo?.nome?.trim() || "Modelo selecionado",
+        snapshot: {
+          assunto: p.assunto,
+          cabecalhoHtml: p.cabecalhoHtml,
+          corpoHtml: p.corpoHtml,
+          rodapeHtml: p.rodapeHtml,
+          timbreUrl: timbreAbs,
+          renderConfig: renderConfig ?? undefined,
+        },
+        geradoEmIso: new Date().toISOString(),
+        renderConfig: renderConfig ?? undefined,
+      });
+      const htmlComBase = htmlFinal.replace("<head>", `<head><base href="${window.location.origin}/" />`);
+      opened.document.open();
+      opened.document.write(htmlComBase);
+      opened.document.close();
     } finally {
       setDocPreviewLoading(false);
     }
@@ -467,7 +517,7 @@ export function LeadDetailProposta({
       const json = (await res.json().catch(() => ({}))) as {
         success?: boolean;
         data?: {
-          preview?: { assunto: string; cabecalhoHtml: string; corpoHtml: string; rodapeHtml: string };
+          preview?: DocumentoPreviewPayload;
         };
         error?: { message?: string };
       };

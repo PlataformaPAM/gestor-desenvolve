@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Copy, Eye, FilePlus2, Pencil, Power, Search } from "lucide-react";
-import Link from "next/link";
+import { Copy, Eye, FilePlus2, Pencil, Power, Search } from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import {
   DocumentoRichEditor,
@@ -16,6 +15,8 @@ import {
   preencherTemplateDocumento,
   valoresPreviewExemplo,
 } from "@/lib/documentos/template-vars";
+import { ConfiguracoesTopNav } from "@/components/configuracoes/configuracoes-top-nav";
+import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 
 type TipoDocumento =
   | "proposta_comercial"
@@ -26,6 +27,7 @@ type TipoDocumento =
 type CampoVariavel = "assunto" | "cabecalho" | "corpo" | "rodape";
 
 type EmpresaDocumentoConfig = {
+  layoutModo: "none" | "background" | "header_footer" | "hybrid";
   razaoSocial: string;
   nomeFantasia: string;
   cnpj: string;
@@ -36,6 +38,14 @@ type EmpresaDocumentoConfig = {
   logoUrl: string;
   cabecalhoPadraoHtml: string;
   rodapePadraoHtml: string;
+  papelTimbradoUrl: string;
+  papelTimbradoOpacity: number;
+  margemTopMm: number;
+  margemRightMm: number;
+  margemBottomMm: number;
+  margemLeftMm: number;
+  headerHeightMm: number;
+  footerHeightMm: number;
 };
 
 type ModeloDocumento = {
@@ -51,6 +61,28 @@ type ModeloDocumento = {
   ativo: boolean;
   versao: number;
   atualizadoEm: string;
+  timbreId?: string;
+  timbreUrl?: string;
+};
+
+type DocumentoTimbre = {
+  id: string;
+  nome: string;
+  url: string;
+  createdAt: string;
+  ativo?: boolean;
+  renderConfig?: Pick<
+    EmpresaDocumentoConfig,
+    | "layoutModo"
+    | "papelTimbradoUrl"
+    | "papelTimbradoOpacity"
+    | "margemTopMm"
+    | "margemRightMm"
+    | "margemBottomMm"
+    | "margemLeftMm"
+    | "headerHeightMm"
+    | "footerHeightMm"
+  >;
 };
 
 const TIPO_LABEL: Record<TipoDocumento, string> = {
@@ -59,9 +91,6 @@ const TIPO_LABEL: Record<TipoDocumento, string> = {
   prestacao_contas: "Prestação de Contas",
   relatorio: "Relatório",
 };
-
-const PREVIEW_HTML_CLASS =
-  "preview-doc-html mt-2 max-w-none text-sm text-slate-800 dark:text-slate-100 [&_a]:text-[#6D28D9] [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_hr]:my-4 [&_img]:max-h-28 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6";
 
 function emptyModelo(): ModeloDocumento {
   return {
@@ -74,6 +103,8 @@ function emptyModelo(): ModeloDocumento {
     cabecalhoHtml: "",
     corpo: "<p></p>",
     rodapeHtml: "",
+    timbreId: "",
+    timbreUrl: "",
     ativo: true,
     versao: 1,
     atualizadoEm: new Date().toISOString(),
@@ -93,27 +124,12 @@ function normalizarModeloCarregado(m: ModeloDocumento): ModeloDocumento {
   };
 }
 
-function PreviewHtmlBloco({
-  titulo,
-  html,
-  previewValues,
-}: {
-  titulo: string;
-  html: string;
-  previewValues: Record<string, string>;
-}) {
-  const filled = preencherTemplateDocumento(html, previewValues);
-  const vazio = !htmlTemTextoVisivel(filled);
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
-      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{titulo}</p>
-      {vazio ? (
-        <p className="mt-1 text-sm text-slate-400">(vazio)</p>
-      ) : (
-        <div className={PREVIEW_HTML_CLASS} dangerouslySetInnerHTML={{ __html: filled }} />
-      )}
-    </div>
-  );
+function absolutizeAssetUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith("data:")) return value;
+  if (typeof window === "undefined") return value;
+  return `${window.location.origin}${value.startsWith("/") ? value : `/${value}`}`;
 }
 
 export default function ConstrutorDocumentosPage() {
@@ -121,7 +137,6 @@ export default function ConstrutorDocumentosPage() {
   const [modelos, setModelos] = useState<ModeloDocumento[]>([]);
   const [busca, setBusca] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [modeloAtual, setModeloAtual] = useState<ModeloDocumento>(emptyModelo());
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erroLista, setErroLista] = useState<string | null>(null);
@@ -130,6 +145,7 @@ export default function ConstrutorDocumentosPage() {
   const [editorNonce, setEditorNonce] = useState(0);
   const [abaVariaveis, setAbaVariaveis] = useState<string>(VARIAVEIS_DOCUMENTO_MODULOS[0]?.id ?? "empresa");
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaDocumentoConfig>({
+    layoutModo: "none",
     razaoSocial: "",
     nomeFantasia: "",
     cnpj: "",
@@ -140,9 +156,16 @@ export default function ConstrutorDocumentosPage() {
     logoUrl: "",
     cabecalhoPadraoHtml: "",
     rodapePadraoHtml: "",
+    papelTimbradoUrl: "",
+    papelTimbradoOpacity: 0.12,
+    margemTopMm: 12,
+    margemRightMm: 12,
+    margemBottomMm: 12,
+    margemLeftMm: 12,
+    headerHeightMm: 28,
+    footerHeightMm: 22,
   });
-  const [salvandoEmpresa, setSalvandoEmpresa] = useState(false);
-  const [empresaCardOpen, setEmpresaCardOpen] = useState(false);
+  const [timbres, setTimbres] = useState<DocumentoTimbre[]>([]);
   const [toast, setToast] = useState<{ visible: boolean; message: string; variant: "success" | "error"; duration: number }>({
     visible: false,
     message: "",
@@ -198,6 +221,23 @@ export default function ConstrutorDocumentosPage() {
     refCabecalho.current?.insertImageFromUrl(url);
   }, [modeloAtual.logoUrl, showToast]);
 
+  const carregarTimbres = useCallback(async () => {
+    try {
+      const res = await fetch("/api/configuracoes/documentos-timbres", { cache: "no-store" });
+      const json = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        data?: { timbres?: DocumentoTimbre[] };
+      };
+      if (!res.ok || !json.success || !Array.isArray(json.data?.timbres)) {
+        setTimbres([]);
+        return;
+      }
+      setTimbres(json.data.timbres);
+    } catch {
+      setTimbres([]);
+    }
+  }, []);
+
   const carregarModelos = useCallback(async () => {
     setCarregandoLista(true);
     setErroLista(null);
@@ -228,6 +268,9 @@ export default function ConstrutorDocumentosPage() {
   useEffect(() => {
     void carregarModelos();
   }, [carregarModelos]);
+  useEffect(() => {
+    void carregarTimbres();
+  }, [carregarTimbres]);
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -290,6 +333,7 @@ export default function ConstrutorDocumentosPage() {
           cabecalhoHtml: modeloAtual.cabecalhoHtml,
           corpo: modeloAtual.corpo,
           rodapeHtml: modeloAtual.rodapeHtml,
+          timbreId: (modeloAtual.timbreId ?? "").trim(),
           ativo: modeloAtual.ativo,
         };
         if (modeloAtual.id) {
@@ -373,26 +417,97 @@ export default function ConstrutorDocumentosPage() {
   }, [carregarModelos, showToast]);
 
 
-  const salvarEmpresaDocumentoConfig = () => {
+  const timbreSelecionado = useMemo(
+    () => timbres.find((t) => t.id === (modeloAtual.timbreId ?? "").trim()) ?? null,
+    [timbres, modeloAtual.timbreId]
+  );
+  const previewValues = useMemo(() => valoresPreviewExemplo(new Date(), empresaConfig), [empresaConfig]);
+  const abrirPreviewCompletoEmNovaAba = useCallback(() => {
     void (async () => {
-      setSalvandoEmpresa(true);
-      try {
-        const res = await fetch('/api/configuracoes/documentos-empresa', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config: empresaConfig }),
-        });
-        const json = (await res.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
-        if (!res.ok || !json.success) {
-          showToast(json.error?.message ?? "Não foi possível salvar configuração da empresa.", "error");
-          return;
-        }
-        showToast("Salvo com sucesso.", "success");
-      } finally {
-        setSalvandoEmpresa(false);
+      const opened = window.open("about:blank", "_blank");
+      if (!opened) {
+        showToast("Não foi possível abrir a nova aba do preview. Verifique o bloqueador de pop-up.", "error");
+        return;
       }
+
+      const timbreUrlBruta = timbreSelecionado?.url?.trim() || modeloAtual.timbreUrl?.trim() || "";
+      const urlAbsoluta = absolutizeAssetUrl(timbreUrlBruta);
+      let fetchStatus = "não executado";
+      let timbreDataUrl = "";
+      if (urlAbsoluta) {
+        try {
+          const resp = await fetch(urlAbsoluta, { cache: "no-store" });
+          fetchStatus = String(resp.status);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            timbreDataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onerror = () => reject(new Error("Falha ao converter timbrado para data URL."));
+              reader.onload = () => resolve(String(reader.result || ""));
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (err) {
+          // Mantém fallback para URL normal.
+          fetchStatus = `erro: ${err instanceof Error ? err.message : "desconhecido"}`;
+        }
+      }
+
+      const timbreUrlFinal = timbreDataUrl || urlAbsoluta;
+      const timbreRenderConfigRaw = timbreSelecionado?.renderConfig
+        ? {
+            ...timbreSelecionado.renderConfig,
+            papelTimbradoUrl: absolutizeAssetUrl(timbreSelecionado.renderConfig.papelTimbradoUrl ?? ""),
+          }
+        : undefined;
+      const timbreRenderConfig = timbreRenderConfigRaw
+        ? {
+            ...timbreRenderConfigRaw,
+            layoutModo:
+              timbreUrlFinal && timbreRenderConfigRaw.layoutModo === "header_footer"
+                ? "hybrid"
+                : timbreUrlFinal && timbreRenderConfigRaw.layoutModo === "none"
+                  ? "background"
+                  : timbreRenderConfigRaw.layoutModo,
+            papelTimbradoOpacity: Math.max(0.22, timbreRenderConfigRaw.papelTimbradoOpacity ?? 0.22),
+            papelTimbradoUrl: timbreDataUrl || timbreRenderConfigRaw.papelTimbradoUrl || timbreUrlFinal,
+          }
+        : timbreUrlFinal
+          ? {
+              layoutModo: "background" as const,
+              papelTimbradoUrl: timbreUrlFinal,
+              papelTimbradoOpacity: Math.max(0.22, empresaConfig.papelTimbradoOpacity ?? 0.22),
+              margemTopMm: empresaConfig.margemTopMm,
+              margemRightMm: empresaConfig.margemRightMm,
+              margemBottomMm: empresaConfig.margemBottomMm,
+              margemLeftMm: empresaConfig.margemLeftMm,
+              headerHeightMm: empresaConfig.headerHeightMm,
+              footerHeightMm: empresaConfig.footerHeightMm,
+            }
+          : undefined;
+
+      const snapshot = {
+        assunto: preencherTemplateDocumento(modeloAtual.assunto || "(sem assunto)", previewValues),
+        cabecalhoHtml: preencherTemplateDocumento(modeloAtual.cabecalhoHtml || "", previewValues),
+        corpoHtml: preencherTemplateDocumento(modeloAtual.corpo || "", previewValues),
+        rodapeHtml: preencherTemplateDocumento(modeloAtual.rodapeHtml || "", previewValues),
+        timbreUrl: timbreUrlFinal,
+        renderConfig: timbreRenderConfig,
+      };
+      const htmlFinal = montarDocumentoHtmlCompleto({
+        title: snapshot.assunto || "Preview do documento",
+        modeloNome: modeloAtual.nome?.trim() || "Modelo em edição",
+        snapshot,
+        geradoEmIso: new Date().toISOString(),
+        renderConfig: empresaConfig,
+      });
+      const htmlComBase = htmlFinal
+        .replace("<head>", `<head><base href="${window.location.origin}/" />`);
+      opened.document.open();
+      opened.document.write(htmlComBase);
+      opened.document.close();
     })();
-  };
+  }, [empresaConfig, modeloAtual, previewValues, showToast, timbreSelecionado]);
   const moduloAtivo = VARIAVEIS_DOCUMENTO_MODULOS.find((x) => x.id === abaVariaveis) ?? VARIAVEIS_DOCUMENTO_MODULOS[0];
 
   return (
@@ -410,12 +525,7 @@ export default function ConstrutorDocumentosPage() {
             />
           </div>
         </div>
-        <Link
-          href="/configuracoes"
-          className="ml-auto inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 text-sm font-medium text-white transition-colors hover:bg-amber-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:bg-amber-600 dark:hover:bg-amber-500"
-        >
-          Voltar a Configurações
-        </Link>
+        <ConfiguracoesTopNav atalhosDocumentos />
       </div>
 
       {erroLista ? (
@@ -439,44 +549,7 @@ export default function ConstrutorDocumentosPage() {
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
-        <button
-          type="button"
-          onClick={() => setEmpresaCardOpen((v) => !v)}
-          className="flex w-full items-center justify-between text-left"
-          aria-expanded={empresaCardOpen}
-        >
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Padrão da empresa (variáveis `empresa.*`)</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Estes dados são globais e serão usados no preview real dos documentos e como padrão ao criar novos modelos.
-            </p>
-          </div>
-          <ChevronDown
-            className={`h-4 w-4 text-slate-500 transition-transform ${empresaCardOpen ? "rotate-180" : "rotate-0"}`}
-          />
-        </button>
 
-        {empresaCardOpen ? (
-          <>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <input value={empresaConfig.razaoSocial} onChange={(e) => setEmpresaConfig((p) => ({ ...p, razaoSocial: e.target.value }))} placeholder="Razão social" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              <input value={empresaConfig.nomeFantasia} onChange={(e) => setEmpresaConfig((p) => ({ ...p, nomeFantasia: e.target.value }))} placeholder="Nome fantasia" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              <input value={empresaConfig.cnpj} onChange={(e) => setEmpresaConfig((p) => ({ ...p, cnpj: e.target.value }))} placeholder="CNPJ" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              <input value={empresaConfig.telefone} onChange={(e) => setEmpresaConfig((p) => ({ ...p, telefone: e.target.value }))} placeholder="Telefone" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              <input value={empresaConfig.email} onChange={(e) => setEmpresaConfig((p) => ({ ...p, email: e.target.value }))} placeholder="E-mail" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              <input value={empresaConfig.site} onChange={(e) => setEmpresaConfig((p) => ({ ...p, site: e.target.value }))} placeholder="Site" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              <input value={empresaConfig.logoUrl} onChange={(e) => setEmpresaConfig((p) => ({ ...p, logoUrl: e.target.value }))} placeholder="URL da logo" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 lg:col-span-3" />
-              <input value={empresaConfig.endereco} onChange={(e) => setEmpresaConfig((p) => ({ ...p, endereco: e.target.value }))} placeholder="Endereço completo" className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 lg:col-span-3" />
-            </div>
-            <div className="mt-3 flex justify-end">
-              <button type="button" onClick={salvarEmpresaDocumentoConfig} disabled={salvandoEmpresa} className="rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60">
-                {salvandoEmpresa ? "Salvando..." : "Salvar padrão da empresa"}
-              </button>
-            </div>
-          </>
-        ) : null}
-      </div>
       {carregandoLista && modelos.length === 0 && !erroLista ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">Carregando modelos...</p>
       ) : null}
@@ -575,6 +648,39 @@ export default function ConstrutorDocumentosPage() {
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Papel timbrado deste modelo
+              </label>
+              <select
+                value={modeloAtual.timbreId ?? ""}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  const timbre = timbres.find((t) => t.id === nextId);
+                  setModeloAtual((p) => ({ ...p, timbreId: nextId, timbreUrl: timbre?.url ?? "" }));
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              >
+                <option value="">(Nenhum / usa padrão global)</option>
+                {timbres.filter((t) => t.ativo !== false).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-600 dark:bg-slate-800/50">
+              {timbreSelecionado ? (
+                <img src={timbreSelecionado.url} alt={timbreSelecionado.nome} className="h-24 w-full rounded object-contain" />
+              ) : (
+                <div className="flex h-24 items-center justify-center text-xs text-slate-500 dark:text-slate-400">
+                  Prévia do timbrado
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Descrição</label>
             <input
@@ -625,7 +731,7 @@ export default function ConstrutorDocumentosPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Cabeçalho (fixo - logo, endereco, contatos)
+              Cabeçalho (fixo - logo, endereço, contatos)
             </label>
             <DocumentoRichEditor
               key={`cab-${editorResetKey}`}
@@ -680,7 +786,7 @@ export default function ConstrutorDocumentosPage() {
               <div className="max-h-[320px] overflow-y-auto p-2">
                 <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
                   Clique na variável para inserir na posição do cursor no último campo em que você clicou (assunto,
-                  cabeçalho, corpo ou rodape). Campos de texto rico: clique dentro do editor antes de escolher a
+                  cabeçalho, corpo ou rodapé). Campos de texto rico: clique dentro do editor antes de escolher a
                   variável.
                 </p>
                 <div className="flex flex-col gap-1.5">
@@ -720,11 +826,11 @@ export default function ConstrutorDocumentosPage() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
             <button
               type="button"
-              onClick={() => setPreviewOpen(true)}
+              onClick={abrirPreviewCompletoEmNovaAba}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <Eye className="h-4 w-4" />
-              Visualizar preview
+              Visualizar documento completo
             </button>
             <div className="flex gap-2">
               <button
@@ -748,19 +854,6 @@ export default function ConstrutorDocumentosPage() {
         </div>
       </DrawerSheet>
 
-      <DrawerSheet open={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview do documento" maxWidth="sm:max-w-3xl">
-        <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Assunto</p>
-            <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
-              {preencherTemplateDocumento(modeloAtual.assunto || "(sem assunto)", valoresPreviewExemplo(new Date(), empresaConfig))}
-            </p>
-          </div>
-          <PreviewHtmlBloco titulo="Cabeçalho" html={modeloAtual.cabecalhoHtml} previewValues={valoresPreviewExemplo(new Date(), empresaConfig)} />
-          <PreviewHtmlBloco titulo="Corpo" html={modeloAtual.corpo} previewValues={valoresPreviewExemplo(new Date(), empresaConfig)} />
-          <PreviewHtmlBloco titulo="Rodapé" html={modeloAtual.rodapeHtml} previewValues={valoresPreviewExemplo(new Date(), empresaConfig)} />
-        </div>
-      </DrawerSheet>
       <Toast
         visible={toast.visible}
         message={toast.message}

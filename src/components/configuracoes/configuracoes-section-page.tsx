@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
-import Link from "next/link";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { UsuariosTable } from "@/components/configuracoes/usuarios-table";
 import { PerfisAcessoTable } from "@/components/configuracoes/perfis-acesso-table";
@@ -16,6 +15,7 @@ import type { PessoaParaVinculo } from "@/lib/configuracoes/types";
 import type { UsuarioFormPayload } from "@/components/configuracoes/novo-usuario-form";
 import type { PerfilFormPayload } from "@/components/configuracoes/perfil-form";
 import { enrichUsuarioVinculos } from "@/lib/configuracoes/enrich-usuario-vinculos";
+import { ConfiguracoesTopNav } from "@/components/configuracoes/configuracoes-top-nav";
 
 type ConfiguracoesSection = "usuarios" | "perfis" | "logs";
 
@@ -259,12 +259,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
             </label>
           )}
         </div>
-        <Link
-          href="/configuracoes"
-          className="ml-auto inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 text-sm font-medium text-white transition-colors hover:bg-amber-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:bg-amber-600 dark:hover:bg-amber-500"
-        >
-          Voltar a Configurações
-        </Link>
+        <ConfiguracoesTopNav />
       </div>
 
       {section === "usuarios" && (
