@@ -4,19 +4,8 @@ import { ok } from "@/lib/server/api-response";
 
 export async function GET() {
   const [usuariosBase, colaboradoresRh, tarefas] = await Promise.all([
-    prisma.usuario.findMany({
-      where: { ativo: true },
-      orderBy: { nomeExibicao: "asc" },
-      select: { id: true, nomeExibicao: true, email: true, cpf: true },
-    }),
-    prisma.colaboradorRH.findMany({
-      where: {
-        status: "ativo",
-        tipoPessoa: { in: ["equipe_interna", "vendedor_externo", "fornecedor_parceiro"] },
-      },
-      orderBy: { nome: "asc" },
-      select: { nome: true, email: true, cpfCnpj: true },
-    }),
+    loadUsuariosBase(),
+    loadColaboradoresRhSafe(),
     prisma.tarefa.findMany({
       include: {
         criadoPor: true,
@@ -66,5 +55,72 @@ export async function GET() {
     tarefas: mappedTarefas,
     data: { usuarios: mappedUsuarios, tarefas: mappedTarefas },
   });
+}
+
+type UsuarioBase = {
+  id: string;
+  nomeExibicao?: string | null;
+  email: string;
+  cpf?: string | null;
+};
+
+async function loadUsuariosBase(): Promise<UsuarioBase[]> {
+  // Tentativa principal (schema completo).
+  try {
+    const ativos = await prisma.usuario.findMany({
+      where: { ativo: true },
+      orderBy: { nomeExibicao: "asc" },
+      select: { id: true, nomeExibicao: true, email: true, cpf: true },
+    });
+    if (ativos.length > 0) return ativos;
+  } catch (e) {
+    console.warn("[tarefas/bootstrap] usuarios com cpf falhou; fallback sem cpf.", e);
+  }
+
+  // Fallback sem cpf (ambientes com cliente Prisma/schema divergente).
+  try {
+    const ativos = await prisma.usuario.findMany({
+      where: { ativo: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, nomeExibicao: true, email: true },
+    });
+    if (ativos.length > 0) return ativos;
+  } catch (e) {
+    console.warn("[tarefas/bootstrap] usuarios ativos falhou; fallback geral.", e);
+  }
+
+  // Último fallback: não bloquear dropdowns se não houver flag de ativo consistente.
+  try {
+    return await prisma.usuario.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { id: true, nomeExibicao: true, email: true },
+    });
+  } catch (e) {
+    console.error("[tarefas/bootstrap] usuarios fallback geral falhou.", e);
+    return [];
+  }
+}
+
+type ColaboradorRhLite = {
+  nome: string;
+  email: string | null;
+  cpfCnpj: string | null;
+};
+
+async function loadColaboradoresRhSafe(): Promise<ColaboradorRhLite[]> {
+  try {
+    return await prisma.colaboradorRH.findMany({
+      where: {
+        status: "ativo",
+        tipoPessoa: { in: ["equipe_interna", "vendedor_externo", "fornecedor_parceiro"] },
+      },
+      orderBy: { nome: "asc" },
+      select: { nome: true, email: true, cpfCnpj: true },
+    });
+  } catch (e) {
+    // RH não pode derrubar bootstrap de tarefas.
+    console.warn("[tarefas/bootstrap] RH indisponível; seguindo apenas com usuarios.", e);
+    return [];
+  }
 }
 
