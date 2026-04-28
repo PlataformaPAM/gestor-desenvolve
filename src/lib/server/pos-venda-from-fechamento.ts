@@ -33,7 +33,13 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
   return `TAR-${ano}-${String(sequencial).padStart(4, "0")}`;
 }
 
-async function proximoCodigoTarefa(tx: any, ano: number): Promise<string> {
+type TxTarefaCompat = {
+  tarefa: {
+    findFirst: (args: unknown) => Promise<unknown>;
+  };
+};
+
+async function proximoCodigoTarefa(tx: TxTarefaCompat, ano: number): Promise<string> {
   const prefixo = `TAR-${ano}-`;
   const ultimo = (await tx.tarefa.findFirst({
     where: { codigo: { startsWith: prefixo } },
@@ -74,20 +80,21 @@ async function insertPosVendaTarefa(
     tag
   );
   const dataFim = new Date(`${input.dataAgendada}T12:00:00.000Z`);
-  const codigo = await proximoCodigoTarefa(tx, dataFim.getUTCFullYear());
+  const codigo = await proximoCodigoTarefa(tx as unknown as TxTarefaCompat, dataFim.getUTCFullYear());
+  const data: Record<string, unknown> = {
+    id: crypto.randomUUID(),
+    titulo: input.titulo,
+    descricao,
+    status: "a_fazer",
+    prioridade: "media",
+    dataInicio: new Date(),
+    dataFim,
+    clienteId: input.clienteId,
+    responsavelId: input.responsavelId,
+  };
+  if (codigo) data.codigo = codigo;
   await tx.tarefa.create({
-    data: {
-      id: crypto.randomUUID(),
-      codigo,
-      titulo: input.titulo,
-      descricao,
-      status: "a_fazer",
-      prioridade: "media",
-      dataInicio: new Date(),
-      dataFim,
-      clienteId: input.clienteId,
-      responsavelId: input.responsavelId,
-    },
+    data: data as unknown as Prisma.TarefaCreateArgs["data"],
   });
 }
 

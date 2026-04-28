@@ -4,6 +4,7 @@ import { encodePosVendaMeta, pickResponsavelId } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { COOKIE_NAME, decodeSession } from "@/lib/auth";
+import type { Prisma } from "@prisma/client";
 
 function mapStatus(status: TarefaRegua["status"]) {
   if (status === "concluida") return "concluido" as const;
@@ -15,7 +16,13 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
   return `TAR-${ano}-${String(sequencial).padStart(4, "0")}`;
 }
 
-async function proximoCodigoTarefa(tx: any, ano: number): Promise<string> {
+type TxTarefaCompat = {
+  tarefa: {
+    findFirst: (args: unknown) => Promise<unknown>;
+  };
+};
+
+async function proximoCodigoTarefa(tx: TxTarefaCompat, ano: number): Promise<string> {
   const prefixo = `TAR-${ano}-`;
   const ultimo = (await tx.tarefa.findFirst({
     where: { codigo: { startsWith: prefixo } },
@@ -61,20 +68,21 @@ export async function POST(req: Request) {
   );
 
   const created = await prisma.$transaction(async (tx) => {
-    const codigo = await proximoCodigoTarefa(tx, new Date().getFullYear());
+    const codigo = await proximoCodigoTarefa(tx as unknown as TxTarefaCompat, new Date().getFullYear());
+    const data: Record<string, unknown> = {
+      id: tarefa.id,
+      titulo: tarefa.titulo,
+      descricao,
+      status: mapStatus(tarefa.status),
+      prioridade: "media",
+      dataInicio: new Date(),
+      dataFim,
+      clienteId: tarefa.clienteId,
+      responsavelId,
+    };
+    if (codigo) data.codigo = codigo;
     return tx.tarefa.create({
-      data: {
-        id: tarefa.id,
-        codigo,
-        titulo: tarefa.titulo,
-        descricao,
-        status: mapStatus(tarefa.status),
-        prioridade: "media",
-        dataInicio: new Date(),
-        dataFim,
-        clienteId: tarefa.clienteId,
-        responsavelId,
-      },
+      data: data as unknown as Prisma.TarefaCreateArgs["data"],
     });
   });
   await prisma.tarefaHistorico.create({
