@@ -45,6 +45,11 @@ function esc(s: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function codigoOuId(item: { id: string }): string {
+  const codigo = (item as { codigo?: string | null }).codigo;
+  return codigo?.trim() || item.id;
+}
+
 export async function buildPrestacaoContasSnapshot(
   params: PrestacaoContasBuildParams
 ): Promise<PrestacaoContasBuildResult> {
@@ -96,7 +101,7 @@ export async function buildPrestacaoContasSnapshot(
   const tarefaRows = tarefas
     .map((t) => {
       const responsavel = t.responsavel?.nomeExibicao?.trim() || t.responsavel?.email || "Não definido";
-      return `<tr><td>${esc(t.codigo)}</td><td>${esc(t.titulo)}</td><td>${esc(t.status)}</td><td>${esc(
+      return `<tr><td>${esc(codigoOuId(t))}</td><td>${esc(t.titulo)}</td><td>${esc(t.status)}</td><td>${esc(
         t.prioridade
       )}</td><td>${esc(responsavel)}</td><td>${formatDateBr(t.dataInicio)}</td><td>${formatDateBr(t.dataFim)}</td></tr>`;
     })
@@ -105,7 +110,7 @@ export async function buildPrestacaoContasSnapshot(
     .map((t) => {
       const resp = t.responsaveis[0]?.usuario;
       const responsavel = resp?.nomeExibicao?.trim() || resp?.email || "Não definido";
-      return `<tr><td>${esc(t.codigo)}</td><td>${esc(t.assunto)}</td><td>${esc(t.status)}</td><td>${esc(
+      return `<tr><td>${esc(codigoOuId(t))}</td><td>${esc(t.assunto)}</td><td>${esc(t.status)}</td><td>${esc(
         t.prioridade
       )}</td><td>${esc(t.categoria)}</td><td>${esc(responsavel)}</td><td>${formatDateBr(
         t.dataCriacao
@@ -120,7 +125,7 @@ export async function buildPrestacaoContasSnapshot(
       const ultimaAcaoTexto = ultimaAcao ? `${ultimaAcao.acao} (${formatDateBr(ultimaAcao.data)})` : "Sem registro";
       const quemFez = ultimaAcao?.autor?.nomeExibicao?.trim() || ultimaAcao?.autor?.email || responsavel;
       const quandoConcluiu = t.status === "concluido" ? formatDateBr(t.updatedAt) : "—";
-      return `<tr><td>${esc(t.codigo)}</td><td>${esc(t.titulo)}</td><td>${esc(t.status)}</td><td>${esc(
+      return `<tr><td>${esc(codigoOuId(t))}</td><td>${esc(t.titulo)}</td><td>${esc(t.status)}</td><td>${esc(
         responsavel
       )}</td><td>${formatDateBr(t.createdAt)}</td><td>${quandoConcluiu}</td><td>${esc(quemFez)}</td><td>${esc(
         ultimaAcaoTexto
@@ -144,7 +149,7 @@ export async function buildPrestacaoContasSnapshot(
         ultimaInteracao && "data" in ultimaInteracao && ultimaInteracao.data instanceof Date
           ? formatDateBr(ultimaInteracao.data)
           : "Sem registro";
-      return `<tr><td>${esc(t.codigo)}</td><td>${esc(t.assunto)}</td><td>${esc(t.status)}</td><td>${esc(
+      return `<tr><td>${esc(codigoOuId(t))}</td><td>${esc(t.assunto)}</td><td>${esc(t.status)}</td><td>${esc(
         responsavel
       )}</td><td>${formatDateBr(t.dataCriacao)}</td><td>${quandoFechou}</td><td>${esc(quemInteragiu)}</td><td>${esc(
         ultimaData

@@ -50,6 +50,11 @@ function esc(s: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function codigoOuId(item: { id: string }): string {
+  const codigo = (item as { codigo?: string | null }).codigo;
+  return codigo?.trim() || item.id;
+}
+
 export async function buildOperacionalSnapshot(params: OperacionalBuildParams): Promise<OperacionalBuildResult> {
   const reportDef = getOperacionalReportById(params.reportId);
   if (!reportDef) throw new Error("Tipo de relatório operacional inválido.");
@@ -120,7 +125,7 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
   const tarefaRows = tarefas
     .map((t) => {
       const responsavel = t.responsavel?.nomeExibicao?.trim() || t.responsavel?.email || "Não definido";
-      return `<tr><td>${esc(t.codigo)}</td><td>${esc(t.titulo)}</td><td>${esc(t.status)}</td><td>${esc(
+      return `<tr><td>${esc(codigoOuId(t))}</td><td>${esc(t.titulo)}</td><td>${esc(t.status)}</td><td>${esc(
         t.prioridade
       )}</td><td>${esc(responsavel)}</td><td>${formatDateBr(t.dataInicio)}</td><td>${formatDateBr(t.dataFim)}</td></tr>`;
     })
@@ -129,7 +134,7 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
     .map((t) => {
       const resp = t.responsaveis[0]?.usuario;
       const responsavel = resp?.nomeExibicao?.trim() || resp?.email || "Não definido";
-      return `<tr><td>${esc(t.codigo)}</td><td>${esc(t.assunto)}</td><td>${esc(t.status)}</td><td>${esc(
+      return `<tr><td>${esc(codigoOuId(t))}</td><td>${esc(t.assunto)}</td><td>${esc(t.status)}</td><td>${esc(
         t.prioridade
       )}</td><td>${esc(t.categoria)}</td><td>${esc(responsavel)}</td><td>${formatDateBr(
         t.dataCriacao
