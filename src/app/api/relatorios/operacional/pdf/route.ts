@@ -43,7 +43,7 @@ export async function POST(req: Request) {
             absolutizeAssetUrl(report.snapshot.renderConfig.papelTimbradoUrl ?? "", req.url) || timbreAbs
           ),
         }
-      : null;
+      : undefined;
     const html = montarDocumentoHtmlCompleto({
       title: `Relatório - ${report.resumo.reportTitulo}`,
       modeloNome: report.modeloNome,
