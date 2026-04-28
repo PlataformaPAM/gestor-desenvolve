@@ -181,6 +181,20 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - `critério de aceite`:
   - Painel com alertas priorizados e score consolidado por cliente.
 
+## BL-016 - Navegação sidebar sem rolagem (UX)
+- `status`: `planejado`
+- `prioridade`: `P1`
+- `impacto`: Alto (navegação diária e usabilidade em telas menores)
+- `escopo`:
+  - Reorganizar sidebar em modelo híbrido: itens principais fixos + item "Mais".
+  - Adicionar busca de menus (atalho rápido) para abrir páginas sem rolagem.
+  - Criar seção de favoritos por usuário (3-5 atalhos).
+  - Melhorar comportamento responsivo (sidebar recolhida em telas menores).
+- `critério de aceite`:
+  - Sidebar principal sem barra de rolagem em resoluções menores.
+  - Acesso rápido às páginas secundárias via "Mais" e busca.
+  - Navegação mais rápida e consistente entre módulos.
+
 ---
 
 ## Ideias novas para ganho de valor (avaliar)

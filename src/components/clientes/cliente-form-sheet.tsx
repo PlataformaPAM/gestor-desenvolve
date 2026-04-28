@@ -103,6 +103,7 @@ export function ClienteFormSheet({
   const [loadingCep, setLoadingCep] = useState(false);
   const [flashCnpj, setFlashCnpj] = useState(false);
   const [flashCep, setFlashCep] = useState(false);
+  const [erroCnpj, setErroCnpj] = useState<string>("");
   const lastFetchedCnpjRef = useRef<string>("");
   const lastFetchedCepRef = useRef<string>("");
 
@@ -139,12 +140,14 @@ export function ClienteFormSheet({
       setContatos([emptyContato()]);
       setStatus("ativo");
     }
+    setErroCnpj("");
     setActiveTab("empresa");
   }, [open, initialCliente]);
 
   const fetchByCnpj = useCallback(async (digits: string) => {
     if (digits.length !== 14) return;
     setLoadingCnpj(true);
+    setErroCnpj("");
     try {
       const res = await fetchCnpjBrasilApi(digits);
       if (res) {
@@ -154,6 +157,8 @@ export function ClienteFormSheet({
         if (res.email) setEmail(res.email);
         setFlashCnpj(true);
         setTimeout(() => setFlashCnpj(false), 2000);
+      } else {
+        setErroCnpj("Não foi possível consultar o CNPJ na Receita. Verifique o número e tente novamente.");
       }
     } finally {
       setLoadingCnpj(false);
@@ -168,7 +173,10 @@ export function ClienteFormSheet({
       lastFetchedCnpjRef.current = digits;
       fetchByCnpj(digits);
     }
-    if (digits.length < 14) lastFetchedCnpjRef.current = "";
+    if (digits.length < 14) {
+      lastFetchedCnpjRef.current = "";
+      setErroCnpj("");
+    }
   }, [open, initialCliente, cnpjRaw, fetchByCnpj]);
 
   const fetchByCep = useCallback(async (digits: string) => {
@@ -324,6 +332,11 @@ export function ClienteFormSheet({
                     </div>
                   )}
                 </div>
+                {erroCnpj ? (
+                  <p className="mt-1 text-xs text-rose-600" role="status" aria-live="polite">
+                    {erroCnpj}
+                  </p>
+                ) : null}
               </div>
 
               <div>
