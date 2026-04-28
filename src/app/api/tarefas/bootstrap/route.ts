@@ -6,18 +6,7 @@ export async function GET() {
   const [usuariosBase, colaboradoresRh, tarefas] = await Promise.all([
     loadUsuariosBase(),
     loadColaboradoresRhSafe(),
-    prisma.tarefa.findMany({
-      include: {
-        criadoPor: true,
-        cliente: { select: { id: true, nome: true, empresa: true } },
-        clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
-        responsavel: true,
-        colaboradores: { include: { usuario: true } },
-        anexos: true,
-        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
+    loadTarefasSafe(),
   ]);
 
   const usuariosById = new Map<string, { id: string; nome: string }>();
@@ -122,5 +111,39 @@ async function loadColaboradoresRhSafe(): Promise<ColaboradorRhLite[]> {
     console.warn("[tarefas/bootstrap] RH indisponível; seguindo apenas com usuarios.", e);
     return [];
   }
+}
+
+async function loadTarefasSafe() {
+  try {
+    return await prisma.tarefa.findMany({
+      include: {
+        criadoPor: true,
+        cliente: { select: { id: true, nome: true, empresa: true } },
+        clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
+        responsavel: true,
+        colaboradores: { include: { usuario: true } },
+        anexos: true,
+        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (e) {
+    console.warn(
+      "[tarefas/bootstrap] include clientesVinculados indisponível no banco; fallback para cliente único.",
+      e
+    );
+  }
+
+  return await prisma.tarefa.findMany({
+    include: {
+      criadoPor: true,
+      cliente: { select: { id: true, nome: true, empresa: true } },
+      responsavel: true,
+      colaboradores: { include: { usuario: true } },
+      anexos: true,
+      historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
