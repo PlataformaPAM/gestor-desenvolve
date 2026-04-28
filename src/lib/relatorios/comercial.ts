@@ -126,7 +126,7 @@ export async function buildComercialSnapshot(params: ComercialBuildParams): Prom
       corpoHtml: preencherTemplateDocumento(modelo.corpo ?? "", values),
       rodapeHtml: preencherTemplateDocumento(modelo.rodapeHtml ?? "", values),
       timbreUrl: timbre?.url ?? "",
-      renderConfig: timbre?.renderConfig ?? null,
+      renderConfig: timbre?.renderConfig ?? undefined,
     },
     resumo: {
       periodoInicio: values["{{periodo_inicio}}"],

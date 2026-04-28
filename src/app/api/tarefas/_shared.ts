@@ -1,6 +1,11 @@
 import type { Cliente as PrismaCliente, Tarefa as PrismaTarefa, Usuario as PrismaUsuario } from "@prisma/client";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 
+type PrismaTarefaCompat = PrismaTarefa & {
+  // Em ambientes com cliente Prisma desatualizado, "codigo" pode não estar tipado.
+  codigo?: string | null;
+};
+
 export function mapUsuarioTarefaFromDb(u: PrismaUsuario): UsuarioTarefa {
   return {
     id: u.id,
@@ -9,7 +14,7 @@ export function mapUsuarioTarefaFromDb(u: PrismaUsuario): UsuarioTarefa {
 }
 
 export function mapTarefaFromDb(
-  t: PrismaTarefa & {
+  t: PrismaTarefaCompat & {
     criadoPor?: PrismaUsuario | null;
     responsavel: PrismaUsuario;
     colaboradores: Array<{ usuario: PrismaUsuario }>;
@@ -27,7 +32,7 @@ export function mapTarefaFromDb(
 ): Tarefa {
   return {
     id: t.id,
-    codigo: t.codigo,
+    codigo: t.codigo ?? "",
     titulo: t.titulo,
     descricao: t.descricao ?? undefined,
     status: t.status as Tarefa["status"],

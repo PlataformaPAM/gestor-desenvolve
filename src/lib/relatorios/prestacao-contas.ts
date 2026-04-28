@@ -158,16 +158,7 @@ export async function buildPrestacaoContasSnapshot(
   ).length;
 
   const clienteNome = (cliente.empresa?.trim() || cliente.nome).trim();
-  const empresaEndereco = [
-    empresaConfig.endereco?.logradouro?.trim(),
-    empresaConfig.endereco?.numero?.trim(),
-    empresaConfig.endereco?.bairro?.trim(),
-    empresaConfig.endereco?.cidade?.trim(),
-    empresaConfig.endereco?.uf?.trim(),
-    empresaConfig.endereco?.cep?.trim(),
-  ]
-    .filter(Boolean)
-    .join(" - ");
+  const empresaEndereco = (empresaConfig.endereco ?? "").trim();
 
   const values = {
     ...valoresPreviewExemplo(new Date(), empresaConfig),
@@ -212,7 +203,7 @@ export async function buildPrestacaoContasSnapshot(
       corpoHtml: preencherTemplateDocumento(modelo.corpo ?? "", values),
       rodapeHtml: preencherTemplateDocumento(modelo.rodapeHtml ?? "", values),
       timbreUrl: timbre?.url ?? "",
-      renderConfig: timbre?.renderConfig ?? null,
+      renderConfig: timbre?.renderConfig ?? undefined,
     },
     resumo: {
       cliente: values["{{cliente_nome}}"],

@@ -155,7 +155,7 @@ export async function buildFinanceiroSnapshot(params: FinanceiroBuildParams): Pr
       corpoHtml: preencherTemplateDocumento(modelo.corpo ?? "", values),
       rodapeHtml: preencherTemplateDocumento(modelo.rodapeHtml ?? "", values),
       timbreUrl: timbre?.url ?? "",
-      renderConfig: timbre?.renderConfig ?? null,
+      renderConfig: timbre?.renderConfig ?? undefined,
     },
     resumo: {
       cliente: clienteNome,

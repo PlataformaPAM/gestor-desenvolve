@@ -29,6 +29,21 @@ function addCalendarDays(isoDate: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function buildCodigoFrom(ano: number, sequencial: number): string {
+  return `TAR-${ano}-${String(sequencial).padStart(4, "0")}`;
+}
+
+async function proximoCodigoTarefa(tx: Prisma.TransactionClient, ano: number): Promise<string> {
+  const prefixo = `TAR-${ano}-`;
+  const ultimo = await tx.tarefa.findFirst({
+    where: { codigo: { startsWith: prefixo } },
+    orderBy: { codigo: "desc" },
+    select: { codigo: true },
+  });
+  const ultimoSequencial = Number.parseInt(ultimo?.codigo.slice(-4) ?? "0", 10);
+  return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
+}
+
 async function insertPosVendaTarefa(
   tx: Prisma.TransactionClient,
   input: {
@@ -59,9 +74,11 @@ async function insertPosVendaTarefa(
     tag
   );
   const dataFim = new Date(`${input.dataAgendada}T12:00:00.000Z`);
+  const codigo = await proximoCodigoTarefa(tx, dataFim.getUTCFullYear());
   await tx.tarefa.create({
     data: {
       id: crypto.randomUUID(),
+      codigo,
       titulo: input.titulo,
       descricao,
       status: "a_fazer",
