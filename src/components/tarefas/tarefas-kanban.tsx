@@ -194,7 +194,7 @@ export function TarefasKanban({
                                   {prazoDiasLabel(t.dataFim, t.status)}
                                 </p>
                               </div>
-                              {t.clienteId && t.clienteNome ? (
+                              {t.clienteNome ? (
                                 <div className="min-w-0">
                                   <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
                                     Cliente:

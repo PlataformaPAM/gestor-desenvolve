@@ -36,6 +36,7 @@ export type Tarefa = {
   responsavel: UsuarioTarefa;
   colaboradores: UsuarioTarefa[];
   clienteId?: string;
+  clienteIds?: string[];
   clienteNome?: string;
   solucaoId?: string;
   /** Nomes dos anexos persistidos */

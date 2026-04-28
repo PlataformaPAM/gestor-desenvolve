@@ -63,6 +63,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         data: tarefa.colaboradores.map((c) => ({ tarefaId: id, usuarioId: c.id })),
       });
     }
+    await tx.tarefaCliente.deleteMany({ where: { tarefaId: id } });
+    const clienteIds = Array.from(new Set((tarefa.clienteIds ?? [tarefa.clienteId]).filter(Boolean) as string[]));
+    if (clienteIds.length) {
+      await tx.tarefaCliente.createMany({
+        data: clienteIds.map((clienteId) => ({ tarefaId: id, clienteId })),
+      });
+    }
 
     await tx.tarefaAnexo.deleteMany({ where: { tarefaId: id } });
     if (tarefa.anexos?.length) {
@@ -94,6 +101,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     where: { id },
     include: {
       cliente: { select: { id: true, nome: true, empresa: true } },
+      clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
       responsavel: true,
       colaboradores: { include: { usuario: true } },
       anexos: true,

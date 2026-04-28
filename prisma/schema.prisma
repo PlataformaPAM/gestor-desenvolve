@@ -384,6 +384,7 @@ model Cliente {
   leads              Lead[]
   contratos          Contrato[]
   tarefas            Tarefa[]
+  tarefasVinculadas  TarefaCliente[]
   helpdeskTickets    HelpdeskTicket[]
   lancamentos        Lancamento[]
   criadoPorId        String?
@@ -706,6 +707,7 @@ model LeadInteractionAnexo {
 
 model Tarefa {
   id                 String                 @id @default(uuid())
+  codigo             String                 @unique
   titulo             String
   descricao          String?
   status             TarefaStatus
@@ -722,10 +724,23 @@ model Tarefa {
   criadoPor          Usuario?               @relation("TarefaCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   atualizadoPor      Usuario?               @relation("TarefaAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   colaboradores      TarefaColaborador[]
+  clientesVinculados TarefaCliente[]
   anexos             TarefaAnexo[]
   historico          TarefaHistorico[]
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
+}
+
+model TarefaCliente {
+  id                 String                 @id @default(uuid())
+  tarefaId           String
+  clienteId          String
+  tarefa             Tarefa                 @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@unique([tarefaId, clienteId])
 }
 
 model TarefaColaborador {

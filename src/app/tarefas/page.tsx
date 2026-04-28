@@ -38,6 +38,24 @@ function formatDataHoraBr(iso: string): string {
   });
 }
 
+function formatClienteResumo(
+  clienteIds: string[],
+  clientes: Pick<Cliente, "id" | "nome" | "empresa">[]
+): string | undefined {
+  const ids = Array.from(new Set(clienteIds.filter(Boolean)));
+  if (ids.length === 0) return undefined;
+  const nomes = ids
+    .map((id) => {
+      const c = clientes.find((x) => x.id === id);
+      return c ? (c.empresa?.trim() || c.nome || "") : "";
+    })
+    .filter(Boolean);
+  if (nomes.length === 0) return undefined;
+  if (clientes.length > 0 && ids.length === clientes.length) return "Todos os Clientes";
+  if (nomes.length === 1) return nomes[0];
+  return `${nomes[0]} e mais ${nomes.length - 1} cliente${nomes.length - 1 > 1 ? "s" : ""}`;
+}
+
 const STATUS_OPTIONS: { value: "" | StatusTarefa; label: string }[] = [
   { value: "", label: "Todos" },
   ...(Object.entries(STATUS_LABELS) as [StatusTarefa, string][]).map(([v, l]) => ({ value: v as "" | StatusTarefa, label: l })),
@@ -166,13 +184,22 @@ export default function TarefasPage() {
   }, []);
 
   const tarefasOperacionais = useMemo(() => {
+    const aplicarResumoClientes = (lista: Tarefa[]) =>
+      lista.map((t) => ({
+        ...t,
+        clienteNome:
+          formatClienteResumo(
+            t.clienteIds?.length ? t.clienteIds : ([t.clienteId].filter(Boolean) as string[]),
+            clientes
+          ) ?? t.clienteNome,
+      }));
     const now = new Date();
     const ativas = tarefas.filter((t) => t.status !== "concluido");
     const isMinhaTarefa = (t: Tarefa) =>
       t.responsavel.id === CURRENT_USER_ID || (t.colaboradores ?? []).some((c) => c.id === CURRENT_USER_ID);
     let base: Tarefa[] = [];
     if (operacaoView === "fechados") {
-      return [...tarefas.filter((t) => t.status === "concluido")].sort((a, b) => {
+      return aplicarResumoClientes([...tarefas.filter((t) => t.status === "concluido")]).sort((a, b) => {
         const aTime = new Date(a.updatedAt ?? a.dataFim).getTime();
         const bTime = new Date(b.updatedAt ?? b.dataFim).getTime();
         return bTime - aTime;
@@ -188,13 +215,13 @@ export default function TarefasPage() {
     } else {
       base = ativas.filter((t) => getSituacaoOperacional(t.dataFim, now) === "vence_logo");
     }
-    return sortByPriorizacao(base, {
+    return aplicarResumoClientes(sortByPriorizacao(base, {
       prioridade: (t) => t.prioridade,
       vencimentoIso: (t) => t.dataFim,
       atualizadoIso: (t) => t.updatedAt ?? t.dataInicio,
       now,
-    });
-  }, [tarefas, operacaoView]);
+    }));
+  }, [tarefas, operacaoView, clientes]);
 
   const tarefasFiltradas = useMemo(() => {
     return tarefasOperacionais.filter((t) => {
@@ -205,23 +232,25 @@ export default function TarefasPage() {
     });
   }, [tarefasOperacionais, statusFilter, prioridadeFilter, responsavelFilter]);
 
-  const handleNovaTarefa = useCallback((nova: Omit<Tarefa, "id">) => {
+  const handleNovaTarefa = useCallback((nova: Omit<Tarefa, "id"> & { clienteIds?: string[] }) => {
     const nowIso = new Date().toISOString();
     const createdBy = usuariosMap.get(CURRENT_USER_ID)?.nome ?? "Usuário";
-    const cliente = nova.clienteId ? clientes.find((c) => c.id === nova.clienteId) : undefined;
-    const clienteNome = cliente ? (cliente.empresa?.trim() || cliente.nome || "") : undefined;
+    const clienteIds = Array.from(
+      new Set((nova.clienteIds?.length ? nova.clienteIds : [nova.clienteId]).filter(Boolean) as string[])
+    );
+    const clienteNome = formatClienteResumo(clienteIds, clientes);
     const created: Tarefa = {
       ...nova,
       id: generateId(),
-      clienteNome: clienteNome || undefined,
+      clienteId: clienteIds[0] || undefined,
+      clienteIds,
+      clienteNome,
       registroCriadoPorNome: createdBy,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
-    setTarefas((prev) => [
-      ...prev,
-      created,
-    ]);
+
+    setTarefas((prev) => [...prev, created]);
     void saveTarefa(created, true)
       .then((saved) => {
         setTarefas((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
@@ -375,10 +404,17 @@ export default function TarefasPage() {
           autorId,
         });
       }
-      if ((current.clienteId ?? "") !== (payload.clienteId ?? "")) {
+      const currentClienteIds = [...(current.clienteIds?.length ? current.clienteIds : [current.clienteId].filter(Boolean) as string[])].sort().join(",");
+      const nextClienteIds = [...(payload.clienteIds?.length ? payload.clienteIds : [payload.clienteId].filter(Boolean) as string[])].sort().join(",");
+      if (currentClienteIds !== nextClienteIds) {
         const clienteAnterior = current.clienteNome?.trim() || "Nenhum";
-        const clienteNovoObj = payload.clienteId ? clientes.find((c) => c.id === payload.clienteId) : undefined;
-        const clienteNovo = clienteNovoObj ? (clienteNovoObj.empresa?.trim() || clienteNovoObj.nome || "") : "Nenhum";
+        const clienteNovo =
+          formatClienteResumo(
+            payload.clienteIds?.length
+              ? payload.clienteIds
+              : ([payload.clienteId].filter(Boolean) as string[]),
+            clientes
+          ) || "Nenhum";
         entries.push({
           id: `h-${Date.now()}-cl`,
           data: now,
@@ -420,12 +456,16 @@ export default function TarefasPage() {
         status: payload.status,
         prioridade: payload.prioridade,
         responsavel,
-        clienteId: payload.clienteId,
-        clienteNome: payload.clienteId
-          ? ((clientes.find((c) => c.id === payload.clienteId)?.empresa?.trim()
-              || clientes.find((c) => c.id === payload.clienteId)?.nome
-              || ""))
-          : undefined,
+        clienteId: (payload.clienteIds?.[0] ?? payload.clienteId) || undefined,
+        clienteIds: payload.clienteIds?.length
+          ? payload.clienteIds
+          : [payload.clienteId].filter(Boolean) as string[],
+        clienteNome: formatClienteResumo(
+          payload.clienteIds?.length
+            ? payload.clienteIds
+            : ([payload.clienteId].filter(Boolean) as string[]),
+          clientes
+        ),
         colaboradores,
         dataInicio: payload.dataInicio,
         dataFim: payload.dataFim,

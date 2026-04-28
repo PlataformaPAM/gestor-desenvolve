@@ -59,6 +59,7 @@ export type TarefaSalvarPayload = {
   prioridade: Tarefa["prioridade"];
   responsavelId: string;
   clienteId?: string;
+  clienteIds?: string[];
   dataInicio: string;
   dataFim: string;
   colaboradorIds: string[];
@@ -101,7 +102,7 @@ export function TarefaDetalheDrawer({
   const [status, setStatus] = useState<Tarefa["status"]>("a_fazer");
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState("");
-  const [clienteId, setClienteId] = useState("");
+  const [clienteIds, setClienteIds] = useState<string[]>([]);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
@@ -114,7 +115,7 @@ export function TarefaDetalheDrawer({
     setStatus(tarefa.status);
     setPrioridade(tarefa.prioridade);
     setResponsavelId(tarefa.responsavel.id);
-    setClienteId(tarefa.clienteId ?? "");
+    setClienteIds(tarefa.clienteIds?.length ? tarefa.clienteIds : (tarefa.clienteId ? [tarefa.clienteId] : []));
     setDataInicio(isoToDateInput(tarefa.dataInicio));
     setDataFim(isoToDateInput(tarefa.dataFim));
     setColaboradorIds(tarefa.colaboradores?.map((c) => c.id) ?? []);
@@ -166,7 +167,8 @@ export function TarefaDetalheDrawer({
       status,
       prioridade,
       responsavelId,
-      clienteId: clienteId || undefined,
+      clienteId: clienteIds[0] || undefined,
+      clienteIds,
       dataInicio: dataInicioIso,
       dataFim: dataFimIso,
       colaboradorIds,
@@ -186,11 +188,17 @@ export function TarefaDetalheDrawer({
     .map(([value, label]) => ({ value, label }));
   const prioridadeOptions: SearchableOption[] = (Object.entries(PRIORIDADE_LABELS) as [Tarefa["prioridade"], string][])
     .map(([value, label]) => ({ value, label }));
-  const clienteOptions: SearchableOption[] = clientes.map((c) => ({
-    value: c.id,
-    label: (c.empresa?.trim() || c.nome).trim(),
-    subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
-  }));
+  const clienteOptions: SearchableOption[] = [...clientes]
+    .sort((a, b) =>
+      (a.empresa?.trim() || a.nome).localeCompare((b.empresa?.trim() || b.nome), "pt-BR", {
+        sensitivity: "base",
+      })
+    )
+    .map((c) => ({
+      value: c.id,
+      label: (c.empresa?.trim() || c.nome).trim(),
+      subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
+    }));
 
   const inputClass =
     "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
@@ -303,13 +311,14 @@ export function TarefaDetalheDrawer({
               />
             </div>
             <div>
-              <label className={labelClass}>Cliente vinculado (opcional)</label>
-              <SearchableSelect
+              <label className={labelClass}>Clientes vinculados (opcional)</label>
+              <SearchableMultiSelect
                 options={clienteOptions}
-                value={clienteId}
-                onChange={setClienteId}
-                placeholder="Nenhum cliente"
+                values={clienteIds}
+                onChange={setClienteIds}
+                placeholder="Selecionar clientes..."
                 searchPlaceholder="Buscar cliente..."
+                selectedLabel="Selecionados"
               />
             </div>
 

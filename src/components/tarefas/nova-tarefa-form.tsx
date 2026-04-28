@@ -18,7 +18,7 @@ type NovaTarefaFormProps = {
   clientes?: Pick<Cliente, "id" | "nome" | "empresa">[];
   /** ID do usuário logado — responsável vem preenchido com ele ao abrir */
   currentUserId?: string;
-  onSave: (tarefa: Omit<Tarefa, "id">) => void;
+  onSave: (tarefa: Omit<Tarefa, "id"> & { clienteIds?: string[] }) => void;
   onCancel: () => void;
 };
 
@@ -36,7 +36,7 @@ export function NovaTarefaForm({
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState(currentUserId);
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
-  const [clienteId, setClienteId] = useState("");
+  const [clienteIds, setClienteIds] = useState<string[]>([]);
   const [dataFim, setDataFim] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [pendingRemoveAnexo, setPendingRemoveAnexo] = useState<{
@@ -52,11 +52,20 @@ export function NovaTarefaForm({
   };
 
   const responsavelOptions: SearchableOption[] = usuarios.map((u) => ({ value: u.id, label: u.nome }));
-  const clienteOptions: SearchableOption[] = clientes.map((c) => ({
-    value: c.id,
-    label: (c.empresa?.trim() || c.nome).trim(),
-    subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
-  }));
+  const clienteOptions: SearchableOption[] = [
+    { value: "__TODOS__", label: "Selecionar Todos" },
+    ...[...clientes]
+      .sort((a, b) =>
+        (a.empresa?.trim() || a.nome).localeCompare((b.empresa?.trim() || b.nome), "pt-BR", {
+          sensitivity: "base",
+        })
+      )
+      .map((c) => ({
+        value: c.id,
+        label: (c.empresa?.trim() || c.nome).trim(),
+        subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
+      })),
+  ];
   const colaboradorOptions: SearchableOption[] = usuarios
     .filter((u) => u.id !== responsavelId)
     .map((u) => ({ value: u.id, label: u.nome }));
@@ -75,6 +84,11 @@ export function NovaTarefaForm({
       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const quemCriou =
       (currentUserId ? usuarios.find((u) => u.id === currentUserId) : undefined) ?? responsavel;
+    const hasSelecionarTodos = clienteIds.includes("__TODOS__");
+    const clienteIdsFinal = hasSelecionarTodos
+      ? clientes.map((c) => c.id)
+      : clienteIds.filter((id) => id !== "__TODOS__");
+
     onSave({
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
@@ -84,7 +98,8 @@ export function NovaTarefaForm({
       dataFim: fim,
       responsavel,
       colaboradores: colaboradores.filter((c) => c.id !== responsavelId),
-      clienteId: clienteId || undefined,
+      clienteId: clienteIdsFinal[0] || undefined,
+      clienteIds: clienteIdsFinal,
       anexos: arquivos.map((f) => f.name),
       arquivos,
       historico: [
@@ -163,14 +178,15 @@ export function NovaTarefaForm({
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Cliente vinculado (opcional)
+          Clientes vinculados (opcional)
         </label>
-        <SearchableSelect
+        <SearchableMultiSelect
           options={clienteOptions}
-          value={clienteId}
-          onChange={setClienteId}
-          placeholder="Nenhum cliente"
+          values={clienteIds}
+          onChange={setClienteIds}
+          placeholder="Selecionar clientes..."
           searchPlaceholder="Buscar cliente..."
+          selectedLabel="Selecionados"
         />
       </div>
 

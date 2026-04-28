@@ -88,6 +88,12 @@ export async function POST(req: Request) {
         data: tarefa.colaboradores.map((c) => ({ tarefaId: tarefa.id, usuarioId: c.id })),
       });
     }
+    const clienteIds = Array.from(new Set((tarefa.clienteIds ?? [tarefa.clienteId]).filter(Boolean) as string[]));
+    if (clienteIds.length) {
+      await tx.tarefaCliente.createMany({
+        data: clienteIds.map((clienteId) => ({ tarefaId: tarefa.id, clienteId })),
+      });
+    }
 
     if (tarefa.anexos?.length) {
       await tx.tarefaAnexo.createMany({
@@ -132,6 +138,7 @@ export async function POST(req: Request) {
     where: { id: tarefa.id },
     include: {
       cliente: { select: { id: true, nome: true, empresa: true } },
+      clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
       responsavel: true,
       colaboradores: { include: { usuario: true } },
       anexos: true,

@@ -19,6 +19,7 @@ export function mapTarefaFromDb(
     responsavel: PrismaUsuario;
     colaboradores: Array<{ usuario: PrismaUsuario }>;
     cliente?: Pick<PrismaCliente, "id" | "nome" | "empresa"> | null;
+    clientesVinculados?: Array<{ cliente: Pick<PrismaCliente, "id" | "nome" | "empresa"> }>;
     anexos: Array<{ nomeArquivo: string }>;
     historico: Array<{
       id: string;
@@ -30,6 +31,16 @@ export function mapTarefaFromDb(
     }>;
   }
 ): Tarefa {
+  const clientesVinculados = (t.clientesVinculados ?? [])
+    .map((v) => v.cliente)
+    .filter(Boolean)
+    .map((c) => ({
+      id: c.id,
+      nomeExibicao: (c.empresa?.trim() || c.nome).trim(),
+    }));
+  const clienteIds = clientesVinculados.map((c) => c.id);
+  const clienteNomeConcat = clientesVinculados.map((c) => c.nomeExibicao).join(", ");
+
   return {
     id: t.id,
     codigo: t.codigo ?? "",
@@ -41,8 +52,11 @@ export function mapTarefaFromDb(
     dataFim: t.dataFim.toISOString(),
     responsavel: mapUsuarioTarefaFromDb(t.responsavel),
     colaboradores: t.colaboradores.map((c) => mapUsuarioTarefaFromDb(c.usuario)),
-    clienteId: t.clienteId ?? undefined,
-    clienteNome: t.cliente ? (t.cliente.empresa?.trim() || t.cliente.nome).trim() : undefined,
+    clienteId: t.clienteId ?? clienteIds[0] ?? undefined,
+    clienteIds,
+    clienteNome:
+      clienteNomeConcat ||
+      (t.cliente ? (t.cliente.empresa?.trim() || t.cliente.nome).trim() : undefined),
     solucaoId: t.solucaoId ?? undefined,
     anexos: t.anexos.map((a) => a.nomeArquivo),
     historico: t.historico.map((h) => ({

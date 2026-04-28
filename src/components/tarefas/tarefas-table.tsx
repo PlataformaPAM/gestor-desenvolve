@@ -101,7 +101,7 @@ export function TarefasTable({
                     <p className="text-xs text-slate-600 dark:text-slate-300">
                       <span className="font-medium">Responsável:</span> {t.responsavel.nome}
                     </p>
-                    {t.clienteId && t.clienteNome ? (
+                    {t.clienteNome ? (
                       <p className="truncate text-xs text-slate-600 dark:text-slate-300">
                         <span className="font-medium">Cliente:</span> {t.clienteNome}
                       </p>
