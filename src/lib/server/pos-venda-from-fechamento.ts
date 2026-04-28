@@ -33,14 +33,14 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
   return `TAR-${ano}-${String(sequencial).padStart(4, "0")}`;
 }
 
-async function proximoCodigoTarefa(tx: Prisma.TransactionClient, ano: number): Promise<string> {
+async function proximoCodigoTarefa(tx: any, ano: number): Promise<string> {
   const prefixo = `TAR-${ano}-`;
-  const ultimo = await tx.tarefa.findFirst({
+  const ultimo = (await tx.tarefa.findFirst({
     where: { codigo: { startsWith: prefixo } },
     orderBy: { codigo: "desc" },
     select: { codigo: true },
-  });
-  const ultimoSequencial = Number.parseInt(ultimo?.codigo.slice(-4) ?? "0", 10);
+  })) as { codigo?: string } | null;
+  const ultimoSequencial = Number.parseInt(ultimo?.codigo?.slice(-4) ?? "0", 10);
   return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
 }
 
