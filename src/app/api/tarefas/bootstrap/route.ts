@@ -38,7 +38,16 @@ export async function GET() {
   const mappedUsuarios = [...usuariosById.values()].sort((a, b) =>
     a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
   );
-  const mappedTarefas = tarefas.map(mapTarefaFromDb);
+  const mappedTarefas = tarefas
+    .map((t) => {
+      try {
+        return mapTarefaFromDb(t);
+      } catch (e) {
+        console.warn("[tarefas/bootstrap] falha ao mapear tarefa; item ignorado.", e);
+        return null;
+      }
+    })
+    .filter((t): t is NonNullable<typeof t> => t != null);
   return ok({
     usuarios: mappedUsuarios,
     tarefas: mappedTarefas,
@@ -134,16 +143,21 @@ async function loadTarefasSafe() {
     );
   }
 
-  return await prisma.tarefa.findMany({
-    include: {
-      criadoPor: true,
-      cliente: { select: { id: true, nome: true, empresa: true } },
-      responsavel: true,
-      colaboradores: { include: { usuario: true } },
-      anexos: true,
-      historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    return await prisma.tarefa.findMany({
+      include: {
+        criadoPor: true,
+        cliente: { select: { id: true, nome: true, empresa: true } },
+        responsavel: true,
+        colaboradores: { include: { usuario: true } },
+        anexos: true,
+        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (e) {
+    console.error("[tarefas/bootstrap] falha ao carregar tarefas; retornando lista vazia.", e);
+    return [];
+  }
 }
 
