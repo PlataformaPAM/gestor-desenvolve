@@ -6,6 +6,12 @@ import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
 
+type TxTarefaCompat = {
+  tarefa: {
+    findFirst: (args: unknown) => Promise<unknown>;
+  };
+};
+
 function buildHistoricoId(tarefaId: string, index: number): string {
   return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -15,16 +21,16 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
 }
 
 async function proximoCodigoTarefa(
-  tx: Prisma.TransactionClient,
+  tx: TxTarefaCompat,
   ano: number
 ): Promise<string> {
   const prefixo = `TAR-${ano}-`;
-  const ultimo = await tx.tarefa.findFirst({
+  const ultimo = (await tx.tarefa.findFirst({
     where: { codigo: { startsWith: prefixo } },
     orderBy: { codigo: "desc" },
     select: { codigo: true },
-  });
-  const ultimoSequencial = Number.parseInt(ultimo?.codigo.slice(-4) ?? "0", 10);
+  })) as { codigo?: string } | null;
+  const ultimoSequencial = Number.parseInt(ultimo?.codigo?.slice(-4) ?? "0", 10);
   return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
 }
 
@@ -40,7 +46,7 @@ export async function POST(req: Request) {
     try {
       await prisma.$transaction(async (tx) => {
         const now = new Date();
-        const codigo = await proximoCodigoTarefa(tx, now.getFullYear());
+        const codigo = await proximoCodigoTarefa(tx as unknown as TxTarefaCompat, now.getFullYear());
 
     const autorIds = Array.from(
       new Set(
@@ -60,20 +66,21 @@ export async function POST(req: Request) {
         : []
     );
 
+    const data: Record<string, unknown> = {
+      id: tarefa.id,
+      titulo: tarefa.titulo,
+      descricao: tarefa.descricao ?? null,
+      status: tarefa.status,
+      prioridade: tarefa.prioridade,
+      dataInicio: new Date(tarefa.dataInicio),
+      dataFim: new Date(tarefa.dataFim),
+      clienteId: tarefa.clienteId ?? null,
+      solucaoId: tarefa.solucaoId ?? null,
+      responsavelId: tarefa.responsavel.id,
+    };
+    if (codigo) data.codigo = codigo;
     await tx.tarefa.create({
-      data: {
-        id: tarefa.id,
-        codigo,
-        titulo: tarefa.titulo,
-        descricao: tarefa.descricao ?? null,
-        status: tarefa.status,
-        prioridade: tarefa.prioridade,
-        dataInicio: new Date(tarefa.dataInicio),
-        dataFim: new Date(tarefa.dataFim),
-        clienteId: tarefa.clienteId ?? null,
-        solucaoId: tarefa.solucaoId ?? null,
-        responsavelId: tarefa.responsavel.id,
-      },
+      data: data as unknown as Prisma.TarefaCreateArgs["data"],
     });
 
     if (tarefa.colaboradores?.length) {
