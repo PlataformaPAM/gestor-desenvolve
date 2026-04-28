@@ -24,6 +24,7 @@ import {
   User,
   Package,
   FileText,
+  BarChart3,
 } from "lucide-react";
 import { GlobalHeader } from "./global-header";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
@@ -59,10 +60,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Clientes", href: "/clientes", icon: Users, modulo: "clientes" },
   { label: "Contratos", href: "/contratos", icon: FileText, modulo: "clientes" },
   { label: "Soluções", href: "/solucoes", icon: Package, modulo: "posVenda" },
-  { label: "Helpdesk", href: "/helpdesk", icon: LifeBuoy, modulo: "helpdesk" },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, modulo: "helpdesk" },
   { label: "Pós-venda", href: "/pos-venda", icon: CheckCircle2, modulo: "posVenda" },
   { label: "Minha caixa", href: "/alertas", icon: Bell },
   { label: "Tarefas Internas", href: "/tarefas", icon: ListTodo, modulo: "tarefas" },
+  { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { label: "RH e Parceiros", href: "/rh", icon: UserCog, modulo: "rh" },
 ];
 
@@ -556,7 +558,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       financeiro: "/financeiro",
       comercial: "/comercial",
       contratos: "/contratos",
-      helpdesk: "/helpdesk",
+      helpdesk: "/suporte",
       posVenda: "/pos-venda",
       sistema: "/alertas",
     };

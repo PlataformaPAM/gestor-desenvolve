@@ -5,6 +5,10 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 
+function buildHistoricoId(tarefaId: string, index: number): string {
+  return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const parsed = await parseJsonSafe<{ tarefa?: Tarefa }>(req);
@@ -20,6 +24,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   });
 
   await prisma.$transaction(async (tx) => {
+    const autorIds = Array.from(
+      new Set(
+        (tarefa.historico ?? [])
+          .map((h) => h.autorId?.trim() ?? "")
+          .filter((autorId) => Boolean(autorId))
+      )
+    );
+    const autoresValidos = new Set(
+      autorIds.length
+        ? (
+            await tx.usuario.findMany({
+              where: { id: { in: autorIds } },
+              select: { id: true },
+            })
+          ).map((u) => u.id)
+        : []
+    );
+
     await tx.tarefa.update({
       where: { id },
       data: {
@@ -51,14 +73,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     await tx.tarefaHistoricoAnexo.deleteMany({ where: { historico: { tarefaId: id } } });
     await tx.tarefaHistorico.deleteMany({ where: { tarefaId: id } });
-    for (const h of tarefa.historico ?? []) {
+    for (const [index, h] of (tarefa.historico ?? []).entries()) {
+      const autorId = h.autorId?.trim() ?? "";
       await tx.tarefaHistorico.create({
         data: {
-          id: h.id,
+          id: buildHistoricoId(id, index),
           tarefaId: id,
           data: new Date(h.data),
           acao: h.acao,
-          autorId: h.autorId?.trim() ? h.autorId.trim() : null,
+          autorId: autorId && autoresValidos.has(autorId) ? autorId : null,
           anexos: {
             create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
           },
@@ -70,6 +93,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const saved = await prisma.tarefa.findUniqueOrThrow({
     where: { id },
     include: {
+      cliente: { select: { id: true, nome: true, empresa: true } },
       responsavel: true,
       colaboradores: { include: { usuario: true } },
       anexos: true,

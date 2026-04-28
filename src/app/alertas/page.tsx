@@ -125,7 +125,7 @@ function AlertasPageContent() {
     { id: "financeiro", label: "Financeiro" },
     { id: "comercial", label: "Comercial" },
     { id: "contratos", label: "Contratos" },
-    { id: "helpdesk", label: "Helpdesk" },
+    { id: "helpdesk", label: "Suporte" },
     { id: "posVenda", label: "Pós-venda" },
     { id: "sistema", label: "Sistema" },
   ];

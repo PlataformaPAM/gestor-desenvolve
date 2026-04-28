@@ -1,4 +1,4 @@
-import type { Ticket } from "@/lib/helpdesk/types";
+import type { Ticket } from "@/lib/suporte/types";
 import { prisma } from "@/lib/prisma";
 import { mapTicketFromDb } from "./_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";

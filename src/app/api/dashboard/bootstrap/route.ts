@@ -149,7 +149,7 @@ export async function GET() {
           tipo: "Ticket",
           titulo: `${t.codigo} · ${t.assunto.slice(0, 36)}`,
           when: t.previsaoConclusao.toISOString(),
-          href: "/helpdesk",
+          href: "/suporte",
           accent: "#0ea5e9",
         });
       });
@@ -262,8 +262,8 @@ export async function GET() {
       },
       {
         id: "helpdesk",
-        title: "Helpdesk",
-        href: "/helpdesk",
+        title: "Suporte",
+        href: "/suporte",
         stat: `${ticketsAbertos} abertos`,
         sub: ticketsCriticos ? `${ticketsCriticos} críticos` : "SLA em dia",
         gradient: "from-sky-500/20 to-transparent",

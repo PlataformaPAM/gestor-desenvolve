@@ -47,6 +47,7 @@ const PATH_TO_MODULE: Record<string, ModuloPermissao> = {
   "/clientes": "clientes",
   "/contratos": "clientes",
   "/helpdesk": "helpdesk",
+  "/suporte": "helpdesk",
   "/pos-venda": "posVenda",
   "/tarefas": "tarefas",
   "/rh": "rh",

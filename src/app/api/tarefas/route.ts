@@ -4,6 +4,29 @@ import { mapTarefaFromDb } from "./_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
+import { Prisma } from "@prisma/client";
+
+function buildHistoricoId(tarefaId: string, index: number): string {
+  return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildCodigoFrom(ano: number, sequencial: number): string {
+  return `TAR-${ano}-${String(sequencial).padStart(4, "0")}`;
+}
+
+async function proximoCodigoTarefa(
+  tx: Prisma.TransactionClient,
+  ano: number
+): Promise<string> {
+  const prefixo = `TAR-${ano}-`;
+  const ultimo = await tx.tarefa.findFirst({
+    where: { codigo: { startsWith: prefixo } },
+    orderBy: { codigo: "desc" },
+    select: { codigo: true },
+  });
+  const ultimoSequencial = Number.parseInt(ultimo?.codigo.slice(-4) ?? "0", 10);
+  return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
+}
 
 export async function POST(req: Request) {
   const parsed = await parseJsonSafe<{ tarefa?: Tarefa }>(req);
@@ -13,10 +36,34 @@ export async function POST(req: Request) {
     return fail("BAD_REQUEST", "Payload de tarefa inválido.", 400);
   }
 
-  await prisma.$transaction(async (tx) => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const codigo = await proximoCodigoTarefa(tx, now.getFullYear());
+
+    const autorIds = Array.from(
+      new Set(
+        (tarefa.historico ?? [])
+          .map((h) => h.autorId?.trim() ?? "")
+          .filter((autorId) => Boolean(autorId))
+      )
+    );
+    const autoresValidos = new Set(
+      autorIds.length
+        ? (
+            await tx.usuario.findMany({
+              where: { id: { in: autorIds } },
+              select: { id: true },
+            })
+          ).map((u) => u.id)
+        : []
+    );
+
     await tx.tarefa.create({
       data: {
         id: tarefa.id,
+        codigo,
         titulo: tarefa.titulo,
         descricao: tarefa.descricao ?? null,
         status: tarefa.status,
@@ -41,25 +88,43 @@ export async function POST(req: Request) {
       });
     }
 
-    for (const h of tarefa.historico ?? []) {
+    for (const [index, h] of (tarefa.historico ?? []).entries()) {
+      const autorId = h.autorId?.trim() ?? "";
       await tx.tarefaHistorico.create({
         data: {
-          id: h.id,
+          id: buildHistoricoId(tarefa.id, index),
           tarefaId: tarefa.id,
           data: new Date(h.data),
           acao: h.acao,
-          autorId: h.autorId?.trim() ? h.autorId.trim() : null,
+          autorId: autorId && autoresValidos.has(autorId) ? autorId : null,
           anexos: {
             create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
           },
         },
       });
     }
-  });
+      });
+      break;
+    } catch (error) {
+      const target =
+        error instanceof Prisma.PrismaClientKnownRequestError ? error.meta?.target : undefined;
+      const targetIncludesCodigo = Array.isArray(target)
+        ? target.includes("codigo")
+        : typeof target === "string"
+          ? target.includes("codigo")
+          : false;
+      const isUniqueCodigoConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        targetIncludesCodigo;
+      if (!isUniqueCodigoConflict || attempt === 4) throw error;
+    }
+  }
 
   const saved = await prisma.tarefa.findUniqueOrThrow({
     where: { id: tarefa.id },
     include: {
+      cliente: { select: { id: true, nome: true, empresa: true } },
       responsavel: true,
       colaboradores: { include: { usuario: true } },
       anexos: true,

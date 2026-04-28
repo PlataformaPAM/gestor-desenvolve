@@ -1,23 +1,18 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { FileText, History, Paperclip, AlertCircle, AlertTriangle, Eye, X } from "lucide-react";
+import { FileText, History, Paperclip, Eye, X } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
-import { STATUS_LABELS, PRIORIDADE_LABELS, getSlaTarefa } from "@/lib/tarefas/constants";
+import { STATUS_LABELS, PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import {
+  SearchableMultiSelect,
+  SearchableSelect,
+  type SearchableOption,
+} from "@/components/ui/searchable-select";
+import { DateField } from "@/components/ui/date-field";
 import clsx from "clsx";
-
-const PRIORIDADE_BADGE: Record<Tarefa["prioridade"], string> = {
-  baixa:
-    "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  media:
-    "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-300",
-  alta:
-    "border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-500/40 dark:bg-orange-950/50 dark:text-orange-300",
-  urgente:
-    "border-red-200 bg-red-100 text-red-700 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-300",
-};
 
 function iniciais(nome: string): string {
   return nome
@@ -41,32 +36,19 @@ function formatHistoricoData(iso: string): string {
   });
 }
 
-/** Converte ISO para valor de input datetime-local (horário local) */
-function isoToDatetimeLocal(iso: string): string {
+/** Converte ISO para valor de input date (yyyy-mm-dd) */
+function isoToDateInput(iso: string): string {
   const d = new Date(iso);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${day}T${h}:${min}`;
+  return `${y}-${m}-${day}`;
 }
 
 function openFilePreview(file: File): void {
   const url = URL.createObjectURL(file);
   window.open(url, "_blank", "noopener,noreferrer");
   window.setTimeout(() => URL.revokeObjectURL(url), 15000);
-}
-
-function Avatar({ usuario }: { usuario: UsuarioTarefa }) {
-  return (
-    <div
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#6D28D9]/10 text-xs font-semibold text-[#6D28D9] dark:bg-violet-500/20 dark:text-violet-300"
-      title={usuario.nome}
-    >
-      {iniciais(usuario.nome)}
-    </div>
-  );
 }
 
 /** Payload enviado ao salvar alterações (apenas campos editáveis) */
@@ -76,6 +58,7 @@ export type TarefaSalvarPayload = {
   status: Tarefa["status"];
   prioridade: Tarefa["prioridade"];
   responsavelId: string;
+  clienteId?: string;
   dataInicio: string;
   dataFim: string;
   colaboradorIds: string[];
@@ -88,6 +71,7 @@ type TabId = "detalhes" | "historico";
 type TarefaDetalheDrawerProps = {
   tarefa: Tarefa | null;
   usuariosMap: Map<string, UsuarioTarefa>;
+  clientes?: Array<{ id: string; nome: string; empresa?: string }>;
   onTrocarResponsavel?: (tarefa: Tarefa, novoResponsavelId: string) => void;
   onAdicionarHistorico?: (tarefaId: string, acao: string, anexos?: string[]) => void;
   /** Chamado ao clicar Salvar na aba Detalhes com os valores atuais do formulário */
@@ -97,6 +81,7 @@ type TarefaDetalheDrawerProps = {
 export function TarefaDetalheDrawer({
   tarefa,
   usuariosMap,
+  clientes = [],
   onTrocarResponsavel,
   onAdicionarHistorico,
   onSalvar,
@@ -116,6 +101,7 @@ export function TarefaDetalheDrawer({
   const [status, setStatus] = useState<Tarefa["status"]>("a_fazer");
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState("");
+  const [clienteId, setClienteId] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
@@ -128,8 +114,9 @@ export function TarefaDetalheDrawer({
     setStatus(tarefa.status);
     setPrioridade(tarefa.prioridade);
     setResponsavelId(tarefa.responsavel.id);
-    setDataInicio(isoToDatetimeLocal(tarefa.dataInicio));
-    setDataFim(isoToDatetimeLocal(tarefa.dataFim));
+    setClienteId(tarefa.clienteId ?? "");
+    setDataInicio(isoToDateInput(tarefa.dataInicio));
+    setDataFim(isoToDateInput(tarefa.dataFim));
     setColaboradorIds(tarefa.colaboradores?.map((c) => c.id) ?? []);
     setArquivosComentario([]);
     setArquivos([]);
@@ -141,7 +128,6 @@ export function TarefaDetalheDrawer({
 
   if (!tarefa) return null;
 
-  const sla = getSlaTarefa(tarefa.dataFim, tarefa.status);
   const usuariosList = Array.from(usuariosMap.values());
 
   const handleEnviarComentario = (e?: React.FormEvent) => {
@@ -167,21 +153,22 @@ export function TarefaDetalheDrawer({
     setArquivosComentario([]);
   };
 
-  const toggleColaborador = (id: string) => {
-    setColaboradorIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
   const handleSalvar = () => {
+    const dataInicioIso = dataInicio
+      ? new Date(`${dataInicio}T00:00:00`).toISOString()
+      : tarefa.dataInicio;
+    const dataFimIso = dataFim
+      ? new Date(`${dataFim}T23:59:59`).toISOString()
+      : tarefa.dataFim;
     onSalvar?.(tarefa.id, {
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
       status,
       prioridade,
       responsavelId,
-      dataInicio: new Date(dataInicio).toISOString(),
-      dataFim: new Date(dataFim).toISOString(),
+      clienteId: clienteId || undefined,
+      dataInicio: dataInicioIso,
+      dataFim: dataFimIso,
       colaboradorIds,
       novosArquivos: arquivos,
     });
@@ -191,9 +178,22 @@ export function TarefaDetalheDrawer({
   const historicoOrdenado = [...tarefa.historico].sort(
     (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
   );
+  const responsavelOptions: SearchableOption[] = usuariosList.map((u) => ({ value: u.id, label: u.nome }));
+  const colaboradorOptions: SearchableOption[] = usuariosList
+    .filter((u) => u.id !== responsavelId)
+    .map((u) => ({ value: u.id, label: u.nome }));
+  const statusOptions: SearchableOption[] = (Object.entries(STATUS_LABELS) as [Tarefa["status"], string][])
+    .map(([value, label]) => ({ value, label }));
+  const prioridadeOptions: SearchableOption[] = (Object.entries(PRIORIDADE_LABELS) as [Tarefa["prioridade"], string][])
+    .map(([value, label]) => ({ value, label }));
+  const clienteOptions: SearchableOption[] = clientes.map((c) => ({
+    value: c.id,
+    label: (c.empresa?.trim() || c.nome).trim(),
+    subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
+  }));
 
   const inputClass =
-    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
+    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
   const labelClass = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300";
 
   return (
@@ -232,38 +232,6 @@ export function TarefaDetalheDrawer({
 
       {activeTab === "detalhes" && (
         <div className="flex flex-1 flex-col min-h-0 overflow-y-auto">
-          <div className="shrink-0 space-y-3 border-b border-slate-200 p-4 dark:border-slate-700 lg:p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{tarefa.titulo}</h3>
-            {tarefa.descricao && (
-              <p className="text-sm text-slate-600 dark:text-slate-400">{tarefa.descricao}</p>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={clsx(
-                  "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
-                  PRIORIDADE_BADGE[tarefa.prioridade]
-                )}
-              >
-                {PRIORIDADE_LABELS[tarefa.prioridade]}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {STATUS_LABELS[tarefa.status]}
-              </span>
-              {sla === "atrasado" && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
-                  <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" aria-hidden />
-                  Prazo atrasado
-                </span>
-              )}
-              {sla === "atencao" && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
-                  Vence em breve
-                </span>
-              )}
-            </div>
-          </div>
-
           <div className="flex-1 p-4 lg:p-6 space-y-4">
             <div>
               <label htmlFor="t-titulo" className={labelClass}>Título</label>
@@ -287,88 +255,62 @@ export function TarefaDetalheDrawer({
             </div>
             <div>
               <label htmlFor="t-status" className={labelClass}>Status</label>
-              <select
-                id="t-status"
+              <SearchableSelect
+                options={statusOptions}
                 value={status}
-                onChange={(e) => setStatus(e.target.value as Tarefa["status"])}
-                className={inputClass}
-              >
-                {(Object.entries(STATUS_LABELS) as [Tarefa["status"], string][]).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
+                onChange={(v) => setStatus(v as Tarefa["status"])}
+                searchable={false}
+              />
             </div>
             <div>
               <label htmlFor="t-prioridade" className={labelClass}>Prioridade</label>
-              <select
-                id="t-prioridade"
+              <SearchableSelect
+                options={prioridadeOptions}
                 value={prioridade}
-                onChange={(e) => setPrioridade(e.target.value as Tarefa["prioridade"])}
-                className={inputClass}
-              >
-                {(Object.entries(PRIORIDADE_LABELS) as [Tarefa["prioridade"], string][]).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
+                onChange={(v) => setPrioridade(v as Tarefa["prioridade"])}
+                searchable={false}
+              />
             </div>
             <div>
               <label htmlFor="t-responsavel" className={labelClass}>Responsável</label>
-              <select
-                id="t-responsavel"
+              <SearchableSelect
+                options={responsavelOptions}
                 value={responsavelId}
-                onChange={(e) => setResponsavelId(e.target.value)}
-                className={inputClass}
-              >
-                {usuariosList.map((u) => (
-                  <option key={u.id} value={u.id}>{u.nome}</option>
-                ))}
-              </select>
+                onChange={setResponsavelId}
+                placeholder="Selecione o responsável..."
+                searchPlaceholder="Buscar responsável..."
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="t-data-inicio" className={labelClass}>Data início</label>
-                <input
-                  id="t-data-inicio"
-                  type="datetime-local"
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                  className={inputClass}
-                />
+                <DateField id="t-data-inicio" value={dataInicio} onChange={setDataInicio} />
               </div>
               <div>
                 <label htmlFor="t-data-fim" className={labelClass}>Prazo (data fim)</label>
-                <input
-                  id="t-data-fim"
-                  type="datetime-local"
-                  value={dataFim}
-                  onChange={(e) => setDataFim(e.target.value)}
-                  className={inputClass}
-                />
+                <DateField id="t-data-fim" value={dataFim} onChange={setDataFim} />
               </div>
             </div>
             <div>
               <label className={labelClass}>Colaboradores</label>
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-600 dark:bg-slate-800/50">
-                {usuariosList
-                  .filter((u) => u.id !== responsavelId)
-                  .map((u) => (
-                    <label
-                      key={u.id}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-white dark:hover:bg-slate-700/80"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={colaboradorIds.includes(u.id)}
-                        onChange={() => toggleColaborador(u.id)}
-                        className="rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
-                      />
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#6D28D9]/10 text-xs font-semibold text-[#6D28D9] dark:bg-violet-500/20 dark:text-violet-300">
-                        {iniciais(u.nome)}
-                      </span>
-                      <span className="text-sm text-slate-900 dark:text-slate-100">{u.nome}</span>
-                    </label>
-                  ))}
-              </div>
+              <SearchableMultiSelect
+                options={colaboradorOptions}
+                values={colaboradorIds}
+                onChange={setColaboradorIds}
+                placeholder="Selecionar colaboradores..."
+                searchPlaceholder="Buscar colaborador..."
+                selectedLabel="Selecionados"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Cliente vinculado (opcional)</label>
+              <SearchableSelect
+                options={clienteOptions}
+                value={clienteId}
+                onChange={setClienteId}
+                placeholder="Nenhum cliente"
+                searchPlaceholder="Buscar cliente..."
+              />
             </div>
 
             {/* Anexos — EXACT COPY da lógica do Helpdesk (multi + preview + remover) */}

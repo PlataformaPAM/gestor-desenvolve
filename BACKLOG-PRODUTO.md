@@ -101,6 +101,86 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - `critério de aceite`:
   - Processo repetível e documentado, sem indisponibilidade.
 
+## BL-009 - Relatórios: variáveis multi-módulo no Construtor (UX guiada)
+- `status`: `em_execucao`
+- `prioridade`: `P1`
+- `impacto`: Alto (agilidade na montagem de templates por área)
+- `escopo`:
+  - Melhorar a experiência de seleção de variáveis por módulos de origem (Operacional, Financeiro, Comercial, Prestação de Contas, etc.).
+  - Incluir busca por variável, exemplos de uso e validação visual de tokens no editor.
+- `critério de aceite`:
+  - Usuário encontra e insere variáveis de outros módulos sem tentativa e erro.
+  - Preview indica claramente variáveis não reconhecidas.
+
+### Progresso recente
+- Catálogo separado por módulos únicos de relatórios (Prestação de Contas, Operacional, Financeiro e Comercial), sem mistura em grupo único.
+- Busca rápida de variáveis adicionada no Construtor para reduzir rolagem em documentos extensos.
+- Renderização de relatórios padronizada com fallback de variáveis completas, evitando tokens crus no preview quando o modelo usa placeholders de módulos diferentes.
+
+## BL-010 - Saúde da Empresa v2: score por responsável e alertas
+- `status`: `planejado`
+- `prioridade`: `P2`
+- `impacto`: Alto (visão executiva e ação preventiva)
+- `escopo`:
+  - Score por colaborador/consultor/parceiro.
+  - Alertas automáticos de risco (cliente e operação).
+  - Metas por área com semáforo (verde/amarelo/vermelho).
+- `critério de aceite`:
+  - Dashboard exibe score por responsável e lista priorizada de alertas.
+  - Metas e semáforos visíveis por área com atualização mensal.
+
+## BL-011 - Relatórios Operacionais avançados
+- `status`: `planejado`
+- `prioridade`: `P1`
+- `impacto`: Alto (controle de execução e qualidade)
+- `escopo`:
+  - Produtividade por responsável (tarefas/tickets concluídos, atrasos e tempo médio).
+  - SLA por cliente e por categoria com tendência mensal.
+  - Backlog por prioridade e tempo em aberto.
+- `critério de aceite`:
+  - Relatórios disponíveis com filtros padrão (cliente, período, situação) e ações de visualizar/exportar/enviar.
+
+## BL-012 - Prestação de Contas executiva mensal
+- `status`: `planejado`
+- `prioridade`: `P1`
+- `impacto`: Alto (comunicação com cliente e transparência)
+- `escopo`:
+  - Versão executiva com resumo mensal e versão detalhada por entregável.
+  - Blocos prontos para envio recorrente por cliente.
+- `critério de aceite`:
+  - Documento pronto para cliente com visão executiva + detalhamento operacional completo.
+
+## BL-013 - Financeiro gerencial e previsão de caixa
+- `status`: `planejado`
+- `prioridade`: `P1`
+- `impacto`: Alto (decisão financeira)
+- `escopo`:
+  - DRE gerencial simplificada por mês e acumulado.
+  - Inadimplência avançada (faixas de atraso e concentração).
+  - Previsão de caixa 30/60/90 dias.
+- `critério de aceite`:
+  - Relatórios financeiros com gráficos, KPIs e projeções acionáveis.
+
+## BL-014 - Comercial de performance e conversão
+- `status`: `planejado`
+- `prioridade`: `P1`
+- `impacto`: Alto (crescimento e previsibilidade)
+- `escopo`:
+  - Funil por origem/canal com taxa de conversão e ticket médio.
+  - Performance de propostas (ganhas/perdidas/motivos/tempo de fechamento).
+- `critério de aceite`:
+  - Gestão comercial com visibilidade por canal, etapa e resultado.
+
+## BL-015 - Suporte e Saúde da Empresa (radar de risco)
+- `status`: `planejado`
+- `prioridade`: `P2`
+- `impacto`: Médio/Alto
+- `escopo`:
+  - Qualidade de atendimento (primeira resposta, resolução, reabertura, backlog).
+  - Radar de risco por cliente com gatilhos automáticos (SLA + financeiro + comercial).
+- `critério de aceite`:
+  - Painel com alertas priorizados e score consolidado por cliente.
+
 ---
 
 ## Ideias novas para ganho de valor (avaliar)

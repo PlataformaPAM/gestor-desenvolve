@@ -26,6 +26,7 @@ export type HistoricoTarefa = {
 
 export type Tarefa = {
   id: string;
+  codigo?: string;
   titulo: string;
   descricao?: string;
   status: StatusTarefa;
@@ -35,6 +36,7 @@ export type Tarefa = {
   responsavel: UsuarioTarefa;
   colaboradores: UsuarioTarefa[];
   clienteId?: string;
+  clienteNome?: string;
   solucaoId?: string;
   /** Nomes dos anexos persistidos */
   anexos: string[];

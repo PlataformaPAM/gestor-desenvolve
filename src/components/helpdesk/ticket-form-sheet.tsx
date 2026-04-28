@@ -4,15 +4,19 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useId } from "react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import { FileText, Paperclip, UserPlus, Users, MessageSquare, Eye, X } from "lucide-react";
+import { FileText, History, Eye } from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
-import { AlertDialog } from "@/components/ui/alert-dialog";
+import {
+  SearchableMultiSelect,
+  SearchableSelect,
+  type SearchableOption,
+} from "@/components/ui/searchable-select";
 import {
   PRIORIDADE_LABELS,
   STATUS_LABELS,
   CATEGORIA_LABELS,
-} from "@/lib/helpdesk/constants";
+} from "@/lib/suporte/constants";
 import type {
   Ticket,
   TicketPrioridade,
@@ -20,7 +24,7 @@ import type {
   TicketCategoria,
   TicketResponsavel,
   HistoricoEntrada,
-} from "@/lib/helpdesk/types";
+} from "@/lib/suporte/types";
 
 export type TicketFormPayload = {
   clienteId: string;
@@ -46,14 +50,10 @@ type TicketFormSheetProps = {
   /** Ticket existente para visualizar/editar; null = novo ticket */
   initialTicket?: Ticket | null;
   /** Título do Sheet (opcional; senão usa "Ticket ID" ou "Novo Ticket") */
-  title?: string;
+  title?: React.ReactNode;
 };
 
 type TabId = "detalhes" | "interacoes";
-
-type PendingRemoveTicket =
-  | { kind: "colaborador"; id: string; nome: string }
-  | { kind: "arquivo_interacao"; index: number; nome: string };
 
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500";
@@ -108,12 +108,9 @@ export function TicketFormSheet({
   const id = useId();
   const [activeTab, setActiveTab] = useState<TabId>("detalhes");
 
-  // Cliente (Select / busca)
+  // Cliente
   const [clienteId, setClienteId] = useState("");
   const [clienteNome, setClienteNome] = useState("");
-  const [buscaCliente, setBuscaCliente] = useState("");
-  const [abertoCliente, setAbertoCliente] = useState(false);
-  const clienteRef = useRef<HTMLDivElement>(null);
 
   // Classificação
   const [categoria, setCategoria] = useState<TicketCategoria>("duvida");
@@ -133,8 +130,6 @@ export function TicketFormSheet({
   // Responsável principal (seleção única) + colaboradores (múltiplos)
   const [responsavelPrincipal, setResponsavelPrincipal] = useState<TicketResponsavel>(() => usuarioAtual);
   const [colaboradores, setColaboradores] = useState<TicketResponsavel[]>([]);
-  const [abertoColaboradores, setAbertoColaboradores] = useState(false);
-  const colaboradoresRef = useRef<HTMLDivElement>(null);
 
   // Histórico (timeline) — auditoria de ações e atualizações
   const [historico, setHistorico] = useState<HistoricoEntrada[]>([]);
@@ -148,17 +143,16 @@ export function TicketFormSheet({
   const [novaAtualizacao, setNovaAtualizacao] = useState("");
   const [arquivosAtualizacao, setArquivosAtualizacao] = useState<File[]>([]);
   const [notificarCliente, setNotificarCliente] = useState(false);
-  const [pendingRemoveTicket, setPendingRemoveTicket] = useState<PendingRemoveTicket | null>(null);
 
-  const clientesFiltrados = useMemo(() => {
-    if (!buscaCliente.trim()) return clientes.slice(0, 10);
-    const q = buscaCliente.toLowerCase();
-    return clientes.filter(
-      (c) =>
-        c.nome.toLowerCase().includes(q) ||
-        (c.empresa || "").toLowerCase().includes(q)
-    ).slice(0, 10);
-  }, [buscaCliente, clientes]);
+  const clienteOptions: SearchableOption[] = useMemo(
+    () =>
+      clientes.map((c) => ({
+        value: c.id,
+        label: (c.empresa || c.nome).trim(),
+        subtitle: c.empresa && c.nome && c.nome !== c.empresa ? c.nome : undefined,
+      })),
+    [clientes]
+  );
 
   /** Lista completa para o select de Responsável Principal (logado + equipe), sem duplicados por id */
   const listaResponsaveisPrincipal = useMemo(() => {
@@ -168,13 +162,45 @@ export function TicketFormSheet({
     });
     return Array.from(byId.values());
   }, [usuarioAtual, equipe]);
-  /** Colaboradores disponíveis para adicionar (exclui o principal) */
-  const colaboradoresDisponiveis = useMemo(
+  const responsavelOptions: SearchableOption[] = useMemo(
     () =>
-      equipe.filter(
-        (m) => m.id !== responsavelPrincipal.id && !colaboradores.some((c) => c.id === m.id)
-      ),
-    [responsavelPrincipal.id, colaboradores, equipe]
+      listaResponsaveisPrincipal.map((r) => ({
+        value: r.id,
+        label: r.id === usuarioAtual.id ? `${r.nome} (você)` : r.nome,
+      })),
+    [listaResponsaveisPrincipal, usuarioAtual.id]
+  );
+  const colaboradorOptions: SearchableOption[] = useMemo(
+    () =>
+      equipe
+        .filter((m) => m.id !== responsavelPrincipal.id)
+        .map((m) => ({ value: m.id, label: m.nome })),
+    [equipe, responsavelPrincipal.id]
+  );
+  const colaboradorIds = useMemo(() => colaboradores.map((c) => c.id), [colaboradores]);
+  const categoriaOptions: SearchableOption[] = useMemo(
+    () =>
+      (Object.entries(CATEGORIA_LABELS) as [TicketCategoria, string][]).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    []
+  );
+  const prioridadeOptions: SearchableOption[] = useMemo(
+    () =>
+      (Object.entries(PRIORIDADE_LABELS) as [TicketPrioridade, string][]).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    []
+  );
+  const statusOptions: SearchableOption[] = useMemo(
+    () =>
+      (Object.entries(STATUS_LABELS) as [TicketStatus, string][]).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    []
   );
 
   // Previsão dinâmica: reage à prioridade (Crítica +4h, Alta +24h, Média +3d, Baixa +7d)
@@ -188,7 +214,6 @@ export function TicketFormSheet({
     if (!initialTicket) {
       setClienteId("");
       setClienteNome("");
-      setBuscaCliente("");
       setCategoria("duvida");
       setPrioridade("media");
       setPrevisaoConclusao(computePrevisaoByPrioridade("media"));
@@ -213,7 +238,6 @@ export function TicketFormSheet({
     } else {
       setClienteId(initialTicket.clienteId);
       setClienteNome(initialTicket.clienteNome);
-      setBuscaCliente("");
       setCategoria(initialTicket.categoria);
       setPrioridade(initialTicket.prioridade);
       setPrevisaoConclusao(initialTicket.previsaoConclusao);
@@ -237,24 +261,6 @@ export function TicketFormSheet({
       prevColaboradoresIdsRef.current = collab.map((c) => c.id).sort().join(",");
     }
   }, [open, initialTicket]);
-
-  useEffect(() => {
-    if (!abertoCliente) return;
-    const handle = (e: MouseEvent) => {
-      if (!clienteRef.current?.contains(e.target as Node)) setAbertoCliente(false);
-    };
-    document.addEventListener("click", handle);
-    return () => document.removeEventListener("click", handle);
-  }, [abertoCliente]);
-
-  useEffect(() => {
-    if (!abertoColaboradores) return;
-    const handle = (e: MouseEvent) => {
-      if (!colaboradoresRef.current?.contains(e.target as Node)) setAbertoColaboradores(false);
-    };
-    document.addEventListener("click", handle);
-    return () => document.removeEventListener("click", handle);
-  }, [abertoColaboradores]);
 
   // Registro automático: mudança de status
   useEffect(() => {
@@ -450,29 +456,24 @@ export function TicketFormSheet({
       .toUpperCase() || "?";
   }
 
-  const handleSelectCliente = (id: string, nome: string) => {
+  const handleSelectCliente = (id: string) => {
+    const c = clientes.find((item) => item.id === id);
     setClienteId(id);
-    setClienteNome(nome);
-    setBuscaCliente("");
-    setAbertoCliente(false);
+    setClienteNome(c ? (c.empresa || c.nome).trim() : "");
+  };
+  const handleChangeColaboradores = (ids: string[]) => {
+    const next = ids
+      .map((id) => equipe.find((m) => m.id === id))
+      .filter(Boolean) as TicketResponsavel[];
+    setColaboradores(next);
   };
 
-  // (input onChange agora fica dentro do MultiFileAttachment)
-
-  const addColaborador = (r: TicketResponsavel) => {
-    setColaboradores((prev) => (prev.some((x) => x.id === r.id) ? prev : [...prev, r]));
-    setAbertoColaboradores(false);
-  };
-
-  const removeColaborador = (id: string) => {
-    setColaboradores((prev) => prev.filter((r) => r.id !== id));
-  };
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-    { id: "detalhes", label: "Detalhes do Ticket", icon: FileText },
-    { id: "interacoes", label: "Interações / Histórico", icon: MessageSquare },
+    { id: "detalhes", label: "Detalhes", icon: FileText },
+    { id: "interacoes", label: "Histórico & Comentários", icon: History },
   ];
 
-  const sheetTitle = titleProp ?? (initialTicket ? `Ticket ${initialTicket.id}` : "Novo Ticket");
+  const sheetTitle = titleProp ?? (initialTicket ? initialTicket.id : "Novo Ticket");
 
   return (
     <DrawerSheet
@@ -482,94 +483,48 @@ export function TicketFormSheet({
       maxWidth="sm:max-w-3xl"
     >
       <form onSubmit={handleSubmit} className="flex h-full flex-col">
-        <div
-          role="tablist"
-          className="flex border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
-        >
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setActiveTab(tab.id)}
-                className={clsx(
-                  "relative flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
-                  isActive
-                    ? "text-[#6D28D9] dark:text-violet-400"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId={`ticket-form-tab-${id}`}
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.3 }}
-                  />
-                )}
-                <Icon className="h-4 w-4 shrink-0" />
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="shrink-0 border-b border-slate-200 dark:border-slate-700">
+          <nav className="flex gap-1 p-2" aria-label="Abas do detalhe do ticket">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={clsx(
+                    "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-[#6D28D9]/10 text-[#6D28D9] dark:bg-violet-950/50 dark:text-violet-300"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === "detalhes" && (
             <div className="space-y-6">
-              {/* Cliente — Select (busca) */}
-              <div ref={clienteRef} className="space-y-1">
-                <label htmlFor="ticket-cliente" className={labelClass}>
+              {/* Cliente */}
+              <div className="space-y-1">
+                <label className={labelClass}>
                   Cliente *
                 </label>
-                <div className="relative">
-                  <input
-                    id="ticket-cliente"
-                    type="text"
-                    value={abertoCliente ? buscaCliente : clienteNome}
-                    onChange={(e) => {
-                      setBuscaCliente(e.target.value);
-                      setAbertoCliente(true);
-                      if (!e.target.value) setClienteId("");
-                    }}
-                    onFocus={() => setAbertoCliente(true)}
-                    placeholder="Buscar por nome ou empresa..."
-                    className={inputClass}
-                    autoComplete="off"
-                  />
-                  {abertoCliente && (
-                    <ul className="absolute z-10 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-900">
-                      {clientesFiltrados.map((c) => (
-                        <li key={c.id}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleSelectCliente(c.id, c.empresa || c.nome)
-                            }
-                            className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-950/40"
-                          >
-                            <span className="font-medium text-slate-900 dark:text-slate-100">
-                              {c.empresa || c.nome}
-                            </span>
-                            {c.empresa && c.nome && (
-                              <span className="text-xs text-slate-500 dark:text-slate-400">
-                                {c.nome}
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                      {clientesFiltrados.length === 0 && (
-                        <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
-                          Nenhum cliente encontrado.
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                </div>
+                <SearchableSelect
+                  options={clienteOptions}
+                  value={clienteId}
+                  onChange={handleSelectCliente}
+                  placeholder="Buscar por nome ou empresa..."
+                  searchPlaceholder="Buscar cliente..."
+                />
               </div>
 
               {/* Classificação — Grid 3 colunas */}
@@ -577,70 +532,43 @@ export function TicketFormSheet({
                 <p className={labelClass}>Classificação</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <label htmlFor="ticket-categoria" className="text-xs text-slate-600">
+                    <label className="text-xs text-slate-600">
                       Categoria
                     </label>
-                    <select
-                      id="ticket-categoria"
+                    <SearchableSelect
+                      options={categoriaOptions}
                       value={categoria}
-                      onChange={(e) =>
-                        setCategoria(e.target.value as TicketCategoria)
-                      }
-                      className={inputClass}
-                    >
-                      {(Object.entries(CATEGORIA_LABELS) as [TicketCategoria, string][]).map(
-                        ([val, label]) => (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        )
-                      )}
-                    </select>
+                      onChange={(v) => setCategoria(v as TicketCategoria)}
+                      placeholder="Selecione a categoria..."
+                      searchable={false}
+                    />
                   </div>
                   <div className="space-y-1">
-                    <label htmlFor="ticket-prioridade" className="text-xs text-slate-600">
+                    <label className="text-xs text-slate-600">
                       Prioridade
                     </label>
-                    <select
-                      id="ticket-prioridade"
+                    <SearchableSelect
+                      options={prioridadeOptions}
                       value={prioridade}
-                      onChange={(e) =>
-                        setPrioridade(e.target.value as TicketPrioridade)
-                      }
-                      className={inputClass}
-                    >
-                      {(Object.entries(PRIORIDADE_LABELS) as [TicketPrioridade, string][]).map(
-                        ([val, label]) => (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        )
-                      )}
-                    </select>
+                      onChange={(v) => setPrioridade(v as TicketPrioridade)}
+                      placeholder="Selecione a prioridade..."
+                      searchable={false}
+                    />
                     <p className="mt-1 text-xs text-slate-500">
                       Previsão calculada pelo SLA: <strong>{formatPrevisaoBr(previsaoConclusao)}</strong>
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <label htmlFor="ticket-status" className="text-xs text-slate-600">
+                    <label className="text-xs text-slate-600">
                       Status
                     </label>
-                    <select
-                      id="ticket-status"
+                    <SearchableSelect
+                      options={statusOptions}
                       value={status}
-                      onChange={(e) =>
-                        setStatus(e.target.value as TicketStatus)
-                      }
-                      className={inputClass}
-                    >
-                      {(Object.entries(STATUS_LABELS) as [TicketStatus, string][]).map(
-                        ([val, label]) => (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        )
-                      )}
-                    </select>
+                      onChange={(v) => setStatus(v as TicketStatus)}
+                      placeholder="Selecione o status..."
+                      searchable={false}
+                    />
                   </div>
                 </div>
               </div>
@@ -648,14 +576,14 @@ export function TicketFormSheet({
               {/* Assunto */}
               <div className="space-y-1">
                 <label htmlFor="ticket-assunto" className={labelClass}>
-                  Assunto *
+                  Título *
                 </label>
                 <input
                   id="ticket-assunto"
                   type="text"
                   value={assunto}
                   onChange={(e) => setAssunto(e.target.value)}
-                  placeholder="Resumo do problema ou solicitação"
+                  placeholder="Resumo do ticket"
                   className={inputClass}
                   required
                 />
@@ -687,89 +615,36 @@ export function TicketFormSheet({
               {/* Responsável Principal + Colaboradores */}
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label htmlFor="ticket-responsavel-principal" className={labelClass}>
-                    Responsável Principal
+                  <label className={labelClass}>
+                    Responsável
                   </label>
-                  <select
-                    id="ticket-responsavel-principal"
+                  <SearchableSelect
+                    options={responsavelOptions}
                     value={responsavelPrincipal.id}
-                    onChange={(e) => {
-                      const id = e.target.value;
+                    onChange={(id) => {
                       const r = listaResponsaveisPrincipal.find((m) => m.id === id);
                       if (r) setResponsavelPrincipal(r);
                     }}
-                    className={inputClass}
-                  >
-                    {listaResponsaveisPrincipal.map((r, idx) => (
-                      <option key={`${r.id}-${idx}`} value={r.id}>
-                        {r.id === usuarioAtual.id ? `${r.nome} (você)` : r.nome}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Selecione o responsável..."
+                    searchPlaceholder="Buscar responsável..."
+                  />
                   <p className="text-xs text-slate-500">
                     Ao criar um novo ticket, o usuário logado é o padrão. Altere para transferir a responsabilidade.
                   </p>
                 </div>
-                <div ref={colaboradoresRef} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-slate-500" />
-                    <span className={labelClass}>Colaboradores</span>
-                  </div>
+                <div className="space-y-2">
+                  <span className={labelClass}>Colaboradores</span>
                   <p className="text-xs text-slate-500">
                     Outros membros da equipe que atuam no chamado em conjunto.
                   </p>
-                  {colaboradores.length > 0 && (
-                    <ul className="flex flex-wrap gap-2">
-                      {colaboradores.map((r) => (
-                        <li
-                          key={r.id}
-                          className="flex items-center gap-2 rounded-full bg-slate-100 py-1.5 pl-3 pr-1.5 text-sm text-slate-800"
-                        >
-                          <span>{r.nome}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPendingRemoveTicket({ kind: "colaborador", id: r.id, nome: r.nome })
-                            }
-                            className="rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
-                            aria-label={`Remover ${r.nome}`}
-                          >
-                            ×
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setAbertoColaboradores((v) => !v)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Adicionar Colaborador
-                    </button>
-                    {abertoColaboradores && colaboradoresDisponiveis.length > 0 && (
-                      <ul className="absolute left-0 top-full z-10 mt-1 min-w-[180px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-900">
-                        {colaboradoresDisponiveis.map((m) => (
-                          <li key={m.id}>
-                            <button
-                              type="button"
-                              onClick={() => addColaborador(m)}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-violet-50 dark:text-slate-200 dark:hover:bg-violet-950/40"
-                            >
-                              {m.nome}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {abertoColaboradores && colaboradoresDisponiveis.length === 0 && (
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Nenhum colaborador disponível para adicionar.
-                      </p>
-                    )}
-                  </div>
+                  <SearchableMultiSelect
+                    options={colaboradorOptions}
+                    values={colaboradorIds}
+                    onChange={handleChangeColaboradores}
+                    placeholder="Selecionar colaboradores..."
+                    searchPlaceholder="Buscar colaborador..."
+                    selectedLabel="Selecionados"
+                  />
                 </div>
               </div>
             </div>
@@ -786,70 +661,12 @@ export function TicketFormSheet({
                   rows={3}
                   className={`${inputClass} min-h-[80px] resize-y`}
                 />
-                <input
-                  id="file-upload-helpdesk"
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files ?? []);
-                    if (!files.length) return;
-                    setArquivosAtualizacao((prev) => {
-                      const existing = new Set(prev.map((f) => `${f.name}-${f.size}-${f.lastModified}`));
-                      const next = [...prev];
-                      files.forEach((f) => {
-                        const key = `${f.name}-${f.size}-${f.lastModified}`;
-                        if (!existing.has(key)) next.push(f);
-                      });
-                      return next;
-                    });
-                    e.target.value = "";
-                  }}
+                <MultiFileAttachment
+                  existingFiles={[]}
+                  newFiles={arquivosAtualizacao}
+                  onNewFilesChange={setArquivosAtualizacao}
                 />
-                {arquivosAtualizacao.length > 0 && (
-                  <ul className="space-y-2">
-                    {arquivosAtualizacao.map((f, idx) => (
-                      <li
-                        key={`${f.name}-${f.size}-${f.lastModified}`}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openFilePreview(f)}
-                          className="inline-flex items-center gap-2 font-medium text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
-                          title="Visualizar"
-                        >
-                          <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                          <span className="truncate max-w-[320px]">{f.name}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPendingRemoveTicket({
-                              kind: "arquivo_interacao",
-                              index: idx,
-                              nome: f.name,
-                            })
-                          }
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                          aria-label="Remover arquivo"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Remover
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 <div className="flex flex-wrap items-center gap-3">
-                  <label
-                    htmlFor="file-upload-helpdesk"
-                    className="cursor-pointer rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                    aria-label="Anexar arquivo"
-                  >
-                    <Paperclip className="h-5 w-5" />
-                  </label>
                   <button
                     type="button"
                     onClick={handleAdicionarAtualizacao}
@@ -951,42 +768,6 @@ export function TicketFormSheet({
           </div>
         )}
       </form>
-      <AlertDialog
-        open={!!pendingRemoveTicket}
-        onClose={() => setPendingRemoveTicket(null)}
-        onConfirm={() => {
-          if (!pendingRemoveTicket) return;
-          if (pendingRemoveTicket.kind === "colaborador") {
-            removeColaborador(pendingRemoveTicket.id);
-          } else {
-            const i = pendingRemoveTicket.index;
-            setArquivosAtualizacao((prev) => prev.filter((_, j) => j !== i));
-          }
-        }}
-        title={
-          pendingRemoveTicket?.kind === "colaborador"
-            ? "Remover colaborador?"
-            : "Remover anexo?"
-        }
-        description={
-          pendingRemoveTicket?.kind === "colaborador" ? (
-            <>
-              <strong className="text-slate-900 dark:text-slate-100">Esta ação é irreversível neste formulário:</strong>{" "}
-              <strong className="text-slate-900 dark:text-slate-100">{pendingRemoveTicket.nome}</strong> deixa de
-              figurar como colaborador. Ao salvar o ticket, a alteração fica permanente.
-            </>
-          ) : pendingRemoveTicket ? (
-            <>
-              <strong className="text-slate-900 dark:text-slate-100">Esta ação é irreversível:</strong> o arquivo{" "}
-              <strong className="text-slate-900 dark:text-slate-100">{pendingRemoveTicket.nome}</strong> será retirado da
-              atualização antes do envio.
-            </>
-          ) : null
-        }
-        cancelLabel="Cancelar"
-        confirmLabel="Sim, remover permanentemente"
-        destructive
-      />
     </DrawerSheet>
   );
 }

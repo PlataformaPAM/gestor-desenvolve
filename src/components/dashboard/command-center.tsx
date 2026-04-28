@@ -151,8 +151,8 @@ const FALLBACK_MODULE_TILES: NonNullable<BootstrapPayload["moduleTiles"]> = [
   },
   {
     id: "helpdesk",
-    title: "Helpdesk",
-    href: "/helpdesk",
+    title: "Suporte",
+    href: "/suporte",
     stat: "Tickets e SLA",
     sub: "Suporte centralizado",
     cardClass: MODULE_CARD_STYLES.helpdesk,

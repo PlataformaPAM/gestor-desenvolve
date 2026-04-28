@@ -3,11 +3,19 @@
 import { useRef, useState } from "react";
 import { Eye, Paperclip, X } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
+import type { Cliente } from "@/lib/clientes/types";
 import { PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import {
+  SearchableMultiSelect,
+  SearchableSelect,
+  type SearchableOption,
+} from "@/components/ui/searchable-select";
+import { DateField } from "@/components/ui/date-field";
 
 type NovaTarefaFormProps = {
   usuarios: UsuarioTarefa[];
+  clientes?: Pick<Cliente, "id" | "nome" | "empresa">[];
   /** ID do usuário logado — responsável vem preenchido com ele ao abrir */
   currentUserId?: string;
   onSave: (tarefa: Omit<Tarefa, "id">) => void;
@@ -16,18 +24,9 @@ type NovaTarefaFormProps = {
 
 const PRIORIDADES: Tarefa["prioridade"][] = ["baixa", "media", "alta", "urgente"];
 
-function iniciais(nome: string): string {
-  return nome
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase() || "?";
-}
-
 export function NovaTarefaForm({
   usuarios,
+  clientes = [],
   currentUserId = "",
   onSave,
   onCancel,
@@ -37,6 +36,7 @@ export function NovaTarefaForm({
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState(currentUserId);
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
+  const [clienteId, setClienteId] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [pendingRemoveAnexo, setPendingRemoveAnexo] = useState<{
@@ -51,11 +51,15 @@ export function NovaTarefaForm({
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
-  const toggleColaborador = (id: string) => {
-    setColaboradorIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  const responsavelOptions: SearchableOption[] = usuarios.map((u) => ({ value: u.id, label: u.nome }));
+  const clienteOptions: SearchableOption[] = clientes.map((c) => ({
+    value: c.id,
+    label: (c.empresa?.trim() || c.nome).trim(),
+    subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
+  }));
+  const colaboradorOptions: SearchableOption[] = usuarios
+    .filter((u) => u.id !== responsavelId)
+    .map((u) => ({ value: u.id, label: u.nome }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +70,9 @@ export function NovaTarefaForm({
       .map((id) => usuarios.find((u) => u.id === id))
       .filter(Boolean) as UsuarioTarefa[];
     const now = new Date().toISOString();
-    const fim = dataFim.trim() ? new Date(dataFim.trim()).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const fim = dataFim.trim()
+      ? new Date(`${dataFim.trim()}T23:59:59`).toISOString()
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const quemCriou =
       (currentUserId ? usuarios.find((u) => u.id === currentUserId) : undefined) ?? responsavel;
     onSave({
@@ -78,6 +84,7 @@ export function NovaTarefaForm({
       dataFim: fim,
       responsavel,
       colaboradores: colaboradores.filter((c) => c.id !== responsavelId),
+      clienteId: clienteId || undefined,
       anexos: arquivos.map((f) => f.name),
       arquivos,
       historico: [
@@ -128,62 +135,53 @@ export function NovaTarefaForm({
       </div>
 
       <div>
-        <label htmlFor="tarefa-responsavel" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Responsável
         </label>
-        <select
-          id="tarefa-responsavel"
+        <SearchableSelect
+          options={responsavelOptions}
           value={responsavelId}
-          onChange={(e) => setResponsavelId(e.target.value)}
-          className={inputClass}
-          required
-        >
-          <option value="">Selecione...</option>
-          {usuarios.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.nome}
-            </option>
-          ))}
-        </select>
+          onChange={setResponsavelId}
+          placeholder="Selecione o responsável..."
+          searchPlaceholder="Buscar responsável..."
+        />
       </div>
 
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Colaboradores (opcional)
         </label>
-        <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-600 dark:bg-slate-800/50">
-          {usuarios
-            .filter((u) => u.id !== responsavelId)
-            .map((u) => (
-              <label
-                key={u.id}
-                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-white dark:hover:bg-slate-700/80"
-              >
-                <input
-                  type="checkbox"
-                  checked={colaboradorIds.includes(u.id)}
-                  onChange={() => toggleColaborador(u.id)}
-                  className="rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
-                />
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#6D28D9]/10 text-xs font-semibold text-[#6D28D9] dark:bg-violet-500/20 dark:text-violet-300">
-                  {iniciais(u.nome)}
-                </span>
-                <span className="text-sm text-slate-900 dark:text-slate-100">{u.nome}</span>
-              </label>
-            ))}
-        </div>
+        <SearchableMultiSelect
+          options={colaboradorOptions}
+          values={colaboradorIds}
+          onChange={setColaboradorIds}
+          placeholder="Selecionar colaboradores..."
+          searchPlaceholder="Buscar colaborador..."
+          selectedLabel="Selecionados"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Cliente vinculado (opcional)
+        </label>
+        <SearchableSelect
+          options={clienteOptions}
+          value={clienteId}
+          onChange={setClienteId}
+          placeholder="Nenhum cliente"
+          searchPlaceholder="Buscar cliente..."
+        />
       </div>
 
       <div>
         <label htmlFor="tarefa-prazo" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
           Prazo (data fim)
         </label>
-        <input
+        <DateField
           id="tarefa-prazo"
-          type="datetime-local"
           value={dataFim}
-          onChange={(e) => setDataFim(e.target.value)}
-          className={inputClass}
+          onChange={setDataFim}
         />
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Se vazio, será definido em 7 dias.</p>
       </div>
@@ -251,21 +249,16 @@ export function NovaTarefaForm({
       </div>
 
       <div>
-        <label htmlFor="tarefa-prioridade" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Prioridade
         </label>
-        <select
-          id="tarefa-prioridade"
+        <SearchableSelect
+          options={PRIORIDADES.map((p) => ({ value: p, label: PRIORIDADE_LABELS[p] }))}
           value={prioridade}
-          onChange={(e) => setPrioridade(e.target.value as Tarefa["prioridade"])}
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-        >
-          {PRIORIDADES.map((p) => (
-            <option key={p} value={p}>
-              {PRIORIDADE_LABELS[p]}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setPrioridade(v as Tarefa["prioridade"])}
+          placeholder="Selecione a prioridade..."
+          searchable={false}
+        />
       </div>
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">

@@ -161,6 +161,11 @@ export function TarefasKanban({
                                 : "shadow-sm"
                             )}
                           >
+                            {t.codigo ? (
+                              <p className="mb-1 inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-500/40 dark:bg-violet-950/40 dark:text-violet-300">
+                                {t.codigo}
+                              </p>
+                            ) : null}
                             <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</p>
                             <div className="mt-2 space-y-2">
                               <div className="min-w-0">
@@ -189,6 +194,16 @@ export function TarefasKanban({
                                   {prazoDiasLabel(t.dataFim, t.status)}
                                 </p>
                               </div>
+                              {t.clienteId && t.clienteNome ? (
+                                <div className="min-w-0">
+                                  <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                    Cliente:
+                                  </p>
+                                  <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                    {t.clienteNome}
+                                  </p>
+                                </div>
+                              ) : null}
                               <div className="min-w-0">
                                 <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
                                   Criado:

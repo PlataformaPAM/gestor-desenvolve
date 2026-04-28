@@ -70,7 +70,7 @@ const LOGIN_MODULE_CARDS = [
     iconClass: "text-fuchsia-100",
   },
   {
-    title: "Helpdesk",
+    title: "Suporte",
     icon: LifeBuoy,
     accent: "from-amber-400/35 to-violet-950/45",
     borderTint: "border-amber-300/28",

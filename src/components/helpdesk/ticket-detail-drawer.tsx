@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Send, User, HeadphonesIcon, Bot } from "lucide-react";
-import type { Ticket, ComentarioTicket } from "@/lib/helpdesk/types";
-import { PRIORIDADE_LABELS, STATUS_LABELS, CATEGORIA_LABELS } from "@/lib/helpdesk/constants";
+import type { Ticket, ComentarioTicket } from "@/lib/suporte/types";
+import { PRIORIDADE_LABELS, STATUS_LABELS, CATEGORIA_LABELS } from "@/lib/suporte/constants";
 import clsx from "clsx";
 
 const STATUS_BADGE: Record<Ticket["status"], string> = {

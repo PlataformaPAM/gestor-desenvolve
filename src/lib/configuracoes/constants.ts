@@ -16,7 +16,7 @@ export const MODULO_LABELS: Record<ModuloPermissao, string> = {
   financeiro: "Financeiro",
   tarefas: "Tarefas",
   clientes: "Clientes",
-  helpdesk: "Helpdesk",
+  helpdesk: "Suporte",
   posVenda: "Pós-venda",
   rh: "RH e Parceiros",
   configuracoes: "Configurações",

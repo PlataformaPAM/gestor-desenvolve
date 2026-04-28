@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { TabsView, type ViewMode } from "@/components/comercial/tabs-view";
+import { OperacaoViews } from "@/components/ui/operacao-views";
 import { TarefasKanban } from "@/components/tarefas/tarefas-kanban";
 import { TarefasTable } from "@/components/tarefas/tarefas-table";
 import { TarefaDetalheDrawer, type TarefaSalvarPayload } from "@/components/tarefas/tarefa-detalhe-drawer";
@@ -15,6 +16,12 @@ import {
   PRIORIDADE_LABELS,
 } from "@/lib/tarefas/constants";
 import type { Tarefa, StatusTarefa, PrioridadeTarefa, UsuarioTarefa } from "@/lib/tarefas/types";
+import {
+  getSituacaoOperacional,
+  sortByPriorizacao,
+  type OperacaoViewId,
+} from "@/lib/operacao/priorizacao";
+import type { Cliente } from "@/lib/clientes/types";
 import type { DropResult } from "@hello-pangea/dnd";
 
 function generateId(): string {
@@ -40,11 +47,14 @@ const PRIORIDADE_OPTIONS: { value: "" | PrioridadeTarefa; label: string }[] = [
   { value: "", label: "Todas" },
   ...(Object.entries(PRIORIDADE_LABELS) as [PrioridadeTarefa, string][]).map(([v, l]) => ({ value: v as "" | PrioridadeTarefa, label: l })),
 ];
+const OPERACAO_VIEW_STORAGE_KEY = "operacao_view_tarefas";
 
 export default function TarefasPage() {
   const { setPrimaryAction } = usePageHeader();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioTarefa[]>([]);
+  const [clientes, setClientes] = useState<Pick<Cliente, "id" | "nome" | "empresa">[]>([]);
+  const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("minha_fila");
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [statusFilter, setStatusFilter] = useState<"" | StatusTarefa>("");
   const [prioridadeFilter, setPrioridadeFilter] = useState<"" | PrioridadeTarefa>("");
@@ -53,7 +63,7 @@ export default function TarefasPage() {
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null);
   const [tarefaToDelete, setTarefaToDelete] = useState<Tarefa | null>(null);
 
-  const saveTarefa = useCallback(async (tarefa: Tarefa, isCreate = false) => {
+  const saveTarefa = useCallback(async (tarefa: Tarefa, isCreate = false): Promise<Tarefa> => {
     const url = isCreate ? "/api/tarefas" : `/api/tarefas/${tarefa.id}`;
     const method = isCreate ? "POST" : "PATCH";
     const res = await fetch(url, {
@@ -62,6 +72,10 @@ export default function TarefasPage() {
       body: JSON.stringify({ tarefa }),
     });
     if (!res.ok) throw new Error("Falha ao persistir tarefa");
+    const payload = (await res.json()) as { tarefa?: Tarefa; data?: { tarefa?: Tarefa } };
+    const saved = payload?.tarefa ?? payload?.data?.tarefa;
+    if (!saved) throw new Error("Resposta inválida ao persistir tarefa");
+    return saved;
   }, []);
 
   const deleteTarefa = useCallback(async (tarefaId: string) => {
@@ -98,6 +112,18 @@ export default function TarefasPage() {
   }, [setPrimaryAction]);
 
   useEffect(() => {
+    const saved = window.localStorage.getItem(OPERACAO_VIEW_STORAGE_KEY) as OperacaoViewId | null;
+    if (!saved) return;
+    if (["minha_fila", "urgentes", "atrasados", "vence_logo", "fechados"].includes(saved)) {
+      setOperacaoView(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(OPERACAO_VIEW_STORAGE_KEY, operacaoView);
+  }, [operacaoView]);
+
+  useEffect(() => {
     let active = true;
     void (async () => {
       try {
@@ -116,25 +142,94 @@ export default function TarefasPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/clientes/bootstrap", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { data?: { clientes?: Cliente[] } };
+        if (!active) return;
+        const opts = (data?.data?.clientes ?? []).map((c) => ({
+          id: c.id,
+          nome: c.nome,
+          empresa: c.empresa,
+        }));
+        setClientes(opts);
+      } catch {
+        // keep UI resilient
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const tarefasOperacionais = useMemo(() => {
+    const now = new Date();
+    const ativas = tarefas.filter((t) => t.status !== "concluido");
+    const isMinhaTarefa = (t: Tarefa) =>
+      t.responsavel.id === CURRENT_USER_ID || (t.colaboradores ?? []).some((c) => c.id === CURRENT_USER_ID);
+    let base: Tarefa[] = [];
+    if (operacaoView === "fechados") {
+      return [...tarefas.filter((t) => t.status === "concluido")].sort((a, b) => {
+        const aTime = new Date(a.updatedAt ?? a.dataFim).getTime();
+        const bTime = new Date(b.updatedAt ?? b.dataFim).getTime();
+        return bTime - aTime;
+      });
+    }
+    if (operacaoView === "minha_fila") {
+      const minhas = ativas.filter(isMinhaTarefa);
+      base = minhas.length > 0 ? minhas : ativas;
+    } else if (operacaoView === "urgentes") {
+      base = ativas.filter((t) => t.prioridade === "urgente");
+    } else if (operacaoView === "atrasados") {
+      base = ativas.filter((t) => getSituacaoOperacional(t.dataFim, now) === "atrasado");
+    } else {
+      base = ativas.filter((t) => getSituacaoOperacional(t.dataFim, now) === "vence_logo");
+    }
+    return sortByPriorizacao(base, {
+      prioridade: (t) => t.prioridade,
+      vencimentoIso: (t) => t.dataFim,
+      atualizadoIso: (t) => t.updatedAt ?? t.dataInicio,
+      now,
+    });
+  }, [tarefas, operacaoView]);
+
   const tarefasFiltradas = useMemo(() => {
-    return tarefas.filter((t) => {
+    return tarefasOperacionais.filter((t) => {
       if (statusFilter && t.status !== statusFilter) return false;
       if (prioridadeFilter && t.prioridade !== prioridadeFilter) return false;
       if (responsavelFilter && t.responsavel.id !== responsavelFilter) return false;
       return true;
     });
-  }, [tarefas, statusFilter, prioridadeFilter, responsavelFilter]);
+  }, [tarefasOperacionais, statusFilter, prioridadeFilter, responsavelFilter]);
 
   const handleNovaTarefa = useCallback((nova: Omit<Tarefa, "id">) => {
-    const created: Tarefa = { ...nova, id: generateId() };
+    const nowIso = new Date().toISOString();
+    const createdBy = usuariosMap.get(CURRENT_USER_ID)?.nome ?? "Usuário";
+    const cliente = nova.clienteId ? clientes.find((c) => c.id === nova.clienteId) : undefined;
+    const clienteNome = cliente ? (cliente.empresa?.trim() || cliente.nome || "") : undefined;
+    const created: Tarefa = {
+      ...nova,
+      id: generateId(),
+      clienteNome: clienteNome || undefined,
+      registroCriadoPorNome: createdBy,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
     setTarefas((prev) => [
       ...prev,
       created,
     ]);
-    void saveTarefa(created, true).catch(() => undefined);
+    void saveTarefa(created, true)
+      .then((saved) => {
+        setTarefas((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
+      })
+      .catch(() => undefined);
     setIsSheetOpen(false);
     setSelectedTarefa(null);
-  }, [saveTarefa]);
+  }, [saveTarefa, usuariosMap, clientes]);
 
   const handleCloseSheet = useCallback(() => {
     setIsSheetOpen(false);
@@ -159,14 +254,18 @@ export default function TarefasPage() {
       autor: autorEdicao.nome,
       autorId: autorEdicao.id,
     };
+    let updatedForPersist: Tarefa | null = null;
     setTarefas((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t;
-        return {
+        const next = {
           ...t,
           status: destStatus,
+          updatedAt: new Date().toISOString(),
           historico: [...t.historico, historicoEntry],
         };
+        updatedForPersist = next;
+        return next;
       })
     );
     setSelectedTarefa((t) => {
@@ -177,16 +276,15 @@ export default function TarefasPage() {
         historico: [...t.historico, historicoEntry],
       };
     });
-    const changed = tarefas.find((t) => t.id === id);
-    if (changed) {
-      const updated = {
-        ...changed,
-        status: destStatus,
-        historico: [...changed.historico, historicoEntry],
-      };
-      void saveTarefa(updated).catch(() => undefined);
+    if (updatedForPersist) {
+      void saveTarefa(updatedForPersist)
+        .then((saved) => {
+          setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+          setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+        })
+        .catch(() => undefined);
     }
-  }, [tarefas, saveTarefa, autorEdicao]);
+  }, [saveTarefa, autorEdicao]);
 
   const handleSalvarTarefa = useCallback(
     (tarefaId: string, payload: TarefaSalvarPayload) => {
@@ -277,6 +375,18 @@ export default function TarefasPage() {
           autorId,
         });
       }
+      if ((current.clienteId ?? "") !== (payload.clienteId ?? "")) {
+        const clienteAnterior = current.clienteNome?.trim() || "Nenhum";
+        const clienteNovoObj = payload.clienteId ? clientes.find((c) => c.id === payload.clienteId) : undefined;
+        const clienteNovo = clienteNovoObj ? (clienteNovoObj.empresa?.trim() || clienteNovoObj.nome || "") : "Nenhum";
+        entries.push({
+          id: `h-${Date.now()}-cl`,
+          data: now,
+          acao: `Cliente vinculado alterado de ${clienteAnterior} para ${clienteNovo}`,
+          autor,
+          autorId,
+        });
+      }
       const currentColIds = (current.colaboradores ?? []).map((c) => c.id).sort().join(",");
       const newColIds = [...payload.colaboradorIds].filter((id) => id !== payload.responsavelId).sort().join(",");
       if (currentColIds !== newColIds) {
@@ -310,6 +420,12 @@ export default function TarefasPage() {
         status: payload.status,
         prioridade: payload.prioridade,
         responsavel,
+        clienteId: payload.clienteId,
+        clienteNome: payload.clienteId
+          ? ((clientes.find((c) => c.id === payload.clienteId)?.empresa?.trim()
+              || clientes.find((c) => c.id === payload.clienteId)?.nome
+              || ""))
+          : undefined,
         colaboradores,
         dataInicio: payload.dataInicio,
         dataFim: payload.dataFim,
@@ -320,9 +436,14 @@ export default function TarefasPage() {
 
       setTarefas((prev) => prev.map((t) => (t.id === tarefaId ? updated : t)));
       setSelectedTarefa((prev) => (prev?.id === tarefaId ? updated : prev));
-      void saveTarefa(updated).catch(() => undefined);
+      void saveTarefa(updated)
+        .then((saved) => {
+          setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+          setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+        })
+        .catch(() => undefined);
     },
-    [usuariosMap, selectedTarefa, tarefas, saveTarefa, autorEdicao]
+    [usuariosMap, selectedTarefa, tarefas, saveTarefa, autorEdicao, clientes]
   );
 
   const handleExcluirClick = useCallback((t: Tarefa) => {
@@ -341,7 +462,11 @@ export default function TarefasPage() {
     void deleteTarefa(id).catch(() => undefined);
   }, [tarefaToDelete, selectedTarefa?.id, deleteTarefa]);
 
-  const sheetTitle = selectedTarefa ? selectedTarefa.titulo : "Nova Tarefa";
+  const sheetTitle = selectedTarefa ? (
+    <span className="truncate font-semibold text-[#6D28D9] dark:text-violet-300">{selectedTarefa.codigo}</span>
+  ) : (
+    "Nova Tarefa"
+  );
 
   const filterInputClass =
     "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
@@ -349,6 +474,7 @@ export default function TarefasPage() {
 
   return (
     <section className="w-full min-w-0 space-y-6">
+      <OperacaoViews value={operacaoView} onChange={setOperacaoView} closedLabel="Concluídas" />
       {/* Barra: Filtros + toggle visão (padrão unificado) */}
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3">
         <div className="flex w-full min-w-0 flex-wrap items-end justify-start gap-x-2 gap-y-2 sm:flex-nowrap sm:gap-3 lg:flex-1">
@@ -407,6 +533,7 @@ export default function TarefasPage() {
             <TarefaDetalheDrawer
               tarefa={selectedTarefa}
               usuariosMap={usuariosMap}
+              clientes={clientes}
               onTrocarResponsavel={(t, novoId) => {
                 const u = usuariosMap.get(novoId);
                 if (!u) return;
@@ -443,7 +570,12 @@ export default function TarefasPage() {
                     : x
                 );
                 if (updatedForPersist) {
-                  void saveTarefa(updatedForPersist).catch(() => undefined);
+                  void saveTarefa(updatedForPersist)
+                    .then((saved) => {
+                      setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+                      setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+                    })
+                    .catch(() => undefined);
                 }
               }}
               onSalvar={handleSalvarTarefa}
@@ -452,6 +584,7 @@ export default function TarefasPage() {
             <div className="overflow-y-auto">
               <NovaTarefaForm
                 usuarios={usuarios}
+                clientes={clientes}
                 currentUserId={CURRENT_USER_ID}
                 onSave={handleNovaTarefa}
                 onCancel={handleCloseSheet}

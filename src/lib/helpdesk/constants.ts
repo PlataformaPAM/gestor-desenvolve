@@ -12,7 +12,7 @@ export function getSlaEstado(previsaoConclusao: string): "no_prazo" | "atencao" 
 
 export function generateTicketId(tickets: Ticket[]): string {
   const ano = new Date().getFullYear();
-  const prefix = `DES-${ano}-`;
+  const prefix = `SUP-${ano}-`;
   const nums = tickets
     .filter((t) => t.id.startsWith(prefix))
     .map((t) => {

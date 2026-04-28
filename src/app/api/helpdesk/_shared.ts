@@ -1,5 +1,5 @@
 import type { HelpdeskTicket, Usuario } from "@prisma/client";
-import type { Ticket } from "@/lib/helpdesk/types";
+import type { Ticket } from "@/lib/suporte/types";
 
 export function mapTicketFromDb(
   t: HelpdeskTicket & {

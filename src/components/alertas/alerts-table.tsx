@@ -5,6 +5,16 @@ import { AlertCircle, Bell, CheckCircle2, ChevronRight, DollarSign, Eye, Trash2 
 
 type ModuloAlerta = "tarefas" | "financeiro" | "sistema" | "comercial" | "contratos" | "helpdesk" | "posVenda";
 
+const MODULO_LABELS: Record<ModuloAlerta, string> = {
+  tarefas: "Tarefas",
+  financeiro: "Financeiro",
+  sistema: "Sistema",
+  comercial: "Comercial",
+  contratos: "Contratos",
+  helpdesk: "Suporte",
+  posVenda: "Pós-venda",
+};
+
 export type AlertaRow = {
   id: string;
   modulo: ModuloAlerta;
@@ -85,7 +95,7 @@ export function AlertsTable({ alertas, onMarcarComoLida, onExcluir }: AlertsTabl
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                       <IconeModuloAlerta modulo={a.modulo} />
-                      <span>{a.modulo}</span>
+                      <span>{MODULO_LABELS[a.modulo]}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">

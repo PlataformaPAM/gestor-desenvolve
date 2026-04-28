@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Upload, FileText } from "lucide-react";
-import { PRIORIDADE_LABELS, CATEGORIA_LABELS } from "@/lib/helpdesk/constants";
-import type { TicketPrioridade, TicketCategoria } from "@/lib/helpdesk/types";
+import { PRIORIDADE_LABELS, CATEGORIA_LABELS } from "@/lib/suporte/constants";
+import type { TicketPrioridade, TicketCategoria } from "@/lib/suporte/types";
 
 export type NovoChamadoPayload = {
   clienteId: string;

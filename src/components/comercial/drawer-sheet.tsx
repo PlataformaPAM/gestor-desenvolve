@@ -8,7 +8,7 @@ import { X } from "lucide-react";
 type DrawerSheetProps = {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   /** Largura máxima no desktop. Padrão global: igual Helpdesk (sm:max-w-3xl) */
   maxWidth?: string;

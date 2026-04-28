@@ -1,4 +1,4 @@
-import type { Tarefa as PrismaTarefa, Usuario as PrismaUsuario } from "@prisma/client";
+import type { Cliente as PrismaCliente, Tarefa as PrismaTarefa, Usuario as PrismaUsuario } from "@prisma/client";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 
 export function mapUsuarioTarefaFromDb(u: PrismaUsuario): UsuarioTarefa {
@@ -13,6 +13,7 @@ export function mapTarefaFromDb(
     criadoPor?: PrismaUsuario | null;
     responsavel: PrismaUsuario;
     colaboradores: Array<{ usuario: PrismaUsuario }>;
+    cliente?: Pick<PrismaCliente, "id" | "nome" | "empresa"> | null;
     anexos: Array<{ nomeArquivo: string }>;
     historico: Array<{
       id: string;
@@ -26,6 +27,7 @@ export function mapTarefaFromDb(
 ): Tarefa {
   return {
     id: t.id,
+    codigo: t.codigo,
     titulo: t.titulo,
     descricao: t.descricao ?? undefined,
     status: t.status as Tarefa["status"],
@@ -35,6 +37,7 @@ export function mapTarefaFromDb(
     responsavel: mapUsuarioTarefaFromDb(t.responsavel),
     colaboradores: t.colaboradores.map((c) => mapUsuarioTarefaFromDb(c.usuario)),
     clienteId: t.clienteId ?? undefined,
+    clienteNome: t.cliente ? (t.cliente.empresa?.trim() || t.cliente.nome).trim() : undefined,
     solucaoId: t.solucaoId ?? undefined,
     anexos: t.anexos.map((a) => a.nomeArquivo),
     historico: t.historico.map((h) => ({

@@ -18,8 +18,8 @@ import { formatCurrency } from "@/lib/clientes/utils";
 import { STATUS_LABELS, SEGMENTO_LABELS } from "@/lib/clientes/constants";
 import type { Lancamento } from "@/lib/financeiro/types";
 import { descricaoParaExibicao, parcelaRotuloCurto } from "@/lib/financeiro/lancamento-utils";
-import type { Ticket } from "@/lib/helpdesk/types";
-import { PRIORIDADE_LABELS, STATUS_LABELS as TICKET_STATUS_LABELS } from "@/lib/helpdesk/constants";
+import type { Ticket } from "@/lib/suporte/types";
+import { PRIORIDADE_LABELS, STATUS_LABELS as TICKET_STATUS_LABELS } from "@/lib/suporte/constants";
 import type { TarefaRegua } from "@/lib/pos-venda/types";
 import { TIPO_TAREFA_LABELS } from "@/lib/pos-venda/constants";
 import clsx from "clsx";
@@ -38,7 +38,7 @@ type ClientePerfil360Props = {
   cliente: Cliente | null;
   /** Lançamentos (parcelas/recorrências) do módulo Financeiro para este cliente */
   lancamentosDoCliente?: Lancamento[];
-  /** Tickets do Helpdesk para este cliente */
+  /** Tickets do Suporte para este cliente */
   ticketsDoCliente?: Ticket[];
   /** Próxima tarefa de relacionamento agendada (módulo Pós-Venda) */
   proximaTarefa?: TarefaRegua | null;
@@ -343,7 +343,7 @@ export function ClientePerfil360({
             {ticketsDoCliente.length > 0 ? (
               <div>
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                  Tickets abertos no Helpdesk
+                  Tickets abertos no Suporte
                 </p>
                 <ul className="space-y-2">
                   {ticketsDoCliente.map((t) => (
@@ -375,7 +375,7 @@ export function ClientePerfil360({
                 </ul>
               </div>
             ) : (
-              <p className="text-sm text-slate-500">Nenhum ticket no Helpdesk para este cliente.</p>
+              <p className="text-sm text-slate-500">Nenhum ticket no Suporte para este cliente.</p>
             )}
           </div>
         )}

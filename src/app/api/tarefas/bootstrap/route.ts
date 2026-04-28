@@ -11,6 +11,7 @@ export async function GET() {
     prisma.tarefa.findMany({
       include: {
         criadoPor: true,
+        cliente: { select: { id: true, nome: true, empresa: true } },
         responsavel: true,
         colaboradores: { include: { usuario: true } },
         anexos: true,

@@ -144,6 +144,7 @@ export default function ConstrutorDocumentosPage() {
   const [acaoId, setAcaoId] = useState<string | null>(null);
   const [editorNonce, setEditorNonce] = useState(0);
   const [abaVariaveis, setAbaVariaveis] = useState<string>(VARIAVEIS_DOCUMENTO_MODULOS[0]?.id ?? "empresa");
+  const [buscaVariavel, setBuscaVariavel] = useState("");
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaDocumentoConfig>({
     layoutModo: "none",
     razaoSocial: "",
@@ -508,7 +509,23 @@ export default function ConstrutorDocumentosPage() {
       opened.document.close();
     })();
   }, [empresaConfig, modeloAtual, previewValues, showToast, timbreSelecionado]);
-  const moduloAtivo = VARIAVEIS_DOCUMENTO_MODULOS.find((x) => x.id === abaVariaveis) ?? VARIAVEIS_DOCUMENTO_MODULOS[0];
+  const termoVariavel = buscaVariavel.trim().toLowerCase();
+  const modulosComVariaveisFiltradas = useMemo(
+    () =>
+      VARIAVEIS_DOCUMENTO_MODULOS.map((mod) => ({
+        ...mod,
+        variaveis: !termoVariavel
+          ? mod.variaveis
+          : mod.variaveis.filter((v) =>
+              `${v.token} ${v.label}`.toLowerCase().includes(termoVariavel)
+            ),
+      })).filter((mod) => mod.variaveis.length > 0),
+    [termoVariavel]
+  );
+  const moduloAtivoFiltrado =
+    modulosComVariaveisFiltradas.find((x) => x.id === abaVariaveis) ??
+    modulosComVariaveisFiltradas[0] ??
+    null;
 
   return (
     <section className="w-full min-w-0 space-y-4">
@@ -765,9 +782,21 @@ export default function ConstrutorDocumentosPage() {
             </div>
 
             <div className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50">
+              <div className="border-b border-slate-200 p-2 dark:border-slate-600">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={buscaVariavel}
+                    onChange={(e) => setBuscaVariavel(e.target.value)}
+                    placeholder="Buscar variável por nome ou token..."
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
               <div className="border-b border-slate-200 dark:border-slate-600">
                 <div className="flex max-h-[220px] flex-wrap gap-1 overflow-y-auto p-2">
-                  {VARIAVEIS_DOCUMENTO_MODULOS.map((mod) => (
+                  {modulosComVariaveisFiltradas.map((mod) => (
                     <button
                       key={mod.id}
                       type="button"
@@ -789,19 +818,25 @@ export default function ConstrutorDocumentosPage() {
                   cabeçalho, corpo ou rodapé). Campos de texto rico: clique dentro do editor antes de escolher a
                   variável.
                 </p>
-                <div className="flex flex-col gap-1.5">
-                  {moduloAtivo?.variaveis.map((v) => (
-                    <button
-                      key={v.token}
-                      type="button"
-                      onClick={() => inserirVariavel(v.token)}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-xs text-slate-800 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                    >
-                      <span className="font-mono text-[11px] text-violet-700 dark:text-violet-300">{v.token}</span>
-                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">{v.label}</span>
-                    </button>
-                  ))}
-                </div>
+                {!moduloAtivoFiltrado ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 bg-white px-2 py-3 text-center text-xs text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                    Nenhuma variável encontrada para esta busca.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {moduloAtivoFiltrado.variaveis.map((v) => (
+                      <button
+                        key={v.token}
+                        type="button"
+                        onClick={() => inserirVariavel(v.token)}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-xs text-slate-800 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <span className="font-mono text-[11px] text-violet-700 dark:text-violet-300">{v.token}</span>
+                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">{v.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
