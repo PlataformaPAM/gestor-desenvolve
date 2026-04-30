@@ -15,6 +15,9 @@ export type SessionPayload = {
   userCpf?: string;
   userEmail?: string;
   userPhone?: string;
+  clienteIds?: string[];
+  isPortalCliente?: boolean;
+  isAdminCliente?: boolean;
   permissoes?: Partial<Record<ModuloPermissao, boolean>>;
 };
 
@@ -48,6 +51,8 @@ const PATH_TO_MODULE: Record<string, ModuloPermissao> = {
   "/contratos": "clientes",
   "/helpdesk": "helpdesk",
   "/suporte": "helpdesk",
+  "/portal/usuarios": "configuracoes",
+  "/portal": "helpdesk",
   "/pos-venda": "posVenda",
   "/tarefas": "tarefas",
   "/rh": "rh",
@@ -55,7 +60,8 @@ const PATH_TO_MODULE: Record<string, ModuloPermissao> = {
 };
 
 function getModuleForPath(pathname: string): ModuloPermissao | null {
-  for (const [path, module] of Object.entries(PATH_TO_MODULE)) {
+  const sorted = Object.entries(PATH_TO_MODULE).sort((a, b) => b[0].length - a[0].length);
+  for (const [path, module] of sorted) {
     if (pathname === path || pathname.startsWith(path + "/")) return module;
   }
   return null;

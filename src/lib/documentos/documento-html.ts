@@ -22,6 +22,15 @@ type DocumentoRenderConfig = Pick<
   | "footerHeightMm"
 >;
 
+function normalizeOpacityForRender(value: unknown, fallback = 0.12): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  // No produto, "sem opacidade" representa sem transparência visual (100% visível).
+  if (n <= 0) return 1;
+  if (n >= 1) return 1;
+  return n;
+}
+
 function cssByLayout(cfg: DocumentoRenderConfig): string {
   const padTop = cfg.margemTopMm + (cfg.layoutModo === "header_footer" || cfg.layoutModo === "hybrid" ? cfg.headerHeightMm : 0);
   const padBottom =
@@ -169,14 +178,17 @@ export function montarDocumentoHtmlCompleto(params: {
 }): string {
   const { title, modeloNome, snapshot, geradoEmIso, autoPrint = false } = params;
   const snapshotTimbreUrl = snapshot.timbreUrl?.trim() || "";
+  const configuredTimbreUrl = params.renderConfig?.papelTimbradoUrl?.trim() || "";
   const configuredLayout = (params.renderConfig?.layoutModo as DocumentoLayoutModo | undefined) ?? "none";
-  // Se o modelo trouxe timbrado próprio, aplica fundo mesmo com layout global "none".
+  // Se houver timbrado (no snapshot ou na configuração), aplica fundo mesmo com layout global "none".
   const effectiveLayoutModo: DocumentoLayoutModo =
-    configuredLayout === "none" && snapshotTimbreUrl ? "background" : configuredLayout;
+    configuredLayout === "none" && (snapshotTimbreUrl || configuredTimbreUrl) ? "background" : configuredLayout;
   const cfg: DocumentoRenderConfig = {
     layoutModo: effectiveLayoutModo,
-    papelTimbradoUrl: snapshotTimbreUrl || params.renderConfig?.papelTimbradoUrl?.trim() || "",
-    papelTimbradoOpacity: params.renderConfig?.papelTimbradoOpacity ?? 0.12,
+    // O timbre pode vir apenas no snapshot (relatórios) sem vir em renderConfig.
+    // Garantimos essa prioridade para não perder o fundo.
+    papelTimbradoUrl: snapshotTimbreUrl || configuredTimbreUrl || "",
+    papelTimbradoOpacity: normalizeOpacityForRender(params.renderConfig?.papelTimbradoOpacity, 0.12),
     margemTopMm: params.renderConfig?.margemTopMm ?? 12,
     margemRightMm: params.renderConfig?.margemRightMm ?? 12,
     margemBottomMm: params.renderConfig?.margemBottomMm ?? 12,
@@ -187,10 +199,11 @@ export function montarDocumentoHtmlCompleto(params: {
   const snapshotCfg = params.snapshot.renderConfig ?? {};
   if (snapshotCfg && typeof snapshotCfg === "object") {
     const snapshotLayout = (snapshotCfg.layoutModo as DocumentoLayoutModo | undefined) ?? cfg.layoutModo;
-    // Se há timbrado no snapshot, evita perder o fundo por layout "none" vindo de config antiga.
-    cfg.layoutModo = snapshot.timbreUrl?.trim() && snapshotLayout === "none" ? "background" : snapshotLayout;
-    cfg.papelTimbradoUrl = snapshotCfg.papelTimbradoUrl?.trim() || cfg.papelTimbradoUrl;
-    cfg.papelTimbradoOpacity = snapshotCfg.papelTimbradoOpacity ?? cfg.papelTimbradoOpacity;
+    // Se há timbrado (snapshot/config), evita perder o fundo por layout "none" vindo de config antiga.
+    const hasAnyTimbre = Boolean(snapshot.timbreUrl?.trim() || snapshotCfg.papelTimbradoUrl?.trim() || cfg.papelTimbradoUrl);
+    cfg.layoutModo = hasAnyTimbre && snapshotLayout === "none" ? "background" : snapshotLayout;
+    cfg.papelTimbradoUrl = snapshotCfg.papelTimbradoUrl?.trim() || snapshotTimbreUrl || cfg.papelTimbradoUrl;
+    cfg.papelTimbradoOpacity = normalizeOpacityForRender(snapshotCfg.papelTimbradoOpacity, cfg.papelTimbradoOpacity);
     cfg.margemTopMm = snapshotCfg.margemTopMm ?? cfg.margemTopMm;
     cfg.margemRightMm = snapshotCfg.margemRightMm ?? cfg.margemRightMm;
     cfg.margemBottomMm = snapshotCfg.margemBottomMm ?? cfg.margemBottomMm;

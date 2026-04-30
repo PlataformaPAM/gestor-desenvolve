@@ -22,6 +22,7 @@ type NovoUsuarioFormProps = {
   initialUsuario?: UsuarioSistema | null;
   onSave: (u: UsuarioFormPayload) => void;
   onCancel: () => void;
+  hideVinculoSection?: boolean;
 };
 
 /** Normaliza termo para busca: minúsculas e, para números, só dígitos. */
@@ -61,6 +62,7 @@ export function NovoUsuarioForm({
   initialUsuario,
   onSave,
   onCancel,
+  hideVinculoSection = false,
 }: NovoUsuarioFormProps) {
   const [cpf, setCpf] = useState(initialUsuario?.cpf ?? "");
   const [email, setEmail] = useState(initialUsuario?.email ?? "");
@@ -374,6 +376,7 @@ export function NovoUsuarioForm({
       )}
 
       {/* Busca vínculo RH / Cliente (autocomplete) */}
+      {!hideVinculoSection && (
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Vincular a pessoa (RH ou Cliente)
@@ -443,6 +446,7 @@ export function NovoUsuarioForm({
           <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{erroCpfVinculo}</p>
         )}
       </div>
+      )}
 
       {erroSenha && (
         <p className="text-xs font-medium text-red-600 dark:text-red-400" role="alert">

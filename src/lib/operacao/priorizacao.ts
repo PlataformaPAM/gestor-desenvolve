@@ -1,4 +1,4 @@
-export type OperacaoViewId = "minha_fila" | "urgentes" | "atrasados" | "vence_logo" | "fechados";
+export type OperacaoViewId = "minha_fila" | "abertos" | "urgentes" | "atrasados" | "vence_logo" | "fechados";
 
 export type SituacaoOperacional = "normal" | "vence_logo" | "atrasado";
 

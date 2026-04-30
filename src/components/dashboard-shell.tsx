@@ -25,6 +25,7 @@ import {
   Package,
   FileText,
   BarChart3,
+  Ticket,
 } from "lucide-react";
 import { GlobalHeader } from "./global-header";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
@@ -41,6 +42,7 @@ type NavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   modulo?: ModuloPermissao;
+  requireAdminCliente?: boolean;
 };
 
 type BootstrapAlerta = {
@@ -62,11 +64,24 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Soluções", href: "/solucoes", icon: Package, modulo: "posVenda" },
   { label: "Suporte", href: "/suporte", icon: LifeBuoy, modulo: "helpdesk" },
   { label: "Pós-venda", href: "/pos-venda", icon: CheckCircle2, modulo: "posVenda" },
-  { label: "Minha caixa", href: "/alertas", icon: Bell },
+  { label: "Minha Caixa", href: "/alertas", icon: Bell },
   { label: "Tarefas Internas", href: "/tarefas", icon: ListTodo, modulo: "tarefas" },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { label: "RH e Parceiros", href: "/rh", icon: UserCog, modulo: "rh" },
 ];
+
+const CLIENT_PORTAL_NAV_ITEMS: NavItem[] = [
+  { label: "Portal do Cliente", href: "/portal", icon: LayoutDashboard, modulo: "helpdesk" },
+  { label: "Suporte", href: "/portal/chamados", icon: Ticket, modulo: "helpdesk" },
+  { label: "Usuários", href: "/portal/usuarios", icon: Users, modulo: "configuracoes" },
+  { label: "Minha Caixa", href: "/alertas", icon: Bell },
+];
+
+function isItemActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/portal") return pathname === "/portal";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function filterNavByPerfil(
   items: NavItem[],
@@ -74,6 +89,18 @@ function filterNavByPerfil(
 ): NavItem[] {
   if (!permissoes || Object.keys(permissoes).length === 0) return items;
   return items.filter((item) => !item.modulo || permissoes[item.modulo] === true);
+}
+
+function buildNavItems(
+  permissoes: Partial<Record<ModuloPermissao, boolean>>,
+  isPortalCliente: boolean,
+  isAdminCliente: boolean
+): NavItem[] {
+  if (isPortalCliente) {
+    const base = CLIENT_PORTAL_NAV_ITEMS.filter((item) => !item.requireAdminCliente || isAdminCliente);
+    return filterNavByPerfil(base, permissoes);
+  }
+  return filterNavByPerfil(NAV_ITEMS, permissoes);
 }
 
 function DesktopSidebar({
@@ -85,6 +112,8 @@ function DesktopSidebar({
   onOpenProfile,
   onLogout,
   unreadByHref,
+  isPortalCliente,
+  isAdminCliente,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -94,10 +123,12 @@ function DesktopSidebar({
   onOpenProfile: () => void;
   onLogout: () => void;
   unreadByHref: Record<string, number>;
+  isPortalCliente: boolean;
+  isAdminCliente: boolean;
 }) {
   const pathname = usePathname();
   const [collapsedMenuOpen, setCollapsedMenuOpen] = useState(false);
-  const navItems = filterNavByPerfil(NAV_ITEMS, permissoes);
+  const navItems = buildNavItems(permissoes, isPortalCliente, isAdminCliente);
   const nomeExibicao = userName || "Usuário";
   const cpfExibicao = userCpf || "—";
 
@@ -144,10 +175,7 @@ function DesktopSidebar({
         <div className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+            const active = isItemActive(pathname, item.href);
 
             return (
               <Link
@@ -186,7 +214,7 @@ function DesktopSidebar({
           })}
         </div>
       </nav>
-      {(Object.keys(permissoes).length === 0 || permissoes.configuracoes === true) && (
+      {!isPortalCliente && (Object.keys(permissoes).length === 0 || permissoes.configuracoes === true) && (
         <div className="shrink-0 border-t border-slate-200 px-3 py-2 dark:border-slate-700">
           <Link
             href="/configuracoes"
@@ -274,36 +302,30 @@ function DesktopSidebar({
   );
 }
 
-const MENU_NAV_ITEMS: NavItem[] = [
-  ...NAV_ITEMS,
-  {
-    label: "Configurações",
-    href: "/configuracoes",
-    icon: Settings,
-    modulo: "configuracoes",
-  },
-];
-
 function MobileMenuDrawerContent({
   onClose,
   permissoes,
   unreadByHref,
+  isPortalCliente,
+  isAdminCliente,
 }: {
   onClose: () => void;
   permissoes: Partial<Record<ModuloPermissao, boolean>>;
   unreadByHref: Record<string, number>;
+  isPortalCliente: boolean;
+  isAdminCliente: boolean;
 }) {
   const pathname = usePathname();
-  const navItems = filterNavByPerfil(MENU_NAV_ITEMS, permissoes);
+  const navItemsBase = buildNavItems(permissoes, isPortalCliente, isAdminCliente);
+  const navItems = !isPortalCliente && (Object.keys(permissoes).length === 0 || permissoes.configuracoes === true)
+    ? [...navItemsBase, { label: "Configurações", href: "/configuracoes", icon: Settings, modulo: "configuracoes" as ModuloPermissao }]
+    : navItemsBase;
 
   return (
     <nav className="flex flex-1 flex-col space-y-1 px-3 py-4">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const active =
-          item.href === "/"
-            ? pathname === "/"
-            : pathname.startsWith(item.href);
+        const active = isItemActive(pathname, item.href);
 
         return (
           <Link
@@ -342,16 +364,21 @@ function MobileMenuDrawerContent({
 function MobileBottomNav({
   permissoes,
   unreadByHref,
+  isPortalCliente,
+  isAdminCliente,
 }: {
   permissoes: Partial<Record<ModuloPermissao, boolean>>;
   unreadByHref: Record<string, number>;
+  isPortalCliente: boolean;
+  isAdminCliente: boolean;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [alerts, setAlerts] = useState<Array<{ id: string; titulo: string; descricao: string; lida: boolean; prioridade?: "urgente" | "alta" | "normal"; slaLabel?: string | null }>>([]);
-  const isHome = pathname === "/";
+  const homeHref = isPortalCliente ? "/portal" : "/";
+  const isHome = pathname === homeHref;
 
   useEffect(() => {
     let active = true;
@@ -391,12 +418,12 @@ function MobileBottomNav({
     <>
       <nav className="fixed inset-x-0 bottom-0 z-50 flex h-14 items-center justify-between border-t border-slate-200 bg-white/95 px-4 pb-[env(safe-area-inset-bottom)] shadow-md backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95 lg:hidden">
         <Link
-          href="/"
+          href={homeHref}
           className={clsx(
             "flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors",
             isHome ? "text-[#6D28D9]" : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
           )}
-          aria-label="Central de Comandos"
+          aria-label={isPortalCliente ? "Portal do Cliente" : "Central de Comandos"}
         >
           <Home className="h-5 w-5" />
           <span
@@ -405,7 +432,7 @@ function MobileBottomNav({
               isHome ? "text-[#6D28D9]" : "text-slate-600 dark:text-slate-400"
             )}
           >
-            Central
+            {isPortalCliente ? "Portal" : "Central"}
           </span>
         </Link>
         <button
@@ -449,7 +476,13 @@ function MobileBottomNav({
         onClose={() => setMenuOpen(false)}
         title="Menu"
       >
-        <MobileMenuDrawerContent onClose={() => setMenuOpen(false)} permissoes={permissoes} unreadByHref={unreadByHref} />
+        <MobileMenuDrawerContent
+          onClose={() => setMenuOpen(false)}
+          permissoes={permissoes}
+          unreadByHref={unreadByHref}
+          isPortalCliente={isPortalCliente}
+          isAdminCliente={isAdminCliente}
+        />
       </DrawerLeft>
 
       <Dialog
@@ -474,7 +507,7 @@ function MobileBottomNav({
       <DrawerSheet
         open={alertsOpen}
         onClose={() => setAlertsOpen(false)}
-        title="Minha caixa"
+        title="Minha Caixa"
       >
         <div className="overflow-y-auto p-4">
           {alerts.length === 0 ? (
@@ -517,7 +550,7 @@ function MobileBottomNav({
                 onClick={() => setAlertsOpen(false)}
                 className="mt-2 block rounded-lg bg-[#6D28D9] px-3 py-2 text-center text-sm font-medium text-white hover:bg-purple-700"
               >
-                Abrir Minha caixa
+                Abrir Minha Caixa
               </Link>
             </div>
           )}
@@ -529,19 +562,20 @@ function MobileBottomNav({
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return window.localStorage.getItem("pam.sidebar.collapsed") === "1";
-    } catch {
-      return false;
-    }
-  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [unreadByHref, setUnreadByHref] = useState<Record<string, number>>({});
   const { perfilId: rawPerfilId, session } = useAuth();
   const perfilId = rawPerfilId ?? "admin";
   const SIDEBAR_STATE_KEY = "pam.sidebar.collapsed";
+
+  useEffect(() => {
+    try {
+      setSidebarCollapsed(window.localStorage.getItem(SIDEBAR_STATE_KEY) === "1");
+    } catch {
+      // noop
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -621,6 +655,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         onOpenProfile={() => setProfileDrawerOpen(true)}
         onLogout={handleLogout}
         unreadByHref={unreadByHref}
+        isPortalCliente={session.isPortalCliente}
+        isAdminCliente={session.isAdminCliente}
       />
       <ProfileDrawer
         open={profileDrawerOpen}
@@ -637,7 +673,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
-      <MobileBottomNav permissoes={session.permissoes} unreadByHref={unreadByHref} />
+      <MobileBottomNav
+        permissoes={session.permissoes}
+        unreadByHref={unreadByHref}
+        isPortalCliente={session.isPortalCliente}
+        isAdminCliente={session.isAdminCliente}
+      />
     </div>
   );
 }

@@ -33,14 +33,26 @@ export async function POST(req: Request) {
 
   const timbreAbs = absolutizeAssetUrl(report.snapshot.timbreUrl ?? "", req.url);
   const timbreUrl = await toDataUrlIfPossible(timbreAbs);
-  const renderConfig = report.snapshot.renderConfig
+  const renderCfgRaw = report.snapshot.renderConfig
+    ? { ...report.snapshot.renderConfig }
+    : timbreUrl || timbreAbs
+      ? {}
+      : undefined;
+  const renderCfgAbs = absolutizeAssetUrl(String(renderCfgRaw?.papelTimbradoUrl ?? ""), req.url);
+  const renderCfgDataUrl = await toDataUrlIfPossible(renderCfgAbs);
+  const renderConfig = renderCfgRaw
     ? {
-        ...report.snapshot.renderConfig,
-        papelTimbradoUrl: await toDataUrlIfPossible(
-          absolutizeAssetUrl(report.snapshot.renderConfig.papelTimbradoUrl ?? "", req.url) || timbreAbs
-        ),
+        ...renderCfgRaw,
+        papelTimbradoUrl: renderCfgDataUrl || timbreUrl || renderCfgAbs || timbreAbs,
       }
     : undefined;
+  if (
+    renderConfig &&
+    (renderConfig.layoutModo === undefined || renderConfig.layoutModo === "none") &&
+    (renderConfig.papelTimbradoUrl || timbreUrl)
+  ) {
+    renderConfig.layoutModo = "background";
+  }
 
   const html = montarDocumentoHtmlCompleto({
     title: `Relatório - ${report.resumo.cliente}`,

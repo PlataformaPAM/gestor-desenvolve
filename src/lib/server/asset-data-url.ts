@@ -24,8 +24,22 @@ export async function toDataUrlIfPossible(assetUrl: string): Promise<string> {
     const pathname = decodeURIComponent(parsed.pathname || "");
     if (pathname.startsWith("/api/uploads/documentos-timbres/")) {
       const filename = pathname.slice("/api/uploads/documentos-timbres/".length);
-      const diskPath = path.join(process.cwd(), "uploads", "documentos-timbres", filename);
-      const file = await readFile(diskPath);
+      const candidates = [
+        path.join(process.cwd(), "uploads", "documentos-timbres", filename),
+        path.join(process.cwd(), "public", "uploads", "documentos-timbres", filename),
+      ];
+      let file: Buffer | null = null;
+      let diskPath = "";
+      for (const p of candidates) {
+        try {
+          file = await readFile(p);
+          diskPath = p;
+          break;
+        } catch {
+          // tenta próximo caminho
+        }
+      }
+      if (!file || !diskPath) return url;
       const ext = path.extname(diskPath).toLowerCase();
       const mime =
         ext === ".jpg" || ext === ".jpeg"
@@ -38,8 +52,23 @@ export async function toDataUrlIfPossible(assetUrl: string): Promise<string> {
       return `data:${mime};base64,${file.toString("base64")}`;
     }
     if (pathname.startsWith("/uploads/")) {
-      const diskPath = path.join(process.cwd(), "public", pathname);
-      const file = await readFile(diskPath);
+      const rel = pathname.replace(/^\/+/, "");
+      const candidates = [
+        path.join(process.cwd(), "public", rel),
+        path.join(process.cwd(), rel),
+      ];
+      let file: Buffer | null = null;
+      let diskPath = "";
+      for (const p of candidates) {
+        try {
+          file = await readFile(p);
+          diskPath = p;
+          break;
+        } catch {
+          // tenta próximo caminho
+        }
+      }
+      if (!file || !diskPath) return url;
       const ext = path.extname(diskPath).toLowerCase();
       const mime =
         ext === ".jpg" || ext === ".jpeg"

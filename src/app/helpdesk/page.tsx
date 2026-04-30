@@ -28,7 +28,7 @@ export default function SuportePage() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("minha_fila");
+  const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("abertos");
   const [clientes, setClientes] = useState<Array<{ id: string; nome: string; empresa?: string }>>([]);
   const [equipe, setEquipe] = useState<Array<{ id: string; nome: string }>>([]);
   const [prioridadeFilter, setPrioridadeFilter] = useState<"" | TicketPrioridade>("");
@@ -55,7 +55,7 @@ export default function SuportePage() {
   useEffect(() => {
     const saved = window.localStorage.getItem(OPERACAO_VIEW_STORAGE_KEY) as OperacaoViewId | null;
     if (!saved) return;
-    if (["minha_fila", "urgentes", "atrasados", "vence_logo", "fechados"].includes(saved)) {
+    if (["minha_fila", "abertos", "urgentes", "atrasados", "vence_logo", "fechados"].includes(saved)) {
       setOperacaoView(saved);
     }
   }, []);
@@ -146,8 +146,9 @@ export default function SuportePage() {
       });
     }
     if (operacaoView === "minha_fila") {
-      const minhas = ativos.filter((t) => (session.userId ? t.responsaveis.some((r) => r.id === session.userId) : false));
-      base = minhas.length > 0 ? minhas : ativos;
+      base = ativos.filter((t) => (session.userId ? t.responsaveis.some((r) => r.id === session.userId) : false));
+    } else if (operacaoView === "abertos") {
+      base = ativos;
     } else if (operacaoView === "urgentes") {
       base = ativos.filter((t) => t.prioridade === "critica");
     } else if (operacaoView === "atrasados") {

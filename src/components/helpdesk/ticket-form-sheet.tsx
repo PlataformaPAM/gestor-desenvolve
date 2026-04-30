@@ -51,6 +51,11 @@ type TicketFormSheetProps = {
   initialTicket?: Ticket | null;
   /** Título do Sheet (opcional; senão usa "Ticket ID" ou "Novo Ticket") */
   title?: React.ReactNode;
+  hideClienteField?: boolean;
+  hideResponsavelSection?: boolean;
+  fixedCliente?: { id: string; nome: string } | null;
+  readOnlyStatus?: boolean;
+  hideSlaPreview?: boolean;
 };
 
 type TabId = "detalhes" | "interacoes";
@@ -104,6 +109,11 @@ export function TicketFormSheet({
   usuarioAtual = { id: "usuario-atual", nome: "Usuário" },
   initialTicket = null,
   title: titleProp,
+  hideClienteField = false,
+  hideResponsavelSection = false,
+  fixedCliente = null,
+  readOnlyStatus = false,
+  hideSlaPreview = false,
 }: TicketFormSheetProps) {
   const id = useId();
   const [activeTab, setActiveTab] = useState<TabId>("detalhes");
@@ -212,8 +222,8 @@ export function TicketFormSheet({
     if (!open) return;
     setActiveTab("detalhes");
     if (!initialTicket) {
-      setClienteId("");
-      setClienteNome("");
+      setClienteId(fixedCliente?.id ?? "");
+      setClienteNome(fixedCliente?.nome ?? "");
       setCategoria("duvida");
       setPrioridade("media");
       setPrevisaoConclusao(computePrevisaoByPrioridade("media"));
@@ -260,7 +270,7 @@ export function TicketFormSheet({
       prevResponsavelPrincipalIdRef.current = principalRes.id;
       prevColaboradoresIdsRef.current = collab.map((c) => c.id).sort().join(",");
     }
-  }, [open, initialTicket]);
+  }, [open, initialTicket, fixedCliente, usuarioAtual]);
 
   // Registro automático: mudança de status
   useEffect(() => {
@@ -514,18 +524,20 @@ export function TicketFormSheet({
           {activeTab === "detalhes" && (
             <div className="space-y-6">
               {/* Cliente */}
-              <div className="space-y-1">
-                <label className={labelClass}>
-                  Cliente *
-                </label>
-                <SearchableSelect
-                  options={clienteOptions}
-                  value={clienteId}
-                  onChange={handleSelectCliente}
-                  placeholder="Buscar por nome ou empresa..."
-                  searchPlaceholder="Buscar cliente..."
-                />
-              </div>
+              {!hideClienteField && (
+                <div className="space-y-1">
+                  <label className={labelClass}>
+                    Cliente *
+                  </label>
+                  <SearchableSelect
+                    options={clienteOptions}
+                    value={clienteId}
+                    onChange={handleSelectCliente}
+                    placeholder="Buscar por nome ou empresa..."
+                    searchPlaceholder="Buscar cliente..."
+                  />
+                </div>
+              )}
 
               {/* Classificação — Grid 3 colunas */}
               <div>
@@ -554,21 +566,29 @@ export function TicketFormSheet({
                       placeholder="Selecione a prioridade..."
                       searchable={false}
                     />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Previsão calculada pelo SLA: <strong>{formatPrevisaoBr(previsaoConclusao)}</strong>
-                    </p>
+                    {!hideSlaPreview && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Previsão calculada pelo SLA: <strong>{formatPrevisaoBr(previsaoConclusao)}</strong>
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-slate-600">
                       Status
                     </label>
-                    <SearchableSelect
-                      options={statusOptions}
-                      value={status}
-                      onChange={(v) => setStatus(v as TicketStatus)}
-                      placeholder="Selecione o status..."
-                      searchable={false}
-                    />
+                    {readOnlyStatus ? (
+                      <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                        {STATUS_LABELS[status]}
+                      </div>
+                    ) : (
+                      <SearchableSelect
+                        options={statusOptions}
+                        value={status}
+                        onChange={(v) => setStatus(v as TicketStatus)}
+                        placeholder="Selecione o status..."
+                        searchable={false}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -613,40 +633,42 @@ export function TicketFormSheet({
               />
 
               {/* Responsável Principal + Colaboradores */}
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className={labelClass}>
-                    Responsável
-                  </label>
-                  <SearchableSelect
-                    options={responsavelOptions}
-                    value={responsavelPrincipal.id}
-                    onChange={(id) => {
-                      const r = listaResponsaveisPrincipal.find((m) => m.id === id);
-                      if (r) setResponsavelPrincipal(r);
-                    }}
-                    placeholder="Selecione o responsável..."
-                    searchPlaceholder="Buscar responsável..."
-                  />
-                  <p className="text-xs text-slate-500">
-                    Ao criar um novo ticket, o usuário logado é o padrão. Altere para transferir a responsabilidade.
-                  </p>
+              {!hideResponsavelSection && (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className={labelClass}>
+                      Responsável
+                    </label>
+                    <SearchableSelect
+                      options={responsavelOptions}
+                      value={responsavelPrincipal.id}
+                      onChange={(id) => {
+                        const r = listaResponsaveisPrincipal.find((m) => m.id === id);
+                        if (r) setResponsavelPrincipal(r);
+                      }}
+                      placeholder="Selecione o responsável..."
+                      searchPlaceholder="Buscar responsável..."
+                    />
+                    <p className="text-xs text-slate-500">
+                      Ao criar um novo ticket, o usuário logado é o padrão. Altere para transferir a responsabilidade.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <span className={labelClass}>Colaboradores</span>
+                    <p className="text-xs text-slate-500">
+                      Outros membros da equipe que atuam no chamado em conjunto.
+                    </p>
+                    <SearchableMultiSelect
+                      options={colaboradorOptions}
+                      values={colaboradorIds}
+                      onChange={handleChangeColaboradores}
+                      placeholder="Selecionar colaboradores..."
+                      searchPlaceholder="Buscar colaborador..."
+                      selectedLabel="Selecionados"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <span className={labelClass}>Colaboradores</span>
-                  <p className="text-xs text-slate-500">
-                    Outros membros da equipe que atuam no chamado em conjunto.
-                  </p>
-                  <SearchableMultiSelect
-                    options={colaboradorOptions}
-                    values={colaboradorIds}
-                    onChange={handleChangeColaboradores}
-                    placeholder="Selecionar colaboradores..."
-                    searchPlaceholder="Buscar colaborador..."
-                    selectedLabel="Selecionados"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
 

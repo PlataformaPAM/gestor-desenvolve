@@ -161,7 +161,20 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
   };
 
   const timbreId = timbresConfig.modeloTimbreById[modelo.id] ?? "";
-  const timbre = timbresConfig.items.find((x) => x.id === timbreId);
+  const timbreVinculado = timbresConfig.items.find((x) => x.id === timbreId);
+  const timbrePadrao = timbresConfig.items.find((x) => x.ativo);
+  const timbre = timbreVinculado ?? timbrePadrao ?? timbresConfig.items[0];
+  const fallbackRenderConfig = {
+    layoutModo: empresaConfig.layoutModo,
+    papelTimbradoUrl: empresaConfig.papelTimbradoUrl,
+    papelTimbradoOpacity: empresaConfig.papelTimbradoOpacity,
+    margemTopMm: empresaConfig.margemTopMm,
+    margemRightMm: empresaConfig.margemRightMm,
+    margemBottomMm: empresaConfig.margemBottomMm,
+    margemLeftMm: empresaConfig.margemLeftMm,
+    headerHeightMm: empresaConfig.headerHeightMm,
+    footerHeightMm: empresaConfig.footerHeightMm,
+  };
   const assunto = preencherTemplateDocumento(modelo.assunto ?? "", values);
   return {
     modeloNome: modelo.nome,
@@ -171,8 +184,8 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
       cabecalhoHtml: preencherTemplateDocumento(modelo.cabecalhoHtml ?? "", values),
       corpoHtml: preencherTemplateDocumento(modelo.corpo ?? "", values),
       rodapeHtml: preencherTemplateDocumento(modelo.rodapeHtml ?? "", values),
-      timbreUrl: timbre?.url ?? "",
-      renderConfig: timbre?.renderConfig ?? undefined,
+      timbreUrl: timbre?.url ?? empresaConfig.papelTimbradoUrl ?? "",
+      renderConfig: timbre?.renderConfig ?? fallbackRenderConfig,
     },
     resumo: {
       cliente: clienteNome,

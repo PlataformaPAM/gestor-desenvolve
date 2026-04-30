@@ -10,6 +10,7 @@ import { GlobalSearch } from "./global-search";
 import { ThemeToggle } from "./theme-toggle";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { emitAlertsUpdated } from "@/lib/alerts/live-sync";
+import { useAuth } from "@/contexts/auth-context";
 
 type ModuloNotificacao = "tarefas" | "financeiro" | "helpdesk" | "sistema" | "comercial" | "contratos" | "posVenda";
 
@@ -50,6 +51,7 @@ function IconeModulo({ modulo }: { modulo: ModuloNotificacao }) {
 export function GlobalHeader() {
   const pathname = usePathname();
   const { title, setTitle, primaryAction, secondaryAction } = usePageHeader();
+  const { session } = useAuth();
   const titleFromPath = usePageTitleFromPath(pathname);
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -58,6 +60,7 @@ export function GlobalHeader() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.lida).length;
+  const isPortalCliente = session.isPortalCliente;
 
   const handleMarkAsRead = (id: string) => {
     setNotifications((prev) =>
@@ -151,14 +154,16 @@ export function GlobalHeader() {
         <div className="ml-2 flex shrink-0 items-center gap-1 sm:gap-2">
           <div className="flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="rounded-xl p-2 text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:text-slate-200 dark:hover:bg-slate-800"
-              aria-label="Busca global (Cmd+K)"
-            >
-              <Search className="h-5 w-5" aria-hidden />
-            </button>
+            {!isPortalCliente && (
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="rounded-xl p-2 text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Busca global (Cmd+K)"
+              >
+                <Search className="h-5 w-5" aria-hidden />
+              </button>
+            )}
             <DropdownMenu
               open={notificationsOpen}
               onClose={() => setNotificationsOpen(false)}
@@ -246,7 +251,7 @@ export function GlobalHeader() {
           </div>
           {(secondaryAction || primaryAction) && (
             <>
-              {secondaryAction && (
+              {!isPortalCliente && secondaryAction && (
                 <button
                   type="button"
                   onClick={secondaryAction.onClick}

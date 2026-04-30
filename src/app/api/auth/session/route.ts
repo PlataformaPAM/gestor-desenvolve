@@ -43,6 +43,22 @@ export async function GET(req: Request) {
   const userCpf = usuario?.cpf ?? session.userCpf ?? null;
   const userEmail = usuario?.email ?? session.userEmail ?? null;
   const userPhone = usuario?.telefone ?? session.userPhone ?? null;
+  const clienteVinculos = userId
+    ? await prisma.usuarioVinculo.findMany({
+        where: { usuarioId: userId, tipo: "cliente" },
+        select: { pessoaId: true },
+      })
+    : [];
+  const clienteIds = Array.from(new Set(clienteVinculos.map((v) => v.pessoaId)));
+  const perfilNome = (perfil?.nome ?? "").toLowerCase();
+  const isPortalCliente = clienteIds.length > 0;
+  const isAdminCliente =
+    isPortalCliente &&
+    (
+      permissoes.configuracoes === true ||
+      perfilNome.includes("admin") ||
+      perfilNome.includes("administrador")
+    );
   return ok({
     perfilId: session.perfilId,
     userId,
@@ -50,6 +66,9 @@ export async function GET(req: Request) {
     userCpf,
     userEmail,
     userPhone,
+    clienteIds,
+    isPortalCliente,
+    isAdminCliente,
     permissoes,
   });
 }

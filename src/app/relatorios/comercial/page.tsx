@@ -188,6 +188,66 @@ export default function RelatoriosComercialPage() {
         </p>
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filtros</h3>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="Período inicial" icon={<CalendarRange className="h-4 w-4" />}>
+              <input type="date" value={periodoInicio} onChange={(e) => setPeriodoInicio(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Período final" icon={<CalendarRange className="h-4 w-4" />}>
+              <input type="date" value={periodoFim} onChange={(e) => setPeriodoFim(e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Situação" icon={<Filter className="h-4 w-4" />}>
+              <select value={situacao} onChange={(e) => setSituacao(e.target.value as ComercialSituacao)} className={inputClass}>
+                <option value="todos">Todos</option>
+                <option value="abertos">Abertos</option>
+                <option value="ganhos">Ganhos</option>
+                <option value="perdidos">Perdidos</option>
+              </select>
+            </Field>
+          </div>
+          <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+            Relatório selecionado: <strong>{reportAtual?.titulo ?? "N/A"}</strong>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Ações</h3>
+          <div className="mt-4 space-y-3">
+            <Field label="Modelo de documento" icon={<FileText className="h-4 w-4" />}>
+              <select value={modeloId} onChange={(e) => setModeloId(e.target.value)} className={inputClass}>
+                <option value="">Selecionar modelo...</option>
+                {modelosDocumento.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <button type="button" onClick={handlePreview} disabled={busyPreview} className="w-full rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700">
+              {busyPreview ? "Gerando..." : "Visualizar"}
+            </button>
+            <button type="button" onClick={handlePdf} disabled={busyPdf} className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <span className="inline-flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                {busyPdf ? "Exportando..." : "Exportar PDF"}
+              </span>
+            </button>
+            <Field label="Enviar para e-mail" icon={<Send className="h-4 w-4" />}>
+              <input type="email" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} placeholder="diretoria@empresa.com" className={inputClass} />
+            </Field>
+            <button type="button" onClick={handleEnviar} disabled={busyEmail} className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <span className="inline-flex items-center gap-2">
+                <Send className="h-4 w-4" />
+                {busyEmail ? "Enviando..." : "Enviar por e-mail"}
+              </span>
+            </button>
+            {statusMessage ? <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-200">{statusMessage}</p> : null}
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3 lg:grid-cols-2">
         {COMERCIAL_REPORTS.map((report) => {
           const active = report.id === reportId;
@@ -250,65 +310,6 @@ export default function RelatoriosComercialPage() {
         </>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filtros</h3>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Field label="Período inicial" icon={<CalendarRange className="h-4 w-4" />}>
-              <input type="date" value={periodoInicio} onChange={(e) => setPeriodoInicio(e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Período final" icon={<CalendarRange className="h-4 w-4" />}>
-              <input type="date" value={periodoFim} onChange={(e) => setPeriodoFim(e.target.value)} className={inputClass} />
-            </Field>
-            <Field label="Situação" icon={<Filter className="h-4 w-4" />}>
-              <select value={situacao} onChange={(e) => setSituacao(e.target.value as ComercialSituacao)} className={inputClass}>
-                <option value="todos">Todos</option>
-                <option value="abertos">Abertos</option>
-                <option value="ganhos">Ganhos</option>
-                <option value="perdidos">Perdidos</option>
-              </select>
-            </Field>
-          </div>
-          <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
-            Relatório selecionado: <strong>{reportAtual?.titulo ?? "N/A"}</strong>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Ações</h3>
-          <div className="mt-4 space-y-3">
-            <Field label="Modelo de documento" icon={<FileText className="h-4 w-4" />}>
-              <select value={modeloId} onChange={(e) => setModeloId(e.target.value)} className={inputClass}>
-                <option value="">Selecionar modelo...</option>
-                {modelosDocumento.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <button type="button" onClick={handlePreview} disabled={busyPreview} className="w-full rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700">
-              {busyPreview ? "Gerando..." : "Visualizar"}
-            </button>
-            <button type="button" onClick={handlePdf} disabled={busyPdf} className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-              <span className="inline-flex items-center gap-2">
-                <Download className="h-4 w-4" />
-                {busyPdf ? "Exportando..." : "Exportar PDF"}
-              </span>
-            </button>
-            <Field label="Enviar para e-mail" icon={<Send className="h-4 w-4" />}>
-              <input type="email" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} placeholder="diretoria@empresa.com" className={inputClass} />
-            </Field>
-            <button type="button" onClick={handleEnviar} disabled={busyEmail} className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-              <span className="inline-flex items-center gap-2">
-                <Send className="h-4 w-4" />
-                {busyEmail ? "Enviando..." : "Enviar por e-mail"}
-              </span>
-            </button>
-            {statusMessage ? <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-200">{statusMessage}</p> : null}
-          </div>
-        </div>
-      </div>
     </section>
   );
 }

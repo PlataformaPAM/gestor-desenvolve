@@ -1,6 +1,7 @@
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 import { buildPrestacaoContasSnapshot } from "@/lib/relatorios/prestacao-contas";
+import { absolutizeAssetUrl, toDataUrlIfPossible } from "@/lib/server/asset-data-url";
 
 type Body = {
   clienteId?: string;
@@ -8,17 +9,6 @@ type Body = {
   periodoInicio?: string;
   periodoFim?: string;
 };
-
-function absolutizeAssetUrl(rawUrl: string, requestUrl: string): string {
-  const value = rawUrl?.trim();
-  if (!value) return "";
-  if (/^data:/i.test(value)) return value;
-  try {
-    return new URL(value, requestUrl).toString();
-  } catch {
-    return value;
-  }
-}
 
 export async function POST(req: Request) {
   const parsed = await parseJsonSafe<Body>(req);
@@ -42,14 +32,28 @@ export async function POST(req: Request) {
     return fail("BAD_REQUEST", message, 400);
   }
 
-  const timbreUrl = absolutizeAssetUrl(report.snapshot.timbreUrl ?? "", req.url);
-  const renderConfig = report.snapshot.renderConfig
+  const timbreAbs = absolutizeAssetUrl(report.snapshot.timbreUrl ?? "", req.url);
+  const timbreUrl = await toDataUrlIfPossible(timbreAbs);
+  const renderCfgRaw = report.snapshot.renderConfig
+    ? { ...report.snapshot.renderConfig }
+    : timbreUrl || timbreAbs
+      ? {}
+      : undefined;
+  const renderCfgAbs = absolutizeAssetUrl(String(renderCfgRaw?.papelTimbradoUrl ?? ""), req.url);
+  const renderCfgDataUrl = await toDataUrlIfPossible(renderCfgAbs);
+  const renderConfig = renderCfgRaw
     ? {
-        ...report.snapshot.renderConfig,
-        papelTimbradoUrl:
-          absolutizeAssetUrl(report.snapshot.renderConfig.papelTimbradoUrl ?? "", req.url) || timbreUrl,
+        ...renderCfgRaw,
+        papelTimbradoUrl: renderCfgDataUrl || timbreUrl || renderCfgAbs || timbreAbs,
       }
     : undefined;
+  if (
+    renderConfig &&
+    (renderConfig.layoutModo === undefined || renderConfig.layoutModo === "none") &&
+    (renderConfig.papelTimbradoUrl || timbreUrl)
+  ) {
+    renderConfig.layoutModo = "background";
+  }
 
   const html = montarDocumentoHtmlCompleto({
     title: `Relatório - ${report.resumo.cliente}`,

@@ -41,6 +41,7 @@ type UsuariosTableProps = {
   /** Fallback para resolver nome quando a API ainda não enviou `nome` no vínculo. */
   pessoasVinculo?: PessoaParaVinculo[];
   onEditar?: (u: UsuarioSistema) => void;
+  hideVinculoColumn?: boolean;
 };
 
 export function UsuariosTable({
@@ -48,6 +49,7 @@ export function UsuariosTable({
   perfis,
   pessoasVinculo,
   onEditar,
+  hideVinculoColumn = false,
 }: UsuariosTableProps) {
   const statusButtonClass = (ativo: boolean) =>
     ativo
@@ -70,9 +72,11 @@ export function UsuariosTable({
                 <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Perfil
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Vínculo
-                </th>
+                {!hideVinculoColumn && (
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Vínculo
+                  </th>
+                )}
                 <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Status
                 </th>
@@ -101,7 +105,7 @@ export function UsuariosTable({
                     <td className="px-4 py-3 text-sm text-slate-700">
                       {perfil?.nome ?? u.perfilId}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{vinculo}</td>
+                    {!hideVinculoColumn && <td className="px-4 py-3 text-sm text-slate-600">{vinculo}</td>}
                     <td className="px-4 py-3">
                       <span
                         className={clsx(
@@ -147,7 +151,9 @@ export function UsuariosTable({
                   <p className="font-medium text-slate-900 truncate">{u.nomeExibicao || u.email}</p>
                   <p className="text-sm text-slate-500 truncate">{u.email}</p>
                   <p className="text-xs font-mono text-slate-500 mt-1">{formatCpf(u.cpf)}</p>
-                  <p className="text-xs text-slate-500 mt-1">{perfil?.nome ?? u.perfilId} • {vinculo}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {hideVinculoColumn ? (perfil?.nome ?? u.perfilId) : `${perfil?.nome ?? u.perfilId} • ${vinculo}`}
+                  </p>
                 </div>
                 <div className="text-right shrink-0">
                   <span

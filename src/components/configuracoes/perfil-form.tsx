@@ -15,6 +15,8 @@ type PerfilFormProps = {
   initialPerfil?: PerfilAcesso | null;
   onSave: (p: PerfilFormPayload) => void;
   onCancel: () => void;
+  allowedModules?: ModuloPermissao[];
+  moduleLabels?: Partial<Record<ModuloPermissao, string>>;
 };
 
 const inputClass =
@@ -25,7 +27,11 @@ export function PerfilForm({
   initialPerfil,
   onSave,
   onCancel,
+  allowedModules,
+  moduleLabels,
 }: PerfilFormProps) {
+  const modules = allowedModules ?? MODULOS;
+  const resolveLabel = (mod: ModuloPermissao) => moduleLabels?.[mod] ?? MODULO_LABELS[mod];
   const [nome, setNome] = useState(initialPerfil?.nome ?? "");
   const [descricao, setDescricao] = useState(initialPerfil?.descricao ?? "");
   const initialPermissoes = (): Record<ModuloPermissao, boolean> =>
@@ -99,7 +105,7 @@ export function PerfilForm({
           Marque os módulos que este perfil pode visualizar na sidebar.
         </p>
         <ul className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-600 dark:bg-slate-800/50">
-          {MODULOS.map((mod) => (
+          {modules.map((mod) => (
             <li key={mod} className="flex items-center gap-3">
               <label className="flex cursor-pointer items-center gap-2">
                 <input
@@ -109,7 +115,7 @@ export function PerfilForm({
                   className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
                 />
                 <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {MODULO_LABELS[mod]}
+                  {resolveLabel(mod)}
                 </span>
               </label>
             </li>

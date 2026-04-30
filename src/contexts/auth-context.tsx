@@ -17,6 +17,9 @@ type AuthSession = {
   userCpf: string | null;
   userEmail: string | null;
   userPhone: string | null;
+  clienteIds: string[];
+  isPortalCliente: boolean;
+  isAdminCliente: boolean;
   permissoes: Partial<Record<ModuloPermissao, boolean>>;
 };
 
@@ -38,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userCpf: null,
     userEmail: null,
     userPhone: null,
+    clienteIds: [],
+    isPortalCliente: false,
+    isAdminCliente: false,
     permissoes: {},
   });
 
@@ -52,6 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userCpf: null,
           userEmail: null,
           userPhone: null,
+          clienteIds: [],
+          isPortalCliente: false,
+          isAdminCliente: false,
           permissoes: {},
         });
         return;
@@ -64,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userCpf?: string;
           userEmail?: string;
           userPhone?: string;
+          clienteIds?: string[];
+          isPortalCliente?: boolean;
+          isAdminCliente?: boolean;
           permissoes?: Partial<Record<ModuloPermissao, boolean>>;
         };
       };
@@ -74,6 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userCpf: payload?.data?.userCpf ?? null,
         userEmail: payload?.data?.userEmail ?? null,
         userPhone: payload?.data?.userPhone ?? null,
+        clienteIds: payload?.data?.clienteIds ?? [],
+        isPortalCliente: payload?.data?.isPortalCliente ?? false,
+        isAdminCliente: payload?.data?.isAdminCliente ?? false,
         permissoes: payload?.data?.permissoes ?? {},
       });
     } catch {
@@ -84,6 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userCpf: null,
         userEmail: null,
         userPhone: null,
+        clienteIds: [],
+        isPortalCliente: false,
+        isAdminCliente: false,
         permissoes: {},
       });
     }

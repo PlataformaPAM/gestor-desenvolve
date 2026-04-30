@@ -9,6 +9,8 @@ type PerfisAcessoTableProps = {
   onEditar?: (p: PerfilAcesso) => void;
   onToggle?: (perfilId: string, modulo: ModuloPermissao, value: boolean) => void;
   readOnly?: boolean;
+  allowedModules?: ModuloPermissao[];
+  moduleLabels?: Partial<Record<ModuloPermissao, string>>;
 };
 
 export function PerfisAcessoTable({
@@ -16,7 +18,11 @@ export function PerfisAcessoTable({
   onEditar,
   onToggle,
   readOnly = true,
+  allowedModules,
+  moduleLabels,
 }: PerfisAcessoTableProps) {
+  const modules = allowedModules ?? MODULOS;
+  const resolveLabel = (mod: ModuloPermissao) => moduleLabels?.[mod] ?? MODULO_LABELS[mod];
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="overflow-x-auto">
@@ -26,13 +32,13 @@ export function PerfisAcessoTable({
               <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Perfil
               </th>
-              {MODULOS.map((mod) => (
+              {modules.map((mod) => (
                 <th
                   key={mod}
                   scope="col"
                   className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider"
                 >
-                  {MODULO_LABELS[mod]}
+                  {resolveLabel(mod)}
                 </th>
               ))}
               {onEditar && (
@@ -51,7 +57,7 @@ export function PerfisAcessoTable({
                     <div className="text-xs text-slate-500">{p.descricao}</div>
                   )}
                 </td>
-                {MODULOS.map((mod) => (
+                {modules.map((mod) => (
                   <td key={mod} className="px-3 py-3 text-center">
                     {readOnly ? (
                       <span

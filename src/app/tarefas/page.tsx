@@ -11,7 +11,6 @@ import { NovaTarefaForm } from "@/components/tarefas/nova-tarefa-form";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { usePageHeader } from "@/contexts/page-header-context";
 import {
-  CURRENT_USER_ID,
   STATUS_LABELS,
   PRIORIDADE_LABELS,
 } from "@/lib/tarefas/constants";
@@ -21,6 +20,7 @@ import {
   sortByPriorizacao,
   type OperacaoViewId,
 } from "@/lib/operacao/priorizacao";
+import { useAuth } from "@/contexts/auth-context";
 import type { Cliente } from "@/lib/clientes/types";
 import type { DropResult } from "@hello-pangea/dnd";
 
@@ -69,10 +69,11 @@ const OPERACAO_VIEW_STORAGE_KEY = "operacao_view_tarefas";
 
 export default function TarefasPage() {
   const { setPrimaryAction } = usePageHeader();
+  const { session } = useAuth();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioTarefa[]>([]);
   const [clientes, setClientes] = useState<Pick<Cliente, "id" | "nome" | "empresa">[]>([]);
-  const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("minha_fila");
+  const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("abertos");
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [statusFilter, setStatusFilter] = useState<"" | StatusTarefa>("");
   const [prioridadeFilter, setPrioridadeFilter] = useState<"" | PrioridadeTarefa>("");
@@ -107,11 +108,12 @@ export default function TarefasPage() {
     return m;
   }, [usuarios]);
 
-  /** Quem registra edições/comentários no app (demo: `CURRENT_USER_ID`). */
+  const usuarioAtualId = session.userId ?? "";
+  /** Quem registra edições/comentários no app. */
   const autorEdicao = useMemo(() => {
-    const u = usuariosMap.get(CURRENT_USER_ID);
-    return { id: CURRENT_USER_ID, nome: u?.nome ?? "Usuário" };
-  }, [usuariosMap]);
+    const u = usuarioAtualId ? usuariosMap.get(usuarioAtualId) : undefined;
+    return { id: usuarioAtualId || "usuario-atual", nome: session.userName ?? u?.nome ?? "Usuário" };
+  }, [session.userName, usuarioAtualId, usuariosMap]);
 
   const RESPONSAVEL_OPTIONS: { value: string; label: string }[] = useMemo(
     () => [{ value: "", label: "Todos" }, ...usuarios.map((u) => ({ value: u.id, label: u.nome }))],
@@ -132,7 +134,7 @@ export default function TarefasPage() {
   useEffect(() => {
     const saved = window.localStorage.getItem(OPERACAO_VIEW_STORAGE_KEY) as OperacaoViewId | null;
     if (!saved) return;
-    if (["minha_fila", "urgentes", "atrasados", "vence_logo", "fechados"].includes(saved)) {
+    if (["minha_fila", "abertos", "urgentes", "atrasados", "vence_logo", "fechados"].includes(saved)) {
       setOperacaoView(saved);
     }
   }, []);
@@ -196,7 +198,9 @@ export default function TarefasPage() {
     const now = new Date();
     const ativas = tarefas.filter((t) => t.status !== "concluido");
     const isMinhaTarefa = (t: Tarefa) =>
-      t.responsavel.id === CURRENT_USER_ID || (t.colaboradores ?? []).some((c) => c.id === CURRENT_USER_ID);
+      usuarioAtualId
+        ? t.responsavel.id === usuarioAtualId || (t.colaboradores ?? []).some((c) => c.id === usuarioAtualId)
+        : false;
     let base: Tarefa[] = [];
     if (operacaoView === "fechados") {
       return aplicarResumoClientes([...tarefas.filter((t) => t.status === "concluido")]).sort((a, b) => {
@@ -206,8 +210,9 @@ export default function TarefasPage() {
       });
     }
     if (operacaoView === "minha_fila") {
-      const minhas = ativas.filter(isMinhaTarefa);
-      base = minhas.length > 0 ? minhas : ativas;
+      base = ativas.filter(isMinhaTarefa);
+    } else if (operacaoView === "abertos") {
+      base = ativas;
     } else if (operacaoView === "urgentes") {
       base = ativas.filter((t) => t.prioridade === "urgente");
     } else if (operacaoView === "atrasados") {
@@ -221,7 +226,7 @@ export default function TarefasPage() {
       atualizadoIso: (t) => t.updatedAt ?? t.dataInicio,
       now,
     }));
-  }, [tarefas, operacaoView, clientes]);
+  }, [tarefas, operacaoView, clientes, usuarioAtualId]);
 
   const tarefasFiltradas = useMemo(() => {
     return tarefasOperacionais.filter((t) => {
@@ -234,7 +239,7 @@ export default function TarefasPage() {
 
   const handleNovaTarefa = useCallback((nova: Omit<Tarefa, "id"> & { clienteIds?: string[] }) => {
     const nowIso = new Date().toISOString();
-    const createdBy = usuariosMap.get(CURRENT_USER_ID)?.nome ?? "Usuário";
+    const createdBy = session.userName ?? (usuarioAtualId ? usuariosMap.get(usuarioAtualId)?.nome : undefined) ?? "Usuário";
     const clienteIds = Array.from(
       new Set((nova.clienteIds?.length ? nova.clienteIds : [nova.clienteId]).filter(Boolean) as string[])
     );
@@ -258,7 +263,7 @@ export default function TarefasPage() {
       .catch(() => undefined);
     setIsSheetOpen(false);
     setSelectedTarefa(null);
-  }, [saveTarefa, usuariosMap, clientes]);
+  }, [saveTarefa, usuariosMap, clientes, session.userName, usuarioAtualId]);
 
   const handleCloseSheet = useCallback(() => {
     setIsSheetOpen(false);
@@ -625,7 +630,7 @@ export default function TarefasPage() {
               <NovaTarefaForm
                 usuarios={usuarios}
                 clientes={clientes}
-                currentUserId={CURRENT_USER_ID}
+                currentUserId={usuarioAtualId || "usuario-atual"}
                 onSave={handleNovaTarefa}
                 onCancel={handleCloseSheet}
               />

@@ -87,10 +87,26 @@ export async function POST(req: Request) {
     const permissoes = Object.fromEntries(
       (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
     ) as Partial<Record<ModuloPermissao, boolean>>;
+    const vinculosCliente = await prisma.usuarioVinculo.findMany({
+      where: { usuarioId: usuario.id, tipo: "cliente" },
+      select: { pessoaId: true },
+    });
+    const clienteIds = Array.from(new Set(vinculosCliente.map((v) => v.pessoaId)));
+    const perfilNome = (perfil?.nome ?? "").toLowerCase();
+    const isPortalCliente = clienteIds.length > 0;
+    const isAdminCliente =
+      isPortalCliente &&
+      (
+        permissoes.configuracoes === true ||
+        perfilNome.includes("admin") ||
+        perfilNome.includes("administrador")
+      );
+    const redirectTo = isPortalCliente ? "/portal" : "/";
 
     const response = ok({
       perfilId: usuario.perfilId,
       user: { id: usuario.id, nome: usuario.nomeExibicao ?? "Usuário" },
+      redirectTo,
       permissoes,
     });
     response.cookies.set({
@@ -102,6 +118,9 @@ export async function POST(req: Request) {
         userCpf: usuario.cpf,
         userEmail: usuario.email,
         userPhone: usuario.telefone ?? undefined,
+        clienteIds,
+        isPortalCliente,
+        isAdminCliente,
         permissoes,
       }),
       httpOnly: true,

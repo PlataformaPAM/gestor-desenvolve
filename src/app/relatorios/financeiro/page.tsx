@@ -235,74 +235,6 @@ export default function RelatoriosFinanceiroPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {FINANCEIRO_REPORTS.map((report) => {
-          const active = report.id === reportId;
-          return (
-            <button
-              key={report.id}
-              type="button"
-              onClick={() => setReportId(report.id)}
-              className={`rounded-xl border p-4 text-left transition ${
-                active
-                  ? "border-violet-300 bg-violet-50/70 dark:border-violet-700 dark:bg-violet-950/30"
-                  : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/70"
-              }`}
-            >
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{report.titulo}</p>
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{report.descricao}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {dashboard ? (
-        <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard title="Entradas no mês" value={dashboard.kpis.entradasTotal} tone="emerald" />
-            <KpiCard title="Saídas no mês" value={dashboard.kpis.saidasTotal} tone="red" />
-            <KpiCard title="Saldo até hoje" value={dashboard.kpis.saldoAteHoje} tone="violet" />
-            <KpiCard title="Projeção fim do mês" value={dashboard.kpis.saldoProjetadoMes} tone="slate" />
-          </div>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <ChartCard title="Acumulado e futuro do mês">
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={[
-                      { name: "Até hoje", entradas: dashboard.kpis.entradasAteHoje, saidas: dashboard.kpis.saidasAteHoje },
-                      { name: "Futuro mês", entradas: dashboard.kpis.entradasFuturas, saidas: dashboard.kpis.saidasFuturas },
-                    ]}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
-                    <Bar dataKey="entradas" fill="#10b981" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="saidas" fill="#ef4444" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
-            <ChartCard title="Tendência diária do mês">
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dashboard.charts.tendenciaDiaria}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="dia" />
-                    <YAxis />
-                    <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
-                    <Line type="monotone" dataKey="entradas" stroke="#10b981" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="saidas" stroke="#ef4444" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="saldo" stroke="#6D28D9" strokeWidth={2.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
-          </div>
-        </>
-      ) : null}
-
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 xl:col-span-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filtros</h3>
@@ -404,6 +336,75 @@ export default function RelatoriosFinanceiroPage() {
           </div>
         </div>
       </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {FINANCEIRO_REPORTS.map((report) => {
+          const active = report.id === reportId;
+          return (
+            <button
+              key={report.id}
+              type="button"
+              onClick={() => setReportId(report.id)}
+              className={`rounded-xl border p-4 text-left transition ${
+                active
+                  ? "border-violet-300 bg-violet-50/70 dark:border-violet-700 dark:bg-violet-950/30"
+                  : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/70"
+              }`}
+            >
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{report.titulo}</p>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{report.descricao}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {dashboard ? (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard title="Entradas no mês" value={dashboard.kpis.entradasTotal} tone="emerald" />
+            <KpiCard title="Saídas no mês" value={dashboard.kpis.saidasTotal} tone="red" />
+            <KpiCard title="Saldo até hoje" value={dashboard.kpis.saldoAteHoje} tone="violet" />
+            <KpiCard title="Projeção fim do mês" value={dashboard.kpis.saldoProjetadoMes} tone="slate" />
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ChartCard title="Acumulado e futuro do mês">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={[
+                      { name: "Até hoje", entradas: dashboard.kpis.entradasAteHoje, saidas: dashboard.kpis.saidasAteHoje },
+                      { name: "Futuro mês", entradas: dashboard.kpis.entradasFuturas, saidas: dashboard.kpis.saidasFuturas },
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Bar dataKey="entradas" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="saidas" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
+            <ChartCard title="Tendência diária do mês">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dashboard.charts.tendenciaDiaria}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="dia" />
+                    <YAxis />
+                    <RechartsTooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Line type="monotone" dataKey="entradas" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="saidas" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="saldo" stroke="#6D28D9" strokeWidth={2.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
+          </div>
+        </>
+      ) : null}
+
     </section>
   );
 }

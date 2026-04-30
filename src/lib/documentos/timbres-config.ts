@@ -8,6 +8,16 @@ import {
 export const DOCUMENTO_TIMBRES_CHAVE = "documento_timbres";
 const MAX_MARGIN_MM = 120;
 
+function normalizeLegacyUploadUrl(raw: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (value.startsWith("/uploads/documentos-timbres/")) {
+    const filename = value.slice("/uploads/documentos-timbres/".length);
+    return `/api/uploads/documentos-timbres/${filename}`;
+  }
+  return value;
+}
+
 export type DocumentoTimbreItem = {
   id: string;
   nome: string;
@@ -61,7 +71,7 @@ function normalizeItem(raw: unknown): DocumentoTimbreItem | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const id = String(r.id ?? "").trim();
-  const url = String(r.url ?? "").trim();
+  const url = normalizeLegacyUploadUrl(String(r.url ?? "").trim());
   if (!id || !url) return null;
   return {
     id,
@@ -94,7 +104,7 @@ function normalizeRenderConfig(raw: unknown, timbreUrlDefault: string): Document
   const base = emptyEmpresaDocumentoConfig();
   const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const layoutModo = normalizeLayoutModo(source.layoutModo);
-  const papelTimbradoUrl = String(source.papelTimbradoUrl ?? "").trim() || timbreUrlDefault;
+  const papelTimbradoUrl = normalizeLegacyUploadUrl(String(source.papelTimbradoUrl ?? "").trim()) || timbreUrlDefault;
   return {
     layoutModo,
     papelTimbradoUrl,

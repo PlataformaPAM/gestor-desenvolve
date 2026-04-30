@@ -17,6 +17,18 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  if (session.isPortalCliente) {
+    const rotaPermitidaCliente =
+      pathname.startsWith("/portal") ||
+      pathname === "/alertas" ||
+      pathname.startsWith("/alertas/");
+    if (!rotaPermitidaCliente) {
+      return NextResponse.redirect(new URL("/portal", request.url));
+    }
+  } else if (pathname.startsWith("/portal")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   if (!hasModuleAccess(session, pathname)) {
     return NextResponse.redirect(new URL("/acesso-negado", request.url));
   }

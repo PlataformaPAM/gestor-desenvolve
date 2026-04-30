@@ -27,6 +27,16 @@ export type EmpresaDocumentoConfig = {
 };
 const MAX_MARGIN_MM = 120;
 
+function normalizeLegacyUploadUrl(raw: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (value.startsWith("/uploads/documentos-timbres/")) {
+    const filename = value.slice("/uploads/documentos-timbres/".length);
+    return `/api/uploads/documentos-timbres/${filename}`;
+  }
+  return value;
+}
+
 function coerceNumber(value: unknown, fallback: number): number {
   if (value === null || value === undefined || value === "") return fallback;
   const n = typeof value === "number" ? value : Number(value);
@@ -96,7 +106,7 @@ export function normalizeEmpresaDocumentoConfig(raw: unknown): EmpresaDocumentoC
     cabecalhoPadraoHtml: String(o.cabecalhoPadraoHtml ?? ""),
     rodapePadraoHtml: String(o.rodapePadraoHtml ?? ""),
     layoutModo,
-    papelTimbradoUrl: String(o.papelTimbradoUrl ?? "").trim(),
+    papelTimbradoUrl: normalizeLegacyUploadUrl(String(o.papelTimbradoUrl ?? "").trim()),
     papelTimbradoOpacity: clamp(coerceNumber(o.papelTimbradoOpacity, base.papelTimbradoOpacity), 0, 1),
     margemTopMm: clamp(coerceNumber(o.margemTopMm, base.margemTopMm), 0, MAX_MARGIN_MM),
     margemRightMm: clamp(coerceNumber(o.margemRightMm, base.margemRightMm), 0, MAX_MARGIN_MM),

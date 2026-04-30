@@ -233,6 +233,27 @@ export default function RelatoriosPrestacaoContasPage() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Ações</h3>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <button type="button" onClick={handlePreview} disabled={busyPreview} className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700">
+            <span className="inline-flex items-center gap-2"><CalendarRange className="h-4 w-4" />{busyPreview ? "Gerando..." : "Visualizar"}</span>
+          </button>
+          <button type="button" onClick={handlePdf} disabled={busyPdf} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <span className="inline-flex items-center gap-2"><Download className="h-4 w-4" />{busyPdf ? "Exportando..." : "Exportar PDF"}</span>
+          </button>
+          <input type="email" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} placeholder="cliente@empresa.com" className={inputClass} />
+          <button type="button" onClick={handleEnviar} disabled={busyEmail} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+            <span className="inline-flex items-center gap-2"><Send className="h-4 w-4" />{busyEmail ? "Enviando..." : "Enviar por e-mail"}</span>
+          </button>
+        </div>
+        {statusMessage ? (
+          <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-200">
+            {statusMessage}
+          </p>
+        ) : null}
+      </div>
+
       {dashboard ? (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -311,26 +332,6 @@ export default function RelatoriosPrestacaoContasPage() {
         </>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Ações</h3>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          <button type="button" onClick={handlePreview} disabled={busyPreview} className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700">
-            <span className="inline-flex items-center gap-2"><CalendarRange className="h-4 w-4" />{busyPreview ? "Gerando..." : "Visualizar"}</span>
-          </button>
-          <button type="button" onClick={handlePdf} disabled={busyPdf} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-            <span className="inline-flex items-center gap-2"><Download className="h-4 w-4" />{busyPdf ? "Exportando..." : "Exportar PDF"}</span>
-          </button>
-          <input type="email" value={emailDestino} onChange={(e) => setEmailDestino(e.target.value)} placeholder="cliente@empresa.com" className={inputClass} />
-          <button type="button" onClick={handleEnviar} disabled={busyEmail} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-            <span className="inline-flex items-center gap-2"><Send className="h-4 w-4" />{busyEmail ? "Enviando..." : "Enviar por e-mail"}</span>
-          </button>
-        </div>
-        {statusMessage ? (
-          <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-200">
-            {statusMessage}
-          </p>
-        ) : null}
-      </div>
     </section>
   );
 }

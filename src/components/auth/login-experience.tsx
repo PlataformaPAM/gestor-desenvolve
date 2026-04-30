@@ -139,7 +139,7 @@ export function LoginExperience() {
       });
       const data = (await res.json()) as {
         success: boolean;
-        data?: { perfilId?: string };
+        data?: { perfilId?: string; redirectTo?: string };
         error?: { message?: string };
       };
       if (!res.ok || !data.success || !data.data?.perfilId) {
@@ -148,7 +148,7 @@ export function LoginExperience() {
         return;
       }
       await syncFromCookie();
-      router.push("/");
+      router.push(data.data.redirectTo || "/");
       router.refresh();
     } catch {
       setErro("Falha ao autenticar. Tente novamente.");

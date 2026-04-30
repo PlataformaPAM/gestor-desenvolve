@@ -48,6 +48,10 @@ const DEFAULT_TITLES: Record<string, string> = {
   "/relatorios/financeiro": "Relatórios · Financeiro",
   "/relatorios/comercial": "Relatórios · Comercial",
   "/relatorios/prestacao-contas": "Relatórios · Prestação de Contas",
+  "/portal": "Portal do Cliente",
+  "/portal/chamados": "Portal do Cliente · Suporte",
+  "/portal/meu-perfil": "Portal do Cliente · Meu Perfil",
+  "/portal/usuarios": "Portal do Cliente · Usuários",
   "/pos-venda": "Pós-venda",
   "/tarefas": "Tarefas Internas",
   "/rh": "Gestão de Pessoas",
@@ -58,7 +62,7 @@ const DEFAULT_TITLES: Record<string, string> = {
   "/configuracoes/construtor-documentos": "Configurações · Construtor de Documentos",
   "/calendario": "Calendário da Equipe",
   "/arquivos": "Drive Interno",
-  "/alertas": "Minha caixa",
+  "/alertas": "Minha Caixa",
 };
 
 export function PageHeaderProvider({ children }: { children: ReactNode }) {

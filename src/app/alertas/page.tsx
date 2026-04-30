@@ -6,6 +6,7 @@ import { usePageHeader } from "@/contexts/page-header-context";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { AlertsTable, type AlertaRow } from "@/components/alertas/alerts-table";
 import { emitAlertsUpdated } from "@/lib/alerts/live-sync";
+import { useAuth } from "@/contexts/auth-context";
 
 type Alerta = AlertaRow;
 
@@ -26,6 +27,8 @@ const FILTROS_QUERY: FiltroAlerta[] = [
 function AlertasPageContent() {
   const searchParams = useSearchParams();
   const { setPrimaryAction } = usePageHeader();
+  const { session } = useAuth();
+  const isPortalCliente = session.isPortalCliente;
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [filtro, setFiltro] = useState<FiltroAlerta>("todas");
   const [filtroPrioridade, setFiltroPrioridade] = useState<"todas" | "urgente" | "alta" | "normal">("todas");
@@ -39,6 +42,12 @@ function AlertasPageContent() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (!isPortalCliente) return;
+    if (["todas", "nao_lidas", "helpdesk", "sistema"].includes(filtro)) return;
+    setFiltro("todas");
+  }, [isPortalCliente, filtro]);
+
+  useEffect(() => {
     setPrimaryAction(null);
     return () => setPrimaryAction(null);
   }, [setPrimaryAction]);
@@ -47,7 +56,8 @@ function AlertasPageContent() {
     let active = true;
     const load = async () => {
       try {
-        const res = await fetch("/api/alertas/bootstrap", { cache: "no-store" });
+        const endpoint = isPortalCliente ? "/api/portal/alertas/bootstrap" : "/api/alertas/bootstrap";
+        const res = await fetch(endpoint, { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as { data?: { alertas?: Alerta[] } };
         if (!active) return;
@@ -64,7 +74,7 @@ function AlertasPageContent() {
       active = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [isPortalCliente]);
 
   const alertasFiltrados = useMemo(() => {
     const base = alertas.filter((a) => {
@@ -118,24 +128,31 @@ function AlertasPageContent() {
     emitAlertsUpdated();
   };
 
-  const FILTROS: { id: FiltroAlerta; label: string }[] = [
-    { id: "todas", label: "Todas" },
-    { id: "nao_lidas", label: "Não Lidas" },
-    { id: "tarefas", label: "Tarefas" },
-    { id: "financeiro", label: "Financeiro" },
-    { id: "comercial", label: "Comercial" },
-    { id: "contratos", label: "Contratos" },
-    { id: "helpdesk", label: "Suporte" },
-    { id: "posVenda", label: "Pós-venda" },
-    { id: "sistema", label: "Sistema" },
-  ];
+  const FILTROS: { id: FiltroAlerta; label: string }[] = isPortalCliente
+    ? [
+        { id: "todas", label: "Todas" },
+        { id: "nao_lidas", label: "Não Lidas" },
+        { id: "helpdesk", label: "Suporte" },
+        { id: "sistema", label: "Sistema" },
+      ]
+    : [
+        { id: "todas", label: "Todas" },
+        { id: "nao_lidas", label: "Não Lidas" },
+        { id: "tarefas", label: "Tarefas" },
+        { id: "financeiro", label: "Financeiro" },
+        { id: "comercial", label: "Comercial" },
+        { id: "contratos", label: "Contratos" },
+        { id: "helpdesk", label: "Suporte" },
+        { id: "posVenda", label: "Pós-venda" },
+        { id: "sistema", label: "Sistema" },
+      ];
 
   return (
     <section className="w-full max-w-full space-y-6">
       {/* Header da página */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900">
-          Minha caixa
+          Minha Caixa
         </h2>
         <button
           type="button"

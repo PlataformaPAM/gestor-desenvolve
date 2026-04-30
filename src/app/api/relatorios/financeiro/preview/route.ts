@@ -2,7 +2,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 import { buildFinanceiroSnapshot } from "@/lib/relatorios/financeiro";
 import type { FinanceiroReportId, FinanceiroSituacao, FinanceiroTipo } from "@/lib/relatorios/financeiro-catalogo";
-import { absolutizeAssetUrl } from "@/lib/server/asset-data-url";
+import { absolutizeAssetUrl, toDataUrlIfPossible } from "@/lib/server/asset-data-url";
 
 type Body = {
   reportId?: FinanceiroReportId;
@@ -34,14 +34,28 @@ export async function POST(req: Request) {
       situacao: parsed.value.situacao,
       tipo: parsed.value.tipo,
     });
-    const timbreUrl = absolutizeAssetUrl(report.snapshot.timbreUrl ?? "", req.url);
-    const renderConfig = report.snapshot.renderConfig
+    const timbreAbs = absolutizeAssetUrl(report.snapshot.timbreUrl ?? "", req.url);
+    const timbreUrl = await toDataUrlIfPossible(timbreAbs);
+    const renderCfgRaw = report.snapshot.renderConfig
+      ? { ...report.snapshot.renderConfig }
+      : timbreUrl || timbreAbs
+        ? {}
+        : undefined;
+    const renderCfgAbs = absolutizeAssetUrl(String(renderCfgRaw?.papelTimbradoUrl ?? ""), req.url);
+    const renderCfgDataUrl = await toDataUrlIfPossible(renderCfgAbs);
+    const renderConfig = renderCfgRaw
       ? {
-          ...report.snapshot.renderConfig,
-          papelTimbradoUrl:
-            absolutizeAssetUrl(report.snapshot.renderConfig.papelTimbradoUrl ?? "", req.url) || timbreUrl,
+          ...renderCfgRaw,
+          papelTimbradoUrl: renderCfgDataUrl || timbreUrl || renderCfgAbs || timbreAbs,
         }
       : undefined;
+    if (
+      renderConfig &&
+      (renderConfig.layoutModo === undefined || renderConfig.layoutModo === "none") &&
+      (renderConfig.papelTimbradoUrl || timbreUrl)
+    ) {
+      renderConfig.layoutModo = "background";
+    }
     const html = montarDocumentoHtmlCompleto({
       title: `Relatório - ${report.resumo.reportTitulo}`,
       modeloNome: report.modeloNome,
