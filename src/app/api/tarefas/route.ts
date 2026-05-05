@@ -42,6 +42,28 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
   return `TAR-${ano}-${String(sequencial).padStart(4, "0")}`;
 }
 
+function extractPersistErrorMessage(error: unknown): string {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const target = Array.isArray(error.meta?.target)
+      ? error.meta?.target.join(", ")
+      : typeof error.meta?.target === "string"
+        ? error.meta.target
+        : "";
+    const cause = typeof error.meta?.cause === "string" ? error.meta.cause : "";
+    const detail = [target ? `target: ${target}` : "", cause].filter(Boolean).join(" | ");
+    return detail ? `Erro ${error.code} - ${detail}` : `Erro ${error.code}`;
+  }
+  if (error instanceof Prisma.PrismaClientValidationError) {
+    return `Erro de validação do Prisma: ${error.message}`;
+  }
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "erro desconhecido";
+  }
+}
+
 async function proximoCodigoTarefa(
   tx: TxTarefaCompat,
   ano: number
@@ -218,7 +240,8 @@ export async function POST(req: Request) {
       }
     } catch (fallbackError) {
       console.error("[tarefas/create] fallback mínimo também falhou.", fallbackError);
-      return fail("INTERNAL_ERROR", "Não foi possível salvar a tarefa interna (erro de persistência no banco).", 500);
+      const detail = extractPersistErrorMessage(fallbackError);
+      return fail("INTERNAL_ERROR", `Falha ao persistir tarefa: ${detail}`, 500);
     }
   }
 
@@ -280,23 +303,27 @@ export async function POST(req: Request) {
       };
     }
   }
+  const persistedForSideEffects = savedFallback ?? (saved ? mapTarefaFromDb(saved) : null);
+  if (!persistedForSideEffects) {
+    return fail("INTERNAL_ERROR", "Falha ao carregar tarefa após persistência.", 500);
+  }
+
   await writeAuditLog(prisma, {
     acao: "Tarefa criada",
     modulo: "tarefas",
-    detalhes: `Tarefa ${saved.titulo} (${saved.id})`,
+    detalhes: `Tarefa ${persistedForSideEffects.titulo} (${persistedForSideEffects.id})`,
   });
   try {
     await emitAlert(prisma, {
       modulo: "tarefas",
       titulo: "Nova tarefa interna criada",
-      descricao: `Tarefa "${saved.titulo}" criada para acompanhamento da equipe.`,
-      dedupeKey: `tarefa-criada-${saved.id}`,
+      descricao: `Tarefa "${persistedForSideEffects.titulo}" criada para acompanhamento da equipe.`,
+      dedupeKey: `tarefa-criada-${persistedForSideEffects.id}`,
     });
   } catch (error) {
     // Alerta não pode impedir persistência da tarefa em produção.
     console.error("[tarefas/create] falha ao emitir alerta:", error);
   }
-  if (savedFallback) return ok({ tarefa: savedFallback }, 201);
-  return ok({ tarefa: mapTarefaFromDb(saved) }, 201);
+  return ok({ tarefa: persistedForSideEffects }, 201);
 }
 
