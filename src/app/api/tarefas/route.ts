@@ -12,6 +12,28 @@ type TxTarefaCompat = {
   };
 };
 
+type FallbackSavedTarefa = {
+  id: string;
+  codigo: string;
+  titulo: string;
+  descricao?: string;
+  status: Tarefa["status"];
+  prioridade: Tarefa["prioridade"];
+  dataInicio: string;
+  dataFim: string;
+  responsavel: { id: string; nome: string };
+  colaboradores: { id: string; nome: string }[];
+  clienteId?: string;
+  clienteIds: string[];
+  clienteNome?: string;
+  solucaoId?: string;
+  anexos: string[];
+  historico: Tarefa["historico"];
+  registroCriadoPorNome?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 function buildHistoricoId(tarefaId: string, index: number): string {
   return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -156,21 +178,44 @@ export async function POST(req: Request) {
     console.error("[tarefas/create] falha na criação completa; tentando fallback mínimo.", lastCreateError);
     try {
       const now = new Date();
-      await prisma.tarefa.create({
-        data: {
-          id: tarefa.id,
-          codigo: buildCodigoFrom(now.getFullYear(), Number.parseInt(String(Date.now()).slice(-4), 10) || 1),
-          titulo: tarefa.titulo,
-          descricao: tarefa.descricao ?? null,
-          status: tarefa.status as unknown as Prisma.TarefaCreateInput["status"],
-          prioridade: tarefa.prioridade as unknown as Prisma.TarefaCreateInput["prioridade"],
-          dataInicio: new Date(tarefa.dataInicio),
-          dataFim: new Date(tarefa.dataFim),
-          clienteId: tarefa.clienteId ?? null,
-          solucaoId: tarefa.solucaoId ?? null,
-          responsavelId: tarefa.responsavel.id,
-        },
-      });
+      const codigoFallback = buildCodigoFrom(now.getFullYear(), Number.parseInt(String(Date.now()).slice(-4), 10) || 1);
+      try {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "Tarefa" ("id","codigo","titulo","descricao","status","prioridade","dataInicio","dataFim","clienteId","solucaoId","responsavelId","createdAt","updatedAt")
+           VALUES ($1,$2,$3,$4,$5::"TarefaStatus",$6::"TarefaPrioridade",$7,$8,$9,$10,$11,$12,$13)`,
+          tarefa.id,
+          codigoFallback,
+          tarefa.titulo,
+          tarefa.descricao ?? null,
+          tarefa.status,
+          tarefa.prioridade,
+          new Date(tarefa.dataInicio),
+          new Date(tarefa.dataFim),
+          tarefa.clienteId ?? null,
+          tarefa.solucaoId ?? null,
+          tarefa.responsavel.id,
+          now,
+          now
+        );
+      } catch (withCodigoError) {
+        console.warn("[tarefas/create] insert com codigo falhou; tentando sem codigo.", withCodigoError);
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "Tarefa" ("id","titulo","descricao","status","prioridade","dataInicio","dataFim","clienteId","solucaoId","responsavelId","createdAt","updatedAt")
+           VALUES ($1,$2,$3,$4::"TarefaStatus",$5::"TarefaPrioridade",$6,$7,$8,$9,$10,$11,$12)`,
+          tarefa.id,
+          tarefa.titulo,
+          tarefa.descricao ?? null,
+          tarefa.status,
+          tarefa.prioridade,
+          new Date(tarefa.dataInicio),
+          new Date(tarefa.dataFim),
+          tarefa.clienteId ?? null,
+          tarefa.solucaoId ?? null,
+          tarefa.responsavel.id,
+          now,
+          now
+        );
+      }
     } catch (fallbackError) {
       console.error("[tarefas/create] fallback mínimo também falhou.", fallbackError);
       return fail("INTERNAL_ERROR", "Não foi possível salvar a tarefa interna (erro de persistência no banco).", 500);
@@ -178,6 +223,7 @@ export async function POST(req: Request) {
   }
 
   let saved: any;
+  let savedFallback: FallbackSavedTarefa | null = null;
   try {
     saved = await prisma.tarefa.findUniqueOrThrow({
       where: { id: tarefa.id },
@@ -192,16 +238,47 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.warn("[tarefas/create] include completo indisponível; usando fallback de leitura.", error);
-    saved = await prisma.tarefa.findUniqueOrThrow({
-      where: { id: tarefa.id },
-      include: {
-        cliente: { select: { id: true, nome: true, empresa: true } },
-        responsavel: true,
-        colaboradores: { include: { usuario: true } },
-        anexos: true,
-        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
-      },
-    });
+    try {
+      saved = await prisma.tarefa.findUniqueOrThrow({
+        where: { id: tarefa.id },
+        include: {
+          cliente: { select: { id: true, nome: true, empresa: true } },
+          responsavel: true,
+          colaboradores: { include: { usuario: true } },
+          anexos: true,
+          historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+        },
+      });
+    } catch (fallbackReadError) {
+      console.warn("[tarefas/create] leitura Prisma indisponível; retornando payload fallback.", fallbackReadError);
+      const responsavelNome =
+        (await prisma.usuario
+          .findUnique({ where: { id: tarefa.responsavel.id }, select: { nomeExibicao: true, email: true } })
+          .then((u) => u?.nomeExibicao?.trim() || u?.email || tarefa.responsavel.nome)
+          .catch(() => tarefa.responsavel.nome)) || "Responsável";
+      const nowIso = new Date().toISOString();
+      savedFallback = {
+        id: tarefa.id,
+        codigo: "",
+        titulo: tarefa.titulo,
+        descricao: tarefa.descricao ?? undefined,
+        status: tarefa.status,
+        prioridade: tarefa.prioridade,
+        dataInicio: new Date(tarefa.dataInicio).toISOString(),
+        dataFim: new Date(tarefa.dataFim).toISOString(),
+        responsavel: { id: tarefa.responsavel.id, nome: responsavelNome },
+        colaboradores: tarefa.colaboradores ?? [],
+        clienteId: tarefa.clienteId ?? undefined,
+        clienteIds: (tarefa.clienteIds ?? [tarefa.clienteId].filter(Boolean)) as string[],
+        clienteNome: undefined,
+        solucaoId: tarefa.solucaoId ?? undefined,
+        anexos: tarefa.anexos ?? [],
+        historico: tarefa.historico ?? [],
+        registroCriadoPorNome: null,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+    }
   }
   await writeAuditLog(prisma, {
     acao: "Tarefa criada",
@@ -219,6 +296,7 @@ export async function POST(req: Request) {
     // Alerta não pode impedir persistência da tarefa em produção.
     console.error("[tarefas/create] falha ao emitir alerta:", error);
   }
+  if (savedFallback) return ok({ tarefa: savedFallback }, 201);
   return ok({ tarefa: mapTarefaFromDb(saved) }, 201);
 }
 
