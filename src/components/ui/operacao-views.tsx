@@ -10,7 +10,7 @@ type OperacaoViewsProps = {
 };
 
 const BASE_VIEWS: Array<{ id: Exclude<OperacaoViewId, "fechados">; label: string }> = [
-  { id: "abertos", label: "Abertos" },
+  { id: "abertos", label: "Todos" },
   { id: "minha_fila", label: "Minha fila" },
   { id: "urgentes", label: "Urgentes" },
   { id: "atrasados", label: "Atrasados" },

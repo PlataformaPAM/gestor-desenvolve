@@ -1,5 +1,6 @@
 import type { Cliente as PrismaCliente, Tarefa as PrismaTarefa, Usuario as PrismaUsuario } from "@prisma/client";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
+import { splitDescricaoCategoria } from "@/lib/tarefas/categorias";
 
 type PrismaTarefaCompat = PrismaTarefa & {
   // Em ambientes com cliente Prisma desatualizado, "codigo" pode não estar tipado.
@@ -53,6 +54,7 @@ export function mapTarefaFromDb(
     }>;
   }
 ): Tarefa {
+  const parsedDescricao = splitDescricaoCategoria(t.descricao);
   const clientesVinculados = (t.clientesVinculados ?? [])
     .map((v) => v.cliente)
     .filter(Boolean)
@@ -66,8 +68,9 @@ export function mapTarefaFromDb(
   return {
     id: t.id,
     codigo: t.codigo ?? "",
+    categoria: parsedDescricao.categoria,
     titulo: t.titulo,
-    descricao: t.descricao ?? undefined,
+    descricao: parsedDescricao.descricao,
     status: normalizeStatus(t.status),
     prioridade: normalizePrioridade(t.prioridade),
     dataInicio: t.dataInicio.toISOString(),

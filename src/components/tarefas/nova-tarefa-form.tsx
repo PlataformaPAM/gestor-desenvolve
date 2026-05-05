@@ -5,6 +5,7 @@ import { Eye, Paperclip, X } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import type { Cliente } from "@/lib/clientes/types";
 import { PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
+import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import {
   SearchableMultiSelect,
@@ -42,6 +43,7 @@ export function NovaTarefaForm({
 }: NovaTarefaFormProps) {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [categoria, setCategoria] = useState<string>("");
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState(currentUserId);
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
@@ -101,6 +103,7 @@ export function NovaTarefaForm({
     onSave({
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
+      categoria: categoria || undefined,
       status: "a_fazer",
       prioridade,
       dataInicio: now,
@@ -138,6 +141,19 @@ export function NovaTarefaForm({
           placeholder="Ex.: Revisar proposta comercial"
           className={formInputClass}
           required
+        />
+      </div>
+
+      <div>
+        <label className={formLabelClass}>
+          Categoria
+        </label>
+        <SearchableSelect
+          options={TAREFA_CATEGORIAS.map((c) => ({ value: c, label: c }))}
+          value={categoria}
+          onChange={setCategoria}
+          placeholder="Selecione a categoria..."
+          searchable={false}
         />
       </div>
 

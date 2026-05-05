@@ -27,6 +27,7 @@ export type HistoricoTarefa = {
 export type Tarefa = {
   id: string;
   codigo?: string;
+  categoria?: string;
   titulo: string;
   descricao?: string;
   status: StatusTarefa;

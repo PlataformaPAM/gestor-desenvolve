@@ -5,6 +5,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
+import { composeDescricaoWithCategoria } from "@/lib/tarefas/categorias";
 
 type TxTarefaCompat = {
   tarefa: {
@@ -16,6 +17,7 @@ type TxTarefaCompat = {
 type FallbackSavedTarefa = {
   id: string;
   codigo: string;
+  categoria?: string;
   titulo: string;
   descricao?: string;
   status: Tarefa["status"];
@@ -144,7 +146,7 @@ export async function POST(req: Request) {
       id: tarefa.id,
       codigo,
       titulo: tarefa.titulo,
-      descricao: tarefa.descricao ?? null,
+      descricao: composeDescricaoWithCategoria(tarefa.descricao, tarefa.categoria),
       status: tarefa.status,
       prioridade: tarefa.prioridade,
       dataInicio: new Date(tarefa.dataInicio),
@@ -229,7 +231,7 @@ export async function POST(req: Request) {
           tarefa.id,
           codigoFallback,
           tarefa.titulo,
-          tarefa.descricao ?? null,
+          composeDescricaoWithCategoria(tarefa.descricao, tarefa.categoria),
           tarefa.status,
           tarefa.prioridade,
           new Date(tarefa.dataInicio),
@@ -247,7 +249,7 @@ export async function POST(req: Request) {
            VALUES ($1,$2,$3,$4::"TarefaStatus",$5::"TarefaPrioridade",$6,$7,$8,$9,$10,$11,$12)`,
           tarefa.id,
           tarefa.titulo,
-          tarefa.descricao ?? null,
+          composeDescricaoWithCategoria(tarefa.descricao, tarefa.categoria),
           tarefa.status,
           tarefa.prioridade,
           new Date(tarefa.dataInicio),
@@ -304,6 +306,7 @@ export async function POST(req: Request) {
       savedFallback = {
         id: tarefa.id,
         codigo: "",
+        categoria: tarefa.categoria,
         titulo: tarefa.titulo,
         descricao: tarefa.descricao ?? undefined,
         status: tarefa.status,

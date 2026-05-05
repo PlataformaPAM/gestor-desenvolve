@@ -5,6 +5,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
+import { composeDescricaoWithCategoria } from "@/lib/tarefas/categorias";
 
 function buildHistoricoId(tarefaId: string, index: number): string {
   return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
@@ -50,7 +51,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         where: { id },
         data: {
           titulo: tarefa.titulo,
-          descricao: tarefa.descricao ?? null,
+          descricao: composeDescricaoWithCategoria(tarefa.descricao, tarefa.categoria),
           status: tarefa.status,
           prioridade: tarefa.prioridade,
           dataInicio: new Date(tarefa.dataInicio),

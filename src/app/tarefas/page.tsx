@@ -229,7 +229,7 @@ export default function TarefasPage() {
     if (operacaoView === "minha_fila") {
       base = ativas.filter(isMinhaTarefa);
     } else if (operacaoView === "abertos") {
-      base = ativas;
+      base = tarefas;
     } else if (operacaoView === "urgentes") {
       base = ativas.filter((t) => t.prioridade === "urgente");
     } else if (operacaoView === "atrasados") {
@@ -247,9 +247,9 @@ export default function TarefasPage() {
 
   const tarefasFiltradas = useMemo(() => {
     return tarefasOperacionais.filter((t) => {
-      if (operacaoView !== "fechados" && statusFilter && t.status !== statusFilter) return false;
+      if (operacaoView !== "fechados" && operacaoView !== "abertos" && statusFilter && t.status !== statusFilter) return false;
       if (prioridadeFilter && t.prioridade !== prioridadeFilter) return false;
-      if (responsavelFilter && t.responsavel.id !== responsavelFilter) return false;
+      if (operacaoView !== "abertos" && responsavelFilter && t.responsavel.id !== responsavelFilter) return false;
       return true;
     });
   }, [tarefasOperacionais, statusFilter, prioridadeFilter, responsavelFilter, operacaoView]);
@@ -398,6 +398,15 @@ export default function TarefasPage() {
           autorId,
         });
       }
+      if ((current.categoria ?? "") !== (payload.categoria ?? "")) {
+        entries.push({
+          id: `h-${Date.now()}-ca`,
+          data: now,
+          acao: `Categoria alterada de ${current.categoria || "Sem categoria"} para ${payload.categoria || "Sem categoria"}`,
+          autor,
+          autorId,
+        });
+      }
       if (current.status !== payload.status) {
         entries.push({
           id: `h-${Date.now()}-s`,
@@ -492,6 +501,7 @@ export default function TarefasPage() {
         ...current,
         titulo: payload.titulo.trim(),
         descricao: payload.descricao?.trim() || undefined,
+        categoria: payload.categoria,
         status: payload.status,
         prioridade: payload.prioridade,
         responsavel,

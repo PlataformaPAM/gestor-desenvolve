@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { FileText, MessageSquare, Paperclip, Eye, X } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import { STATUS_LABELS, PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
+import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import {
@@ -57,6 +58,7 @@ function openFilePreview(file: File): void {
 export type TarefaSalvarPayload = {
   titulo: string;
   descricao?: string;
+  categoria?: string;
   status: Tarefa["status"];
   prioridade: Tarefa["prioridade"];
   responsavelId: string;
@@ -102,6 +104,7 @@ export function TarefaDetalheDrawer({
   // Form state (aba Detalhes) — sincronizado com tarefa quando abre/muda
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [status, setStatus] = useState<Tarefa["status"]>("a_fazer");
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState("");
@@ -115,6 +118,7 @@ export function TarefaDetalheDrawer({
     if (!tarefa) return;
     setTitulo(tarefa.titulo);
     setDescricao(tarefa.descricao ?? "");
+    setCategoria(tarefa.categoria ?? "");
     setStatus(tarefa.status);
     setPrioridade(tarefa.prioridade);
     setResponsavelId(tarefa.responsavel.id);
@@ -167,6 +171,7 @@ export function TarefaDetalheDrawer({
     onSalvar?.(tarefa.id, {
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
+      categoria: categoria || undefined,
       status,
       prioridade,
       responsavelId,
@@ -266,6 +271,16 @@ export function TarefaDetalheDrawer({
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
                 className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="t-categoria" className={labelClass}>Categoria</label>
+              <SearchableSelect
+                options={TAREFA_CATEGORIAS.map((c) => ({ value: c, label: c }))}
+                value={categoria}
+                onChange={setCategoria}
+                placeholder="Selecione a categoria..."
+                searchable={false}
               />
             </div>
             <div>
