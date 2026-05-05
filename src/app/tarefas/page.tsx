@@ -247,12 +247,12 @@ export default function TarefasPage() {
 
   const tarefasFiltradas = useMemo(() => {
     return tarefasOperacionais.filter((t) => {
-      if (statusFilter && t.status !== statusFilter) return false;
+      if (operacaoView !== "fechados" && statusFilter && t.status !== statusFilter) return false;
       if (prioridadeFilter && t.prioridade !== prioridadeFilter) return false;
       if (responsavelFilter && t.responsavel.id !== responsavelFilter) return false;
       return true;
     });
-  }, [tarefasOperacionais, statusFilter, prioridadeFilter, responsavelFilter]);
+  }, [tarefasOperacionais, statusFilter, prioridadeFilter, responsavelFilter, operacaoView]);
 
   const handleNovaTarefa = useCallback((nova: Omit<Tarefa, "id"> & { clienteIds?: string[] }) => {
     const nowIso = new Date().toISOString();

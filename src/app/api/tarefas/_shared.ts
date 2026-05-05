@@ -6,6 +6,28 @@ type PrismaTarefaCompat = PrismaTarefa & {
   codigo?: string | null;
 };
 
+function normalizeStatus(status: unknown): Tarefa["status"] {
+  const raw = String(status ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim();
+  if (raw === "concluido" || raw === "concluida" || raw === "done") return "concluido";
+  if (raw === "em_andamento" || raw === "em andamento" || raw === "andamento" || raw === "doing") {
+    return "em_andamento";
+  }
+  if (raw === "impedimento" || raw === "impedido" || raw === "blocked") return "impedimento";
+  return "a_fazer";
+}
+
+function normalizePrioridade(prioridade: unknown): Tarefa["prioridade"] {
+  const raw = String(prioridade ?? "").toLowerCase().trim();
+  if (raw === "urgente") return "urgente";
+  if (raw === "alta") return "alta";
+  if (raw === "baixa") return "baixa";
+  return "media";
+}
+
 export function mapUsuarioTarefaFromDb(u: PrismaUsuario): UsuarioTarefa {
   return {
     id: u.id,
@@ -46,8 +68,8 @@ export function mapTarefaFromDb(
     codigo: t.codigo ?? "",
     titulo: t.titulo,
     descricao: t.descricao ?? undefined,
-    status: t.status as Tarefa["status"],
-    prioridade: t.prioridade as Tarefa["prioridade"],
+    status: normalizeStatus(t.status),
+    prioridade: normalizePrioridade(t.prioridade),
     dataInicio: t.dataInicio.toISOString(),
     dataFim: t.dataFim.toISOString(),
     responsavel: mapUsuarioTarefaFromDb(t.responsavel),
