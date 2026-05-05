@@ -4,6 +4,7 @@ import { mapTarefaFromDb } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
+import { Prisma } from "@prisma/client";
 
 function buildHistoricoId(tarefaId: string, index: number): string {
   return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
@@ -23,91 +24,133 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: { status: true, titulo: true },
   });
 
-  await prisma.$transaction(async (tx) => {
-    const autorIds = Array.from(
-      new Set(
-        (tarefa.historico ?? [])
-          .map((h) => h.autorId?.trim() ?? "")
-          .filter((autorId) => Boolean(autorId))
-      )
-    );
-    const autoresValidos = new Set(
-      autorIds.length
-        ? (
-            await tx.usuario.findMany({
-              where: { id: { in: autorIds } },
-              select: { id: true },
-            })
-          ).map((u) => u.id)
-        : []
-    );
+  try {
+    await prisma.$transaction(async (tx) => {
+      const autorIds = Array.from(
+        new Set(
+          (tarefa.historico ?? [])
+            .map((h) => h.autorId?.trim() ?? "")
+            .filter((autorId) => Boolean(autorId))
+        )
+      );
+      const autoresValidos = new Set(
+        autorIds.length
+          ? (
+              await tx.usuario.findMany({
+                where: { id: { in: autorIds } },
+                select: { id: true },
+              })
+            ).map((u) => u.id)
+          : []
+      );
 
-    await tx.tarefa.update({
-      where: { id },
-      data: {
-        titulo: tarefa.titulo,
-        descricao: tarefa.descricao ?? null,
-        status: tarefa.status,
-        prioridade: tarefa.prioridade,
-        dataInicio: new Date(tarefa.dataInicio),
-        dataFim: new Date(tarefa.dataFim),
-        clienteId: tarefa.clienteId ?? null,
-        solucaoId: tarefa.solucaoId ?? null,
-        responsavelId: tarefa.responsavel.id,
-      },
-    });
-
-    await tx.tarefaColaborador.deleteMany({ where: { tarefaId: id } });
-    if (tarefa.colaboradores?.length) {
-      await tx.tarefaColaborador.createMany({
-        data: tarefa.colaboradores.map((c) => ({ tarefaId: id, usuarioId: c.id })),
-      });
-    }
-    await tx.tarefaCliente.deleteMany({ where: { tarefaId: id } });
-    const clienteIds = Array.from(new Set((tarefa.clienteIds ?? [tarefa.clienteId]).filter(Boolean) as string[]));
-    if (clienteIds.length) {
-      await tx.tarefaCliente.createMany({
-        data: clienteIds.map((clienteId) => ({ tarefaId: id, clienteId })),
-      });
-    }
-
-    await tx.tarefaAnexo.deleteMany({ where: { tarefaId: id } });
-    if (tarefa.anexos?.length) {
-      await tx.tarefaAnexo.createMany({
-        data: tarefa.anexos.map((nomeArquivo) => ({ tarefaId: id, nomeArquivo, url: null })),
-      });
-    }
-
-    await tx.tarefaHistoricoAnexo.deleteMany({ where: { historico: { tarefaId: id } } });
-    await tx.tarefaHistorico.deleteMany({ where: { tarefaId: id } });
-    for (const [index, h] of (tarefa.historico ?? []).entries()) {
-      const autorId = h.autorId?.trim() ?? "";
-      await tx.tarefaHistorico.create({
+      // Campo principal: deve persistir sempre (inclusive drag/drop de status).
+      await tx.tarefa.update({
+        where: { id },
         data: {
-          id: buildHistoricoId(id, index),
-          tarefaId: id,
-          data: new Date(h.data),
-          acao: h.acao,
-          autorId: autorId && autoresValidos.has(autorId) ? autorId : null,
-          anexos: {
-            create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
-          },
+          titulo: tarefa.titulo,
+          descricao: tarefa.descricao ?? null,
+          status: tarefa.status,
+          prioridade: tarefa.prioridade,
+          dataInicio: new Date(tarefa.dataInicio),
+          dataFim: new Date(tarefa.dataFim),
+          clienteId: tarefa.clienteId ?? null,
+          solucaoId: tarefa.solucaoId ?? null,
+          responsavelId: tarefa.responsavel.id,
         },
       });
-    }
-  });
 
-  const saved = await prisma.tarefa.findUniqueOrThrow({
-    where: { id },
-    include: {
-      cliente: { select: { id: true, nome: true, empresa: true } },
-      clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
-      responsavel: true,
-      colaboradores: { include: { usuario: true } },
-      anexos: true,
-      historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
-    },
-  });
+      try {
+        await tx.tarefaColaborador.deleteMany({ where: { tarefaId: id } });
+        if (tarefa.colaboradores?.length) {
+          await tx.tarefaColaborador.createMany({
+            data: tarefa.colaboradores.map((c) => ({ tarefaId: id, usuarioId: c.id })),
+          });
+        }
+      } catch (error) {
+        console.warn("[tarefas/update] colaboradores indisponível; mantendo atualização principal.", error);
+      }
+
+      try {
+        await tx.tarefaCliente.deleteMany({ where: { tarefaId: id } });
+        const clienteIds = Array.from(new Set((tarefa.clienteIds ?? [tarefa.clienteId]).filter(Boolean) as string[]));
+        if (clienteIds.length) {
+          await tx.tarefaCliente.createMany({
+            data: clienteIds.map((clienteId) => ({ tarefaId: id, clienteId })),
+          });
+        }
+      } catch (error) {
+        console.warn("[tarefas/update] clientes vinculados indisponível; mantendo atualização principal.", error);
+      }
+
+      try {
+        await tx.tarefaAnexo.deleteMany({ where: { tarefaId: id } });
+        if (tarefa.anexos?.length) {
+          await tx.tarefaAnexo.createMany({
+            data: tarefa.anexos.map((nomeArquivo) => ({ tarefaId: id, nomeArquivo, url: null })),
+          });
+        }
+      } catch (error) {
+        console.warn("[tarefas/update] anexos indisponível; mantendo atualização principal.", error);
+      }
+
+      try {
+        await tx.tarefaHistoricoAnexo.deleteMany({ where: { historico: { tarefaId: id } } });
+        await tx.tarefaHistorico.deleteMany({ where: { tarefaId: id } });
+        for (const [index, h] of (tarefa.historico ?? []).entries()) {
+          const autorId = h.autorId?.trim() ?? "";
+          await tx.tarefaHistorico.create({
+            data: {
+              id: buildHistoricoId(id, index),
+              tarefaId: id,
+              data: new Date(h.data),
+              acao: h.acao,
+              autorId: autorId && autoresValidos.has(autorId) ? autorId : null,
+              anexos: {
+                create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
+              },
+            },
+          });
+        }
+      } catch (error) {
+        console.warn("[tarefas/update] histórico indisponível; mantendo atualização principal.", error);
+      }
+    });
+  } catch (error) {
+    const detail =
+      error instanceof Prisma.PrismaClientKnownRequestError
+        ? `Erro ${error.code}`
+        : error instanceof Error
+          ? error.message
+          : "erro desconhecido";
+    return fail("INTERNAL_ERROR", `Falha ao persistir tarefa: ${detail}`, 500);
+  }
+
+  let saved: any;
+  try {
+    saved = await prisma.tarefa.findUniqueOrThrow({
+      where: { id },
+      include: {
+        cliente: { select: { id: true, nome: true, empresa: true } },
+        clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
+        responsavel: true,
+        colaboradores: { include: { usuario: true } },
+        anexos: true,
+        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+      },
+    });
+  } catch {
+    saved = await prisma.tarefa.findUniqueOrThrow({
+      where: { id },
+      include: {
+        cliente: { select: { id: true, nome: true, empresa: true } },
+        responsavel: true,
+        colaboradores: { include: { usuario: true } },
+        anexos: true,
+        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+      },
+    });
+  }
   await writeAuditLog(prisma, {
     acao: "Tarefa atualizada",
     modulo: "tarefas",

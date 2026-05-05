@@ -10,6 +10,7 @@ type TxTarefaCompat = {
   tarefa: {
     findFirst: (args: unknown) => Promise<unknown>;
   };
+  $queryRawUnsafe?: <T = unknown>(query: string, ...values: unknown[]) => Promise<T>;
 };
 
 type FallbackSavedTarefa = {
@@ -78,10 +79,30 @@ async function proximoCodigoTarefa(
     const ultimoSequencial = Number.parseInt(ultimo?.codigo?.slice(-4) ?? "0", 10);
     return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
   } catch (error) {
-    // Fallback para não bloquear criação se a consulta do último código falhar.
-    console.warn("[tarefas/create] não foi possível consultar último código TAR; usando fallback.", error);
-    const seed = Number.parseInt(String(Date.now()).slice(-4), 10);
-    return buildCodigoFrom(ano, Number.isFinite(seed) ? seed : 1);
+    // Fallback determinístico: evita códigos "aleatórios" em produção.
+    console.warn("[tarefas/create] consulta Prisma do último código falhou; tentando SQL.", error);
+    try {
+      const rows = await (tx.$queryRawUnsafe
+        ? tx.$queryRawUnsafe<Array<{ codigo: string | null }>>(
+            `SELECT "codigo" FROM "Tarefa"
+             WHERE "codigo" LIKE $1
+             ORDER BY "codigo" DESC
+             LIMIT 1`,
+            `${prefixo}%`
+          )
+        : prisma.$queryRawUnsafe<Array<{ codigo: string | null }>>(
+            `SELECT "codigo" FROM "Tarefa"
+             WHERE "codigo" LIKE $1
+             ORDER BY "codigo" DESC
+             LIMIT 1`,
+            `${prefixo}%`
+          ));
+      const ultimoSequencial = Number.parseInt((rows?.[0]?.codigo ?? "").slice(-4) || "0", 10);
+      return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
+    } catch (sqlError) {
+      console.warn("[tarefas/create] fallback SQL do código também falhou; iniciando em 0001.", sqlError);
+      return buildCodigoFrom(ano, 1);
+    }
   }
 }
 

@@ -311,9 +311,11 @@ export default function TarefasPage() {
       autorId: autorEdicao.id,
     };
     let updatedForPersist: Tarefa | null = null;
+    let previousForRollback: Tarefa | null = null;
     setTarefas((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t;
+        previousForRollback = t;
         const next = {
           ...t,
           status: destStatus,
@@ -338,9 +340,14 @@ export default function TarefasPage() {
           setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
           setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
         })
-        .catch(() => undefined);
+        .catch((error) => {
+          if (!previousForRollback) return;
+          setTarefas((prev) => prev.map((t) => (t.id === previousForRollback!.id ? previousForRollback! : t)));
+          setSelectedTarefa((prev) => (prev?.id === previousForRollback!.id ? previousForRollback : prev));
+          showToast(error instanceof Error ? error.message : "Falha ao mover tarefa.", "error");
+        });
     }
-  }, [saveTarefa, autorEdicao]);
+  }, [saveTarefa, autorEdicao, showToast]);
 
   const handleSalvarTarefa = useCallback(
     (tarefaId: string, payload: TarefaSalvarPayload) => {
