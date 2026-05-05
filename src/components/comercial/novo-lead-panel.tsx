@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, BadgeHelp, CircleMinus, Text } from "lucide-react";
+import { AlertTriangle, BadgeHelp, CircleMinus, Mail, Phone, Text, User } from "lucide-react";
 import { DrawerSheet } from "./drawer-sheet";
 import type { Lead, LeadPriority, LeadOrigem, PipelineStageId } from "@/lib/comercial/types";
 import { ORIGEM_OPCOES, ORIGEM_COM_DETALHE } from "@/lib/comercial/constants";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { comercialInputClass, comercialLabelClass } from "./field-styles";
+import {
+  FormSearchableSelectField,
+  FormTextInput,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "./field-styles";
+import { formLabelClass } from "@/components/ui/field-patterns";
 import { iconForOrigem } from "./origem-icons";
 
 type NovoLeadPanelProps = {
@@ -70,10 +76,7 @@ export function NovoLeadPanel({
     >
       <div className="max-h-[85vh] overflow-y-auto p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="novo-lead-origem" className={comercialLabelClass}>
-              Origem
-            </label>
+          <FormSearchableSelectField id="novo-lead-origem" label="Origem">
             <SearchableSelect
               options={ORIGEM_OPCOES.map((opt) => ({
                 value: opt.value,
@@ -87,53 +90,37 @@ export function NovoLeadPanel({
               searchable={false}
               leadingIcon={BadgeHelp}
             />
-          </div>
+          </FormSearchableSelectField>
 
           {showOrigemDetalhe && (
-            <div>
-              <label htmlFor="novo-lead-origem-detalhe" className={comercialLabelClass}>
-                Detalhar origem
-              </label>
-              <div className="relative">
-                <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="novo-lead-origem-detalhe"
-                  type="text"
-                  value={origemDetalhe}
-                  onChange={(e) => setOrigemDetalhe(e.target.value)}
-                  placeholder={
-                    origem === "evento"
-                      ? "Ex: Feira XPTO 2025"
-                      : origem === "indicacao"
-                      ? "Ex: João Silva"
-                      : "Ex: Detalhes da origem"
-                  }
-                  className={`${comercialInputClass} pl-9`}
-                />
-              </div>
-            </div>
+            <FormTextInput
+              id="novo-lead-origem-detalhe"
+              label="Detalhar origem"
+              icon={Text}
+              value={origemDetalhe}
+              onChange={(e) => setOrigemDetalhe(e.target.value)}
+              placeholder={
+                origem === "evento"
+                  ? "Ex: Feira XPTO 2025"
+                  : origem === "indicacao"
+                  ? "Ex: João Silva"
+                  : "Ex: Detalhes da origem"
+              }
+            />
           )}
 
-          <div>
-            <label htmlFor="novo-lead-name" className={comercialLabelClass}>
-              Nome do Lead (Assunto + Entidade) *
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="novo-lead-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Implantação ERP - Empresa XYZ"
-                className={`${comercialInputClass} pl-9`}
-                required
-              />
-            </div>
-          </div>
+          <FormTextInput
+            id="novo-lead-name"
+            label="Nome do Lead (Assunto + Entidade)"
+            required
+            icon={Text}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex: Implantação ERP - Empresa XYZ"
+          />
 
           <div>
-            <p className="mb-1 block text-sm font-medium text-slate-700">Prioridade</p>
+            <p className={formLabelClass}>Prioridade</p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {PRIORIDADE_OPCOES.map((opt) => (
                 <button
@@ -154,70 +141,41 @@ export function NovoLeadPanel({
             </div>
           </div>
 
-          <div>
-            <label htmlFor="novo-lead-contact" className={comercialLabelClass}>
-              Contato
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="novo-lead-contact"
-                type="text"
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-                placeholder="Nome do contato"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
+          <FormTextInput
+            id="novo-lead-contact"
+            label="Contato"
+            icon={User}
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            placeholder="Nome do contato"
+          />
 
-          <div>
-            <label htmlFor="novo-lead-phone" className={comercialLabelClass}>
-              Telefone
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="novo-lead-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(00) 00000-0000"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
+          <FormTextInput
+            id="novo-lead-phone"
+            label="Telefone"
+            icon={Phone}
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="(00) 00000-0000"
+          />
 
-          <div>
-            <label htmlFor="novo-lead-email" className={comercialLabelClass}>
-              E-mail
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="novo-lead-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@empresa.com"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
+          <FormTextInput
+            id="novo-lead-email"
+            label="E-mail"
+            icon={Mail}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@empresa.com"
+          />
 
           <div className="shrink-0 bg-white px-4 py-3 lg:px-6 lg:py-3">
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9]"
-              >
+              <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
                 Cancelar
               </button>
-              <button
-                type="submit"
-                className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2"
-              >
+              <button type="submit" className={formModalSubmitButtonClass}>
                 Salvar lead
               </button>
             </div>

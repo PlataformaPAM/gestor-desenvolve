@@ -1,17 +1,21 @@
 /**
- * Padrões visuais dos formulários (modais) alinhados a **Comercial** e **Tarefas Internas**.
+ * Padrões visuais dos formulários (modais).
+ *
+ * **Componentes compostos** (rótulo + ícone + validação): `@/components/ui/form-fields`
+ * (`FormTextInput`, `FormTextarea`, `FormDateField`, `FormCurrencyInput`, `FormSearchableSelectField`, …).
  *
  * | Tipo | Componente / classe |
  * |------|---------------------|
- * | Texto, número formatado | `formInputClass` em `<input>` |
- * | Textarea | `formTextareaClass` |
+ * | Texto com ícone | `FormTextInput` ou `formInputClass` + `formInputLeadingIconPaddingClass` |
+ * | Textarea com ícone | `FormTextarea` ou `formTextareaClass` |
  * | Somente leitura | `formReadOnlyClass` |
- * | Data | `@/components/ui/date-field` (`DateField`) — calendário pt-BR |
- * | Seleção única / lista pesquisável | `@/components/ui/searchable-select` (`SearchableSelect` / `SearchableMultiSelect`) |
- * | Select nativo (HTML) | `formNativeSelectClass` — mesmo shell dos inputs |
+ * | Data | `FormDateField` ou `DateField` em `@/components/ui/date-field` |
+ * | Valor (R$) | `FormCurrencyInput` |
+ * | Seleção pesquisável | `FormSearchableSelectField` + `SearchableSelect` |
+ * | Select nativo | `FormNativeSelectField` ou `formNativeSelectClass` |
  * | Input compacto (grids) | `formInputCompactClass` |
- * | Label | `formLabelClass` |
- * | Zona de anexo | `formAttachmentDropzoneClass` + lista `formAttachmentFileRowClass` |
+ * | Label + * | `FormLabel` ou `formLabelClass` |
+ * | Zona de anexo | `FormAttachmentField` ou `formAttachmentDropzoneClass` + `formAttachmentFileRowClass` |
  * | Botões de rodapé de modal | `formModalCancelButtonClass`, `formModalSubmitButtonClass` |
  */
 
@@ -21,6 +25,15 @@ export const formLabelClass =
 /** Rótulo de seção sem margem inferior extra (ex.: “Anexos” acima de área customizada) */
 export const formSectionLabelClass =
   "block text-sm font-medium text-slate-700 dark:text-slate-300";
+
+/**
+ * Padding extra quando há ícone Lucide à esquerda (alinha texto com `SearchableSelect` / `DateField`).
+ * Use em `<input>` / `<textarea>` junto do ícone absoluto em `left-3`.
+ */
+export const formInputLeadingIconPaddingClass = "pl-10";
+
+/** Posição vertical do ícone à esquerda em textarea com várias linhas */
+export const formTextareaLeadingIconTopClass = "top-3.5";
 
 /** Campo de texto / número — borda suave, foco violeta (#6D28D9), cantos xl */
 export const formInputClass =

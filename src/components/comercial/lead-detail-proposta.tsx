@@ -8,8 +8,12 @@ import { AlertDialog } from "@/components/ui/alert-dialog";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { Toast } from "@/components/ui/toast";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
-import { DateField } from "@/components/ui/date-field";
-import { comercialInputClass, comercialInputCompactClass, comercialLabelClass } from "./field-styles";
+import {
+  comercialInputClass,
+  comercialInputCompactClass,
+  comercialLabelClass,
+  FormDateField,
+} from "./field-styles";
 import type {
   Lead,
   LeadInteraction,
@@ -676,23 +680,21 @@ export function LeadDetailProposta({
 
       {needsPrevisaoFechamento && (
         <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-800/40">
-          <label htmlFor="lead-previsao-fechamento-proposta" className={comercialLabelClass}>
-            Previsão de fechamento *
-          </label>
-          <div className="max-w-xs">
-            <DateField
-              id="lead-previsao-fechamento-proposta"
-              value={lead.previsaoFechamento ?? ""}
-              onChange={(v) => {
-                const trimmed = v.trim();
-                onUpdateLead(
-                  { previsaoFechamento: trimmed ? trimmed : undefined },
-                  { skipSuccessToast: true }
-                );
-              }}
-              placeholder="Selecione a data"
-            />
-          </div>
+          <FormDateField
+            id="lead-previsao-fechamento-proposta"
+            label="Previsão de fechamento"
+            required
+            className="max-w-xs"
+            value={lead.previsaoFechamento ?? ""}
+            onChange={(v) => {
+              const trimmed = v.trim();
+              onUpdateLead(
+                { previsaoFechamento: trimmed ? trimmed : undefined },
+                { skipSuccessToast: true }
+              );
+            }}
+            placeholder="Selecione a data"
+          />
           <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
             Obrigatória para avançar o funil a partir da proposta.
           </p>
