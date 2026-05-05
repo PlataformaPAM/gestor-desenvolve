@@ -24,6 +24,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     select: { status: true, titulo: true },
   });
 
+  let usedStatusOnlyFallback = false;
   try {
     await prisma.$transaction(async (tx) => {
       const autorIds = Array.from(
@@ -131,6 +132,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           new Date(),
           id
         );
+        usedStatusOnlyFallback = true;
       } catch (fallbackStatusError) {
         const detail =
           fallbackStatusError instanceof Prisma.PrismaClientKnownRequestError
@@ -165,16 +167,40 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       },
     });
   } catch {
-    saved = await prisma.tarefa.findUniqueOrThrow({
-      where: { id },
-      include: {
-        cliente: { select: { id: true, nome: true, empresa: true } },
-        responsavel: true,
-        colaboradores: { include: { usuario: true } },
-        anexos: true,
-        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
-      },
-    });
+    try {
+      saved = await prisma.tarefa.findUniqueOrThrow({
+        where: { id },
+        include: {
+          cliente: { select: { id: true, nome: true, empresa: true } },
+          responsavel: true,
+          colaboradores: { include: { usuario: true } },
+          anexos: true,
+          historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+        },
+      });
+    } catch (readError) {
+      if (!usedStatusOnlyFallback) {
+        const detail =
+          readError instanceof Prisma.PrismaClientKnownRequestError
+            ? `Erro ${readError.code}`
+            : readError instanceof Error
+              ? readError.message
+              : "erro desconhecido";
+        return fail("INTERNAL_ERROR", `Falha ao carregar tarefa após atualização: ${detail}`, 500);
+      }
+      // Em fallback de status (schema legado), retornamos payload mínimo para evitar falso erro no front.
+      return ok({
+        tarefa: {
+          ...tarefa,
+          updatedAt: new Date().toISOString(),
+          historico: tarefa.historico ?? [],
+          anexos: tarefa.anexos ?? [],
+          colaboradores: tarefa.colaboradores ?? [],
+          clienteIds: tarefa.clienteIds ?? [tarefa.clienteId].filter(Boolean),
+          codigo: tarefa.codigo ?? "",
+        },
+      });
+    }
   }
   await writeAuditLog(prisma, {
     acao: "Tarefa atualizada",

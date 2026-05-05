@@ -339,6 +339,11 @@ export default function TarefasPage() {
         .then((saved) => {
           setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
           setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+          if (destStatus === "concluido" && operacaoView !== "fechados") {
+            setOperacaoView("fechados");
+            setStatusFilter("");
+            showToast("Tarefa concluída e exibida na visão Fechados.", "success");
+          }
         })
         .catch((error) => {
           if (!previousForRollback) return;
@@ -347,7 +352,7 @@ export default function TarefasPage() {
           showToast(error instanceof Error ? error.message : "Falha ao mover tarefa.", "error");
         });
     }
-  }, [saveTarefa, autorEdicao, showToast]);
+  }, [saveTarefa, autorEdicao, showToast, operacaoView]);
 
   const handleSalvarTarefa = useCallback(
     (tarefaId: string, payload: TarefaSalvarPayload) => {
