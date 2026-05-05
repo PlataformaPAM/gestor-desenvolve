@@ -260,7 +260,10 @@ export default function TarefasPage() {
       .then((saved) => {
         setTarefas((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
       })
-      .catch(() => undefined);
+      .catch(() => {
+        // Evita “fantasma” no Kanban/lista quando o backend falha.
+        setTarefas((prev) => prev.filter((t) => t.id !== created.id));
+      });
     setIsSheetOpen(false);
     setSelectedTarefa(null);
   }, [saveTarefa, usuariosMap, clientes, session.userName, usuarioAtualId]);

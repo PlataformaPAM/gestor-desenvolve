@@ -23,15 +23,21 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
 async function proximoCodigoTarefa(
   tx: TxTarefaCompat,
   ano: number
-): Promise<string> {
+): Promise<string | null> {
   const prefixo = `TAR-${ano}-`;
-  const ultimo = (await tx.tarefa.findFirst({
-    where: { codigo: { startsWith: prefixo } },
-    orderBy: { codigo: "desc" },
-    select: { codigo: true },
-  })) as { codigo?: string } | null;
-  const ultimoSequencial = Number.parseInt(ultimo?.codigo?.slice(-4) ?? "0", 10);
-  return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
+  try {
+    const ultimo = (await tx.tarefa.findFirst({
+      where: { codigo: { startsWith: prefixo } },
+      orderBy: { codigo: "desc" },
+      select: { codigo: true },
+    })) as { codigo?: string } | null;
+    const ultimoSequencial = Number.parseInt(ultimo?.codigo?.slice(-4) ?? "0", 10);
+    return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
+  } catch (error) {
+    // Compatibilidade com ambientes onde a coluna codigo ainda não existe.
+    console.warn("[tarefas/create] não foi possível gerar código TAR; prosseguindo sem código.", error);
+    return null;
+  }
 }
 
 export async function POST(req: Request) {
@@ -90,9 +96,14 @@ export async function POST(req: Request) {
     }
     const clienteIds = Array.from(new Set((tarefa.clienteIds ?? [tarefa.clienteId]).filter(Boolean) as string[]));
     if (clienteIds.length) {
-      await tx.tarefaCliente.createMany({
-        data: clienteIds.map((clienteId) => ({ tarefaId: tarefa.id, clienteId })),
-      });
+      try {
+        await tx.tarefaCliente.createMany({
+          data: clienteIds.map((clienteId) => ({ tarefaId: tarefa.id, clienteId })),
+        });
+      } catch (error) {
+        // Não aborta criação por falha no vínculo N:N; clienteId principal já foi salvo em Tarefa.
+        console.warn("[tarefas/create] falha ao salvar clientes vinculados; mantendo tarefa criada.", error);
+      }
     }
 
     if (tarefa.anexos?.length) {
