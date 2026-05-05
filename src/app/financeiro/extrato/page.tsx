@@ -705,7 +705,7 @@ export default function FinanceiroExtratoPage() {
         }}
         title={lancamentoEmEdicao ? `Editar Lançamento — ${lancamentoEmEdicao.descricao}` : "Editar Lançamento"}
       >
-        <div className="overflow-y-auto p-4 lg:p-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {lancamentoEmEdicao && (
             <LancamentoForm
               key={`${lancamentoEmEdicao.id}-rh${fornecedoresRh.length}`}

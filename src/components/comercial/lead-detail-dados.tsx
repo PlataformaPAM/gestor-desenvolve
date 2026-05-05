@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { AlertTriangle, BadgeHelp, CircleMinus, Text } from "lucide-react";
 import type { Lead, LeadOrigem, LeadPriority } from "@/lib/comercial/types";
 import type { Cliente, Contato } from "@/lib/clientes/types";
 import type { UsuarioSistema } from "@/lib/configuracoes/types";
@@ -15,6 +16,13 @@ import { LeadDadosContatosOportunidade } from "./lead-dados-contatos-oportunidad
 import { LeadResponsavelEquipe } from "./lead-responsavel-equipe";
 import { useAuth } from "@/contexts/auth-context";
 import { buildOwnershipInteraction, getLeadOwnership } from "@/lib/comercial/ownership";
+import {
+  comercialInputClass,
+  comercialLabelClass,
+  comercialReadOnlyClass,
+} from "./field-styles";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { iconForOrigem } from "./origem-icons";
 
 type LeadDetailDadosProps = {
   lead: Lead;
@@ -327,52 +335,59 @@ export function LeadDetailDados({
         </div>
 
         <div>
-          <label htmlFor="lead-origem" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="lead-origem" className={comercialLabelClass}>
             Origem
           </label>
-          <select
-            id="lead-origem"
+          <SearchableSelect
+            options={ORIGEM_OPCOES.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+              icon: iconForOrigem(opt.value),
+            }))}
             value={formData.origem}
-            onChange={(e) => setFormData((prev) => ({ ...prev, origem: e.target.value as LeadOrigem }))}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-          >
-            {ORIGEM_OPCOES.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setFormData((prev) => ({ ...prev, origem: v as LeadOrigem }))}
+            placeholder="Selecione a origem..."
+            searchPlaceholder="Buscar origem..."
+            searchable={false}
+            leadingIcon={BadgeHelp}
+          />
         </div>
 
         {showOrigemDetalhe && (
           <div>
-            <label htmlFor="lead-origem-detalhe" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="lead-origem-detalhe" className={comercialLabelClass}>
               Detalhar origem
             </label>
-            <input
-              id="lead-origem-detalhe"
-              type="text"
-              value={formData.notes ?? ""}
-              onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-              placeholder="Ex: Evento, indicador ou outro detalhe"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="lead-origem-detalhe"
+                type="text"
+                value={formData.notes ?? ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="Ex: Evento, indicador ou outro detalhe"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
         )}
 
         <div>
-          <label htmlFor="lead-nome" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="lead-nome" className={comercialLabelClass}>
             Nome do Lead (Assunto + Entidade) *
           </label>
-          <input
-            id="lead-nome"
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Ex: Implantação ERP - Empresa XYZ"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            required
-          />
+          <div className="relative">
+            <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="lead-nome"
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="Ex: Implantação ERP - Empresa XYZ"
+              className={`${comercialInputClass} pl-9`}
+              required
+            />
+          </div>
         </div>
 
         <div>
@@ -392,6 +407,9 @@ export function LeadDetailDados({
                 } ${formData.priority === p ? "ring-2 ring-offset-1 ring-[#6D28D9]" : "hover:opacity-90"}`}
                 aria-pressed={formData.priority === p}
               >
+                {p === "alta" ? <AlertTriangle className="mr-1 h-3.5 w-3.5" /> : null}
+                {p === "media" ? <BadgeHelp className="mr-1 h-3.5 w-3.5" /> : null}
+                {p === "baixa" ? <CircleMinus className="mr-1 h-3.5 w-3.5" /> : null}
                 {PRIORIDADE_LABELS[p]}
               </button>
             ))}
@@ -434,21 +452,21 @@ export function LeadDetailDados({
                 value={formData.contact ?? ""}
                 readOnly
                 disabled
-                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-slate-600"
+                className={comercialReadOnlyClass}
               />
               <input
                 type="text"
                 value={formData.phone ?? ""}
                 readOnly
                 disabled
-                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-slate-600"
+                className={comercialReadOnlyClass}
               />
               <input
                 type="email"
                 value={formData.email ?? ""}
                 readOnly
                 disabled
-                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-slate-600"
+                className={comercialReadOnlyClass}
               />
             </div>
           )}
@@ -476,45 +494,54 @@ export function LeadDetailDados({
       ) : (
         <>
           <div>
-            <label htmlFor="lead-contact" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="lead-contact" className={comercialLabelClass}>
               Contato
             </label>
-            <input
-              id="lead-contact"
-              type="text"
-              value={formData.contact ?? ""}
-              onChange={(e) => setFormData((prev) => ({ ...prev, contact: e.target.value }))}
-              placeholder="Nome do contato"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="lead-contact"
+                type="text"
+                value={formData.contact ?? ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, contact: e.target.value }))}
+                placeholder="Nome do contato"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="lead-phone" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="lead-phone" className={comercialLabelClass}>
               Telefone
             </label>
-            <input
-              id="lead-phone"
-              type="text"
-              value={formData.phone ?? ""}
-              onChange={(e) => setFormData((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
-              placeholder="(00) 00000-0000"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="lead-phone"
+                type="text"
+                value={formData.phone ?? ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
+                placeholder="(00) 00000-0000"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="lead-email" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="lead-email" className={comercialLabelClass}>
               E-mail
             </label>
-            <input
-              id="lead-email"
-              type="email"
-              value={formData.email ?? ""}
-              onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-              placeholder="email@empresa.com"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="lead-email"
+                type="email"
+                value={formData.email ?? ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="email@empresa.com"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
         </>
       )}

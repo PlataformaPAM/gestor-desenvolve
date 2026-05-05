@@ -17,6 +17,8 @@ import { formatDateDMY } from "@/lib/format/dates";
 type ContratoRow = {
   id: string;
   codigo: string;
+  codigoSistema?: string;
+  codigoPersonalizado?: string | null;
   leadId: string | null;
   clienteId: string;
   origem: string;
@@ -271,7 +273,7 @@ export default function ContratosPage() {
                       Contrato
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Vencimento
+                      Prazos
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       Valor
@@ -313,13 +315,20 @@ export default function ContratosPage() {
                           {tituloContratoExibicao(c)}
                         </p>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          {c.codigo} · Data de início:{" "}
-                          {c.dataInicio ? formatDateDMY(c.dataInicio) : "—"}
+                          {c.codigoSistema ?? c.codigo}
                         </p>
+                        {c.codigoPersonalizado?.trim() ? (
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Contrato: {c.codigoPersonalizado.trim()}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-mono text-slate-800 dark:text-slate-200">
-                          {c.dataFim ? formatDateDMY(c.dataFim) : "—"}
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Início: <span className="font-mono text-slate-800 dark:text-slate-200">{c.dataInicio ? formatDateDMY(c.dataInicio) : "—"}</span>
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Vencimento: <span className="font-mono text-slate-800 dark:text-slate-200">{c.dataFim ? formatDateDMY(c.dataFim) : "—"}</span>
                         </p>
                         <div className="mt-1.5 flex flex-col items-start gap-1">
                           {badge && (
@@ -409,12 +418,19 @@ export default function ContratosPage() {
                     {tituloContratoExibicao(c)}
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {c.codigo} · Data de início: {c.dataInicio ? formatDateDMY(c.dataInicio) : "—"}
+                    {c.codigoSistema ?? c.codigo}
                   </p>
+                  {c.codigoPersonalizado?.trim() ? (
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Contrato: {c.codigoPersonalizado.trim()}
+                    </p>
+                  ) : null}
                   <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-700">
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Vencimento</p>
-                    <p className="text-sm font-mono text-slate-800 dark:text-slate-200">
-                      {c.dataFim ? formatDateDMY(c.dataFim) : "—"}
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Início: <span className="font-mono text-slate-800 dark:text-slate-200">{c.dataInicio ? formatDateDMY(c.dataInicio) : "—"}</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Vencimento: <span className="font-mono text-slate-800 dark:text-slate-200">{c.dataFim ? formatDateDMY(c.dataFim) : "—"}</span>
                     </p>
                     {badge && (
                       <span

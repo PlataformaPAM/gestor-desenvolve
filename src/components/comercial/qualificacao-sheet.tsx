@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DrawerSheet } from "./drawer-sheet";
 import type { Lead } from "@/lib/comercial/types";
+import { comercialInputClass, comercialLabelClass } from "./field-styles";
 
 type QualificacaoSheetProps = {
   open: boolean;
@@ -47,7 +48,7 @@ export function QualificacaoSheet({
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="qualificacao-cliente-id" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="qualificacao-cliente-id" className={comercialLabelClass}>
               ID do Cliente *
             </label>
             <input
@@ -56,7 +57,7 @@ export function QualificacaoSheet({
               value={clienteId}
               onChange={(e) => setClienteId(e.target.value)}
               placeholder="Ex.: cli-123 ou cadastre no módulo Clientes"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+              className={comercialInputClass}
               required
             />
             <p className="mt-1 text-xs text-slate-500">

@@ -7,6 +7,7 @@ import { AlertDialog } from "@/components/ui/alert-dialog";
 import type { Lead } from "@/lib/comercial/types";
 import type { Cliente, Contato, ContatoPapel, ClienteEndereco } from "@/lib/clientes/types";
 import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
+import { comercialInputClass, comercialLabelClass, comercialSelectClass } from "./field-styles";
 
 const CONTATO_PAPEL_OPTIONS: { value: ContatoPapel; label: string }[] = [
   { value: "gestor_empresa", label: "Gestor da Empresa" },
@@ -180,7 +181,7 @@ export function QualificarOportunidadeSheet({
         {modo === "busca" && (
           <div className="p-6 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className={comercialLabelClass}>
                 Buscar Cliente Existente ou Cadastrar Novo
               </label>
               <div className="relative">
@@ -190,7 +191,7 @@ export function QualificarOportunidadeSheet({
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Nome, empresa ou CNPJ..."
-                  className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                  className={`${comercialInputClass} pl-10 pr-4`}
                 />
               </div>
             </div>
@@ -264,120 +265,120 @@ export function QualificarOportunidadeSheet({
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-slate-800">Dados da empresa (CNPJ)</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">CNPJ (14 dígitos)</label>
+                <label className={comercialLabelClass}>CNPJ (14 dígitos)</label>
                 <input
                   type="text"
                   value={cnpjRaw}
                   onChange={(e) => setCnpjRaw(e.target.value.replace(/\D/g, "").slice(0, 14))}
                   placeholder="00000000000000"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                  className={`${comercialInputClass} font-mono`}
                 />
                 {loadingCnpj && <p className="mt-1 text-xs text-slate-500">Consultando BrasilAPI...</p>}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Razão Social</label>
+                  <label className={comercialLabelClass}>Razão Social</label>
                   <input
                     type="text"
                     value={empresa}
                     onChange={(e) => setEmpresa(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Nome Fantasia</label>
+                  <label className={comercialLabelClass}>Nome Fantasia</label>
                   <input
                     type="text"
                     value={nomeFantasia}
                     onChange={(e) => setNomeFantasia(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-slate-700">CEP</label>
+                  <label className={comercialLabelClass}>CEP</label>
                   <input
                     type="text"
                     value={endereco.cep}
                     onChange={(e) => setEndereco((p) => ({ ...p, cep: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Rua</label>
+                  <label className={comercialLabelClass}>Rua</label>
                   <input
                     type="text"
                     value={endereco.logradouro}
                     onChange={(e) => setEndereco((p) => ({ ...p, logradouro: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Número</label>
+                  <label className={comercialLabelClass}>Número</label>
                   <input
                     type="text"
                     value={endereco.numero}
                     onChange={(e) => setEndereco((p) => ({ ...p, numero: e.target.value }))}
                     placeholder="S/N"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Complemento</label>
+                  <label className={comercialLabelClass}>Complemento</label>
                   <input
                     type="text"
                     value={endereco.complemento ?? ""}
                     onChange={(e) => setEndereco((p) => ({ ...p, complemento: e.target.value || undefined }))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Bairro</label>
+                  <label className={comercialLabelClass}>Bairro</label>
                   <input
                     type="text"
                     value={endereco.bairro}
                     onChange={(e) => setEndereco((p) => ({ ...p, bairro: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Cidade / UF</label>
+                  <label className={comercialLabelClass}>Cidade / UF</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={endereco.cidade}
                       onChange={(e) => setEndereco((p) => ({ ...p, cidade: e.target.value }))}
-                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                      className={comercialInputClass}
                     />
                     <input
                       type="text"
                       value={endereco.uf}
                       onChange={(e) => setEndereco((p) => ({ ...p, uf: e.target.value.toUpperCase().slice(0, 2) }))}
                       placeholder="UF"
-                      className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                      className={`${comercialInputClass} w-14 px-2 text-center`}
                     />
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">E-mail da empresa</label>
+                  <label className={comercialLabelClass}>E-mail da empresa</label>
                   <input
                     type="email"
                     value={emailEmpresa}
                     onChange={(e) => setEmailEmpresa(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">WhatsApp</label>
+                  <label className={comercialLabelClass}>WhatsApp</label>
                   <input
                     type="tel"
                     value={whatsappEmpresa}
                     onChange={(e) => setWhatsappEmpresa(e.target.value)}
                     placeholder="(00) 00000-0000"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                    className={comercialInputClass}
                   />
                 </div>
               </div>
@@ -408,7 +409,7 @@ export function QualificarOportunidadeSheet({
                       <select
                         value={c.papel}
                         onChange={(e) => updateContato(c.id, { papel: e.target.value as ContatoPapel })}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                      className={comercialSelectClass}
                       >
                         {CONTATO_PAPEL_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>{o.label}</option>
@@ -432,7 +433,7 @@ export function QualificarOportunidadeSheet({
                           type="text"
                           value={c.nome}
                           onChange={(e) => updateContato(c.id, { nome: e.target.value })}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                          className={comercialInputClass}
                         />
                       </div>
                       <div>
@@ -441,7 +442,7 @@ export function QualificarOportunidadeSheet({
                           type="email"
                           value={c.email}
                           onChange={(e) => updateContato(c.id, { email: e.target.value })}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                          className={comercialInputClass}
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -451,7 +452,7 @@ export function QualificarOportunidadeSheet({
                           value={c.telefone}
                           onChange={(e) => updateContato(c.id, { telefone: e.target.value })}
                           placeholder="(00) 00000-0000"
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
+                          className={comercialInputClass}
                         />
                       </div>
                     </div>

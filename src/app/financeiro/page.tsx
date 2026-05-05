@@ -1218,9 +1218,10 @@ export default function FinanceiroPage() {
         }}
         title={aprovacaoParaLancar ? `Novo Lançamento — ${aprovacaoParaLancar.leadNome}` : "Novo Lançamento"}
       >
-        <div className="overflow-y-auto p-4 lg:p-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {aprovacaoParaLancar && aprovacaoParaLancar.solucoes.length > 0 && (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-sm dark:border-amber-500/30 dark:bg-amber-950/35">
+            <div className="shrink-0 px-1 pb-3 pt-0 text-sm sm:px-0">
+              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-500/30 dark:bg-amber-950/35">
               <p className="font-medium text-amber-900 dark:text-amber-200">Soluções da proposta</p>
               <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90">
                 Registre o lançamento (único, mensal ou parcelado) para cada item. A aprovação só conclui quando todos
@@ -1244,8 +1245,10 @@ export default function FinanceiroPage() {
                   );
                 })}
               </ul>
+              </div>
             </div>
           )}
+          <div className="min-h-0 flex-1 overflow-hidden">
           <LancamentoForm
             key={`novo-${aprovacaoParaLancar?.leadId ?? "livre"}-${aprovacaoLinhaSolucaoId ?? "auto"}-${aprovacaoFormEpoch}`}
             mode="create"
@@ -1349,6 +1352,7 @@ export default function FinanceiroPage() {
               setAprovacaoLinhaSolucaoId(null);
             }}
           />
+          </div>
         </div>
       </DrawerSheet>
 
@@ -1360,7 +1364,7 @@ export default function FinanceiroPage() {
         }}
         title={lancamentoEmEdicao ? `Editar Lançamento — ${lancamentoEmEdicao.descricao}` : "Editar Lançamento"}
       >
-        <div className="overflow-y-auto p-4 lg:p-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {lancamentoEmEdicao && (
             <LancamentoForm
               key={`${lancamentoEmEdicao.id}-rh${fornecedoresRh.length}`}

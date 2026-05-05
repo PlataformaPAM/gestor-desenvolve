@@ -12,6 +12,15 @@ import {
   type SearchableOption,
 } from "@/components/ui/searchable-select";
 import { DateField } from "@/components/ui/date-field";
+import {
+  formAttachmentDropzoneClass,
+  formAttachmentFileRowClass,
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formSectionLabelClass,
+} from "@/components/ui/field-patterns";
 
 type NovaTarefaFormProps = {
   usuarios: UsuarioTarefa[];
@@ -114,14 +123,11 @@ export function NovaTarefaForm({
     });
   };
 
-  const inputClass =
-    "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500";
-
   return (
     <>
     <form onSubmit={handleSubmit} className="space-y-6 p-4 lg:p-6">
       <div>
-        <label htmlFor="tarefa-titulo" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="tarefa-titulo" className={formLabelClass}>
           Título
         </label>
         <input
@@ -130,13 +136,13 @@ export function NovaTarefaForm({
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           placeholder="Ex.: Revisar proposta comercial"
-          className={inputClass}
+          className={formInputClass}
           required
         />
       </div>
 
       <div>
-        <label htmlFor="tarefa-desc" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="tarefa-desc" className={formLabelClass}>
           Descrição (opcional)
         </label>
         <textarea
@@ -145,12 +151,12 @@ export function NovaTarefaForm({
           onChange={(e) => setDescricao(e.target.value)}
           rows={2}
           placeholder="Detalhes da tarefa..."
-          className={inputClass}
+          className={formInputClass}
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className={formLabelClass}>
           Responsável
         </label>
         <SearchableSelect
@@ -177,7 +183,7 @@ export function NovaTarefaForm({
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className={formLabelClass}>
           Clientes vinculados (opcional)
         </label>
         <SearchableMultiSelect
@@ -191,7 +197,7 @@ export function NovaTarefaForm({
       </div>
 
       <div>
-        <label htmlFor="tarefa-prazo" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="tarefa-prazo" className={formLabelClass}>
           Prazo (data fim)
         </label>
         <DateField
@@ -203,7 +209,7 @@ export function NovaTarefaForm({
       </div>
 
       <div className="space-y-1">
-        <span className="block text-sm font-medium text-slate-700 dark:text-slate-300">Anexos</span>
+        <span className={formSectionLabelClass}>Anexos</span>
         <input
           ref={fileInputRef}
           type="file"
@@ -228,7 +234,7 @@ export function NovaTarefaForm({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 py-6 text-sm text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100/80 hover:text-slate-700 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+          className={formAttachmentDropzoneClass}
         >
           <Paperclip className="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
           <span>Arraste documentos ou clique para anexar</span>
@@ -238,7 +244,7 @@ export function NovaTarefaForm({
             {arquivos.map((f, idx) => (
               <li
                 key={`${f.name}-${f.size}-${f.lastModified}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
+                className={formAttachmentFileRowClass}
               >
                 <button
                   type="button"
@@ -265,7 +271,7 @@ export function NovaTarefaForm({
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className={formLabelClass}>
           Prioridade
         </label>
         <SearchableSelect
@@ -278,17 +284,13 @@ export function NovaTarefaForm({
       </div>
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
+        <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
           Cancelar
         </button>
         <button
           type="submit"
           disabled={!titulo.trim() || !responsavelId}
-          className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+          className={formModalSubmitButtonClass}
         >
           Criar tarefa
         </button>

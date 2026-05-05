@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { composeCodigoContrato, getContratoCodigoPersonalizadoMap } from "@/lib/contratos/codigo-personalizado";
 import { fail, ok } from "@/lib/server/api-response";
 import { emitAlert } from "@/lib/server/alerts";
 
@@ -68,10 +69,13 @@ export async function GET() {
       },
     });
     const rowsComCodigo = withContratoCode(rows);
+    const customMap = await getContratoCodigoPersonalizadoMap();
 
     const contratos = rowsComCodigo.map((c) => ({
       id: c.id,
-      codigo: c.codigo,
+      codigo: composeCodigoContrato(c.codigo, customMap[c.id] ?? null),
+      codigoSistema: c.codigo,
+      codigoPersonalizado: customMap[c.id] ?? null,
       leadId: c.leadId,
       clienteId: c.clienteId,
       origem: c.origem,

@@ -10,6 +10,7 @@ type DateFieldProps = {
   placeholder?: string;
   min?: string;
   max?: string;
+  disabled?: boolean;
 };
 
 function formatPtBr(isoDate: string): string {
@@ -58,7 +59,15 @@ function clampToMonthStart(value?: string): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-export function DateField({ id, value, onChange, placeholder = "Selecione a data", min, max }: DateFieldProps) {
+export function DateField({
+  id,
+  value,
+  onChange,
+  placeholder = "Selecione a data",
+  min,
+  max,
+  disabled = false,
+}: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
@@ -70,6 +79,10 @@ export function DateField({ id, value, onChange, placeholder = "Selecione a data
     setMonthCursor(clampToMonthStart(value));
     setInputValue(value ? formatPtBr(value) : "");
   }, [value]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -132,7 +145,7 @@ export function DateField({ id, value, onChange, placeholder = "Selecione a data
     return cells;
   }, [monthCursor]);
 
-  const isDisabled = (iso: string): boolean => {
+  const isIsoOutsideBounds = (iso: string): boolean => {
     if (!iso) return true;
     const d = new Date(`${iso}T00:00:00`);
     if (minDate && d < minDate) return true;
@@ -145,8 +158,11 @@ export function DateField({ id, value, onChange, placeholder = "Selecione a data
       <button
         id={id}
         type="button"
-        onClick={() => setOpen((s) => !s)}
-        className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((s) => !s)}
+        className={`flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 ${
+          disabled ? "cursor-not-allowed opacity-60 hover:border-slate-200 dark:hover:border-slate-600" : ""
+        }`}
       >
         <span className={value ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
           {inputValue || placeholder}
@@ -154,7 +170,7 @@ export function DateField({ id, value, onChange, placeholder = "Selecione a data
         <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
 
-      {open ? (
+      {open && !disabled ? (
         <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900">
           <div className="mb-2">
             <input
@@ -268,12 +284,12 @@ export function DateField({ id, value, onChange, placeholder = "Selecione a data
             {days.map((cell, idx) => {
               if (cell.muted) return <div key={`m-${idx}`} className="h-8 rounded-md" />;
               const selected = selectedDate ? toIso(selectedDate) === cell.iso : false;
-              const disabled = isDisabled(cell.iso);
+              const disabledCell = isIsoOutsideBounds(cell.iso);
               return (
                 <button
                   key={cell.iso}
                   type="button"
-                  disabled={disabled}
+                  disabled={disabledCell}
                   onClick={() => {
                     onChange(cell.iso);
                     setOpen(false);
@@ -282,7 +298,7 @@ export function DateField({ id, value, onChange, placeholder = "Selecione a data
                     selected
                       ? "bg-[#6D28D9] text-white"
                       : "text-slate-800 hover:bg-violet-50 dark:text-slate-100 dark:hover:bg-violet-950/40"
-                  } ${disabled ? "cursor-not-allowed opacity-40 hover:bg-transparent" : ""}`}
+                  } ${disabledCell ? "cursor-not-allowed opacity-40 hover:bg-transparent" : ""}`}
                 >
                   {cell.day}
                 </button>

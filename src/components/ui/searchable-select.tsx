@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
+import type { ComponentType } from "react";
 
 export type SearchableOption = {
   value: string;
   label: string;
   subtitle?: string;
+  icon?: ComponentType<{ className?: string }>;
 };
 
 type SearchableSelectProps = {
@@ -18,6 +20,9 @@ type SearchableSelectProps = {
   emptyLabel?: string;
   disabled?: boolean;
   searchable?: boolean;
+  leadingIcon?: ComponentType<{ className?: string }>;
+  /** Default true. When false, trigger fits content (for label-inline layouts). */
+  fullWidth?: boolean;
 };
 
 export function SearchableSelect({
@@ -29,6 +34,8 @@ export function SearchableSelect({
   emptyLabel = "Nenhuma opção encontrada.",
   disabled = false,
   searchable = true,
+  leadingIcon: LeadingIcon,
+  fullWidth = true,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -50,23 +57,32 @@ export function SearchableSelect({
     if (!q) return options;
     return options.filter((o) => `${o.label} ${o.subtitle ?? ""}`.toLowerCase().includes(q));
   }, [options, query, searchable]);
+  const SelectedIcon = selected?.icon ?? LeadingIcon;
+
+  const rootCls = fullWidth ? "relative" : "relative inline-block w-fit max-w-full";
+  const btnCls = fullWidth
+    ? "flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500"
+    : "inline-flex w-auto min-w-[10.5rem] max-w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500";
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={rootCls}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((s) => !s)}
-        className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500"
+        className={btnCls}
       >
-        <span className={selected ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
-          {selected ? selected.label : placeholder}
+        <span className="flex min-w-0 items-center gap-2">
+          {SelectedIcon ? <SelectedIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+          <span className={selected ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
+            {selected ? selected.label : placeholder}
+          </span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
 
       {open ? (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900">
+        <div className="absolute z-[200] mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900">
           {searchable ? (
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -87,6 +103,7 @@ export function SearchableSelect({
             ) : (
               filtered.map((opt) => {
                 const isSelected = opt.value === value;
+                const OptionIcon = opt.icon;
                 return (
                   <button
                     key={opt.value}
@@ -99,7 +116,10 @@ export function SearchableSelect({
                     className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-950/30"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
+                      <span className="flex items-center gap-2">
+                        {OptionIcon ? <OptionIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+                        <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
+                      </span>
                       {opt.subtitle ? (
                         <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{opt.subtitle}</span>
                       ) : null}
@@ -124,6 +144,8 @@ type SearchableMultiSelectProps = {
   searchPlaceholder?: string;
   emptyLabel?: string;
   selectedLabel?: string;
+  showSelectedBadges?: boolean;
+  leadingIcon?: ComponentType<{ className?: string }>;
 };
 
 export function SearchableMultiSelect({
@@ -134,6 +156,8 @@ export function SearchableMultiSelect({
   searchPlaceholder = "Buscar...",
   emptyLabel = "Nenhuma opção encontrada.",
   selectedLabel = "Selecionados",
+  showSelectedBadges = true,
+  leadingIcon: LeadingIcon,
 }: SearchableMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -168,14 +192,17 @@ export function SearchableMultiSelect({
         onClick={() => setOpen((s) => !s)}
         className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500"
       >
-        <span className={selectedItems.length ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
-          {selectedItems.length ? `${selectedItems.length} ${selectedLabel.toLowerCase()}` : placeholder}
+        <span className="flex min-w-0 items-center gap-2">
+          {LeadingIcon ? <LeadingIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+          <span className={selectedItems.length ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
+            {selectedItems.length ? `${selectedItems.length} ${selectedLabel.toLowerCase()}` : placeholder}
+          </span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
 
       {open ? (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900">
+        <div className="absolute z-[200] mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -194,6 +221,7 @@ export function SearchableMultiSelect({
             ) : (
               filtered.map((opt) => {
                 const isSelected = selectedSet.has(opt.value);
+                const OptionIcon = opt.icon;
                 return (
                   <button
                     key={opt.value}
@@ -202,7 +230,10 @@ export function SearchableMultiSelect({
                     className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-950/30"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
+                      <span className="flex items-center gap-2">
+                        {OptionIcon ? <OptionIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+                        <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
+                      </span>
                       {opt.subtitle ? (
                         <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{opt.subtitle}</span>
                       ) : null}
@@ -216,13 +247,14 @@ export function SearchableMultiSelect({
         </div>
       ) : null}
 
-      {selectedItems.length > 0 ? (
+      {showSelectedBadges && selectedItems.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {selectedItems.map((item) => (
             <span
               key={item.value}
               className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200"
             >
+              {item.icon ? <item.icon className="h-3.5 w-3.5" /> : null}
               {item.label}
               <button
                 type="button"

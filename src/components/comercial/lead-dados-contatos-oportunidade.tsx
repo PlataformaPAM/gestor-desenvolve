@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Plus, Trash2, User } from "lucide-react";
+import { ChevronDown, ChevronUp, Contact, Plus, Trash2 } from "lucide-react";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { SearchableMultiSelect } from "@/components/ui/searchable-select";
 import type { Lead, ContatoOportunidade, PapelContatoOportunidade } from "@/lib/comercial/types";
 import type { Contato } from "@/lib/clientes/types";
 import { PAPEIS_CONTATO_OPORTUNIDADE } from "@/lib/comercial/constants";
+import { comercialInputCompactClass, comercialLabelClass } from "./field-styles";
 
 function formatPhoneInput(v: string): string {
   const digits = v.replace(/\D/g, "").slice(0, 11);
@@ -52,7 +54,6 @@ export function LeadDadosContatosOportunidade({
   const contatos = lead.contatosOportunidade ?? [];
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contatoIdParaRemover, setContatoIdParaRemover] = useState<string | null>(null);
-  const contatosSelecionadosIds = new Set(contatos.map((c) => c.id));
 
   const mapClienteContatoToOportunidade = (c: Contato): ContatoOportunidade => ({
     id: c.id,
@@ -127,47 +128,42 @@ export function LeadDadosContatosOportunidade({
   return (
     <>
     <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-      <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-        <User className="h-4 w-4" />
-        Contatos da Oportunidade
-      </h4>
+      <h4 className="mb-3 text-sm font-semibold text-slate-800">Contatos da Oportunidade</h4>
 
       {contatosClienteDisponiveis.length > 0 && (
         <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Contatos já cadastrados no cliente
+            Contatos já cadastrados no Cliente
           </p>
-          <div className="space-y-2">
-            {contatosClienteDisponiveis.map((c) => {
-              const checked = contatosSelecionadosIds.has(c.id);
-              return (
-                <label key={c.id} className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => {
-                      if (checked) {
-                        const next = contatos.filter((x) => x.id !== c.id);
-                        onApplyLocal({ contatosOportunidade: next });
-                        onPersistToServer({ contatosOportunidade: next });
-                        return;
-                      }
-                      const next = [...contatos, mapClienteContatoToOportunidade(c)];
-                      onApplyLocal({ contatosOportunidade: next });
-                      onPersistToServer({ contatosOportunidade: next });
-                    }}
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
-                  />
-                  <span>
-                    <span className="font-medium text-slate-800">{c.nome}</span>
-                    <span className="block text-xs text-slate-500">
-                      {[c.email, c.telefone].filter(Boolean).join(" · ") || "Sem e-mail/telefone"}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          <SearchableMultiSelect
+            options={contatosClienteDisponiveis.map((c) => ({
+              value: c.id,
+              label: c.nome,
+              subtitle: [c.email, c.telefone].filter(Boolean).join(" · ") || "Sem e-mail/telefone",
+              icon: Contact,
+            }))}
+            values={contatos
+              .map((c) => c.id)
+              .filter((id) => contatosClienteDisponiveis.some((x) => x.id === id))}
+            onChange={(ids) => {
+              const currentById = new Map(contatos.map((x) => [x.id, x] as const));
+              const selectedFromCliente = ids.map((id) => {
+                const fromCurrent = currentById.get(id);
+                if (fromCurrent) return fromCurrent;
+                const fromCliente = contatosClienteDisponiveis.find((x) => x.id === id);
+                return fromCliente ? mapClienteContatoToOportunidade(fromCliente) : null;
+              }).filter(Boolean) as ContatoOportunidade[];
+              const manualOnly = contatos.filter((x) => !contatosClienteDisponiveis.some((c) => c.id === x.id));
+              const next = [...manualOnly, ...selectedFromCliente];
+              onApplyLocal({ contatosOportunidade: next });
+              onPersistToServer({ contatosOportunidade: next });
+            }}
+            placeholder="Selecionar contatos..."
+            searchPlaceholder="Buscar contato..."
+            selectedLabel="Selecionados"
+            showSelectedBadges={false}
+            leadingIcon={Contact}
+          />
         </div>
       )}
 
@@ -230,40 +226,40 @@ export function LeadDadosContatosOportunidade({
               {isExpanded && (
                 <div className="border-t border-slate-100 p-3 space-y-3">
                   <div>
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">Nome</label>
+                    <label className={comercialLabelClass}>Nome</label>
                     <input
                       type="text"
                       value={c.nome}
                       onChange={(e) => updateContato(c.id, { nome: e.target.value })}
                       placeholder="Nome completo"
-                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                      className={comercialInputCompactClass}
                     />
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
-                      <label className="mb-0.5 block text-xs font-medium text-slate-600">Cargo</label>
+                      <label className={comercialLabelClass}>Cargo</label>
                       <input
                         type="text"
                         value={c.cargo ?? ""}
                         onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
                         placeholder="Ex: Diretor"
-                        className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        className={comercialInputCompactClass}
                       />
                     </div>
                     <div>
-                      <label className="mb-0.5 block text-xs font-medium text-slate-600">Setor</label>
+                      <label className={comercialLabelClass}>Setor</label>
                       <input
                         type="text"
                         value={c.setor ?? ""}
                         onChange={(e) => updateContato(c.id, { setor: e.target.value })}
                         placeholder="Ex: Comercial"
-                        className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        className={comercialInputCompactClass}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
-                      <label className="mb-0.5 block text-xs font-medium text-slate-600">Telefone</label>
+                      <label className={comercialLabelClass}>Telefone</label>
                       <input
                         type="text"
                         value={c.telefone}
@@ -271,17 +267,17 @@ export function LeadDadosContatosOportunidade({
                           updateContato(c.id, { telefone: formatPhoneInput(e.target.value) })
                         }
                         placeholder="(00) 00000-0000"
-                        className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        className={comercialInputCompactClass}
                       />
                     </div>
                     <div>
-                      <label className="mb-0.5 block text-xs font-medium text-slate-600">E-mail</label>
+                      <label className={comercialLabelClass}>E-mail</label>
                       <input
                         type="email"
                         value={c.email}
                         onChange={(e) => updateContato(c.id, { email: e.target.value })}
                         placeholder="email@empresa.com"
-                        className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                        className={comercialInputCompactClass}
                       />
                     </div>
                   </div>

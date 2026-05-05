@@ -4,9 +4,33 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useId } from "react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import { Building2, Users, Plus, Trash2 } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Plus,
+  Trash2,
+  Mail,
+  Phone,
+  Globe,
+  MapPin,
+  Home,
+  Hash,
+  User,
+  Briefcase,
+  CheckCircle2,
+  AlertCircle,
+  CircleSlash2,
+} from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import {
+  formInputClass,
+  formInputCompactClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "@/components/ui/field-patterns";
 import type { Cliente, Contato, ClienteEndereco, ClienteStatus, PapelContatoCliente } from "@/lib/clientes/types";
 import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
 import { fetchViaCep } from "@/lib/clientes/viacep";
@@ -64,7 +88,7 @@ function AutoFillInput({
   return (
     <input
       className={clsx(
-        "w-full rounded-lg border px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]",
+        formInputClass,
         justFilled && "border-emerald-500 ring-2 ring-emerald-400/50 ring-offset-1",
         className
       )}
@@ -267,6 +291,11 @@ export function ClienteFormSheet({
     { id: "empresa", label: "Dados da Empresa", icon: Building2 },
     { id: "contatos", label: "Contatos", icon: Users },
   ];
+  const statusOptions: SearchableOption[] = [
+    { value: "ativo", label: STATUS_LABELS.ativo, icon: CheckCircle2 },
+    { value: "inativo", label: STATUS_LABELS.inativo, icon: CircleSlash2 },
+    { value: "inadimplente", label: STATUS_LABELS.inadimplente, icon: AlertCircle },
+  ];
 
   return (
     <>
@@ -310,12 +339,13 @@ export function ClienteFormSheet({
           })}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           {activeTab === "empresa" && (
             <div className="space-y-6">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">CNPJ *</label>
+                <label className={formLabelClass}>CNPJ *</label>
                 <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <AutoFillInput
                     justFilled={flashCnpj}
                     value={cnpjRaw}
@@ -323,7 +353,7 @@ export function ClienteFormSheet({
                     placeholder="00.000.000/0001-00"
                     required
                     disabled={loadingCnpj}
-                    className="pr-10"
+                    className="pl-9 pr-10"
                   />
                   {loadingCnpj && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-slate-500">
@@ -340,71 +370,83 @@ export function ClienteFormSheet({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Nome (Fantasia ou Razão Social) *</label>
-                <AutoFillInput
-                  justFilled={flashCnpj}
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Nome fantasia ou razão social"
-                  required
-                />
+                <label className={formLabelClass}>Nome (Fantasia ou Razão Social) *</label>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <AutoFillInput
+                    justFilled={flashCnpj}
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Nome fantasia ou razão social"
+                    required
+                    className="pl-9"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-                <select
+                <label className={formLabelClass}>Status</label>
+                <SearchableSelect
+                  options={statusOptions}
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as ClienteStatus)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20"
-                >
-                  <option value="ativo">{STATUS_LABELS.ativo}</option>
-                  <option value="inativo">{STATUS_LABELS.inativo}</option>
-                  <option value="inadimplente">{STATUS_LABELS.inadimplente}</option>
-                </select>
+                  onChange={(v) => setStatus(v as ClienteStatus)}
+                  searchable={false}
+                  leadingIcon={CheckCircle2}
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">E-mail *</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="email@empresa.com"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-                    required
-                  />
+                  <label className={formLabelClass}>E-mail *</label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="email@empresa.com"
+                      className={`${formInputClass} pl-9`}
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Telefone *</label>
-                  <input
-                    type="text"
-                    value={telefone}
-                    onChange={(e) => setTelefone(formatPhone(e.target.value))}
-                    placeholder="(00) 00000-0000"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-                    required
-                  />
+                  <label className={formLabelClass}>Telefone *</label>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={telefone}
+                      onChange={(e) => setTelefone(formatPhone(e.target.value))}
+                      placeholder="(00) 00000-0000"
+                      className={`${formInputClass} pl-9`}
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">URL Site Oficial</label>
-                <input
-                  type="url"
-                  value={urlSiteOficial}
-                  onChange={(e) => setUrlSiteOficial(e.target.value)}
-                  placeholder="https://www.empresa.com.br"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-                />
+                <label className={formLabelClass}>URL Site Oficial</label>
+                <div className="relative">
+                  <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="url"
+                    value={urlSiteOficial}
+                    onChange={(e) => setUrlSiteOficial(e.target.value)}
+                    placeholder="https://www.empresa.com.br"
+                    className={`${formInputClass} pl-9`}
+                  />
+                </div>
               </div>
 
-              <div className="border-t border-slate-200 pt-4">
+              <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
                 <h4 className="mb-3 text-sm font-semibold text-slate-800">Endereço</h4>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="sm:col-span-2">
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">CEP *</label>
+                    <label className={formLabelClass}>CEP *</label>
                     <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <AutoFillInput
                         justFilled={flashCep}
                         value={endereco.cep}
@@ -412,7 +454,7 @@ export function ClienteFormSheet({
                         placeholder="00000-000"
                         required
                         disabled={loadingCep}
-                        className="pr-10"
+                        className="pl-9 pr-10"
                       />
                       {loadingCep && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-slate-500">
@@ -423,59 +465,81 @@ export function ClienteFormSheet({
                     </div>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">Rua *</label>
-                    <AutoFillInput
-                      justFilled={flashCep || flashCnpj}
-                      value={endereco.logradouro}
-                      onChange={(e) => setEndereco((p) => ({ ...p, logradouro: e.target.value }))}
-                      required
-                    />
+                    <label className={formLabelClass}>Rua *</label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <AutoFillInput
+                        justFilled={flashCep || flashCnpj}
+                        value={endereco.logradouro}
+                        onChange={(e) => setEndereco((p) => ({ ...p, logradouro: e.target.value }))}
+                        required
+                        className="pl-9"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">N° *</label>
-                    <input
-                      value={endereco.numero}
-                      onChange={(e) => setEndereco((p) => ({ ...p, numero: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-                      required
-                    />
+                    <label className={formLabelClass}>N° *</label>
+                    <div className="relative">
+                      <Hash className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={endereco.numero}
+                        onChange={(e) => setEndereco((p) => ({ ...p, numero: e.target.value }))}
+                        className={`${formInputCompactClass} pl-8`}
+                        required
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">Complemento</label>
-                    <input
-                      value={endereco.complemento ?? ""}
-                      onChange={(e) => setEndereco((p) => ({ ...p, complemento: e.target.value || undefined }))}
-                      placeholder="Sala, andar (opcional)"
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-                    />
+                    <label className={formLabelClass}>Complemento</label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={endereco.complemento ?? ""}
+                        onChange={(e) => setEndereco((p) => ({ ...p, complemento: e.target.value || undefined }))}
+                        placeholder="Sala, andar (opcional)"
+                        className={`${formInputCompactClass} pl-8`}
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">Bairro *</label>
-                    <AutoFillInput
-                      justFilled={flashCep || flashCnpj}
-                      value={endereco.bairro}
-                      onChange={(e) => setEndereco((p) => ({ ...p, bairro: e.target.value }))}
-                      required
-                    />
+                    <label className={formLabelClass}>Bairro *</label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <AutoFillInput
+                        justFilled={flashCep || flashCnpj}
+                        value={endereco.bairro}
+                        onChange={(e) => setEndereco((p) => ({ ...p, bairro: e.target.value }))}
+                        required
+                        className="pl-9"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">Cidade *</label>
-                    <AutoFillInput
-                      justFilled={flashCep || flashCnpj}
-                      value={endereco.cidade}
-                      onChange={(e) => setEndereco((p) => ({ ...p, cidade: e.target.value }))}
-                      required
-                    />
+                    <label className={formLabelClass}>Cidade *</label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <AutoFillInput
+                        justFilled={flashCep || flashCnpj}
+                        value={endereco.cidade}
+                        onChange={(e) => setEndereco((p) => ({ ...p, cidade: e.target.value }))}
+                        required
+                        className="pl-9"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="mb-0.5 block text-xs font-medium text-slate-600">UF *</label>
-                    <AutoFillInput
-                      justFilled={flashCep || flashCnpj}
-                      value={endereco.uf}
-                      onChange={(e) => setEndereco((p) => ({ ...p, uf: e.target.value.toUpperCase().slice(0, 2) }))}
-                      placeholder="SP"
-                      required
-                    />
+                    <label className={formLabelClass}>UF *</label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <AutoFillInput
+                        justFilled={flashCep || flashCnpj}
+                        value={endereco.uf}
+                        onChange={(e) => setEndereco((p) => ({ ...p, uf: e.target.value.toUpperCase().slice(0, 2) }))}
+                        placeholder="SP"
+                        required
+                        className="pl-9"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -489,7 +553,7 @@ export function ClienteFormSheet({
                 <button
                   type="button"
                   onClick={addContato}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-[#5B21B6]"
+                  className={`${formModalSubmitButtonClass} inline-flex items-center gap-2`}
                 >
                   <Plus className="h-4 w-4" /> Adicionar Contato
                 </button>
@@ -497,7 +561,7 @@ export function ClienteFormSheet({
 
               <ul className="space-y-4">
                 {contatos.map((c) => (
-                  <li key={c.id} className="rounded-xl border border-slate-200 bg-slate-50/30 p-4">
+                  <li key={c.id} className="rounded-xl border border-slate-200 bg-slate-50/30 p-4 dark:border-slate-700 dark:bg-slate-800/30">
                     <div className="mb-3 flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700">
                         {c.nome.trim() || "Novo contato"}
@@ -513,45 +577,60 @@ export function ClienteFormSheet({
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="mb-0.5 block text-xs font-medium text-slate-600">Nome completo</label>
-                        <input
-                          value={c.nome}
-                          onChange={(e) => updateContato(c.id, { nome: e.target.value })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                        />
+                        <label className={formLabelClass}>Nome completo</label>
+                        <div className="relative">
+                          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            value={c.nome}
+                            onChange={(e) => updateContato(c.id, { nome: e.target.value })}
+                            className={`${formInputClass} pl-9`}
+                          />
+                        </div>
                       </div>
                       <div>
-                        <label className="mb-0.5 block text-xs font-medium text-slate-600">E-mail</label>
-                        <input
-                          type="email"
-                          value={c.email}
-                          onChange={(e) => updateContato(c.id, { email: e.target.value })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                        />
+                        <label className={formLabelClass}>E-mail</label>
+                        <div className="relative">
+                          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="email"
+                            value={c.email}
+                            onChange={(e) => updateContato(c.id, { email: e.target.value })}
+                            className={`${formInputClass} pl-9`}
+                          />
+                        </div>
                       </div>
                       <div>
-                        <label className="mb-0.5 block text-xs font-medium text-slate-600">Telefone</label>
-                        <input
-                          value={c.telefone}
-                          onChange={(e) => updateContato(c.id, { telefone: formatPhone(e.target.value) })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                        />
+                        <label className={formLabelClass}>Telefone</label>
+                        <div className="relative">
+                          <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            value={c.telefone}
+                            onChange={(e) => updateContato(c.id, { telefone: formatPhone(e.target.value) })}
+                            className={`${formInputClass} pl-9`}
+                          />
+                        </div>
                       </div>
                       <div>
-                        <label className="mb-0.5 block text-xs font-medium text-slate-600">Setor</label>
-                        <input
-                          value={c.setor ?? ""}
-                          onChange={(e) => updateContato(c.id, { setor: e.target.value })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                        />
+                        <label className={formLabelClass}>Setor</label>
+                        <div className="relative">
+                          <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            value={c.setor ?? ""}
+                            onChange={(e) => updateContato(c.id, { setor: e.target.value })}
+                            className={`${formInputClass} pl-9`}
+                          />
+                        </div>
                       </div>
                       <div>
-                        <label className="mb-0.5 block text-xs font-medium text-slate-600">Cargo</label>
-                        <input
-                          value={c.cargo ?? ""}
-                          onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                        />
+                        <label className={formLabelClass}>Cargo</label>
+                        <div className="relative">
+                          <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            value={c.cargo ?? ""}
+                            onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
+                            className={`${formInputClass} pl-9`}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="mt-3">
@@ -583,18 +662,18 @@ export function ClienteFormSheet({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 lg:px-6 lg:py-3">
+        <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:px-6 lg:py-3">
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9]"
+              className={formModalCancelButtonClass}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2"
+              className={formModalSubmitButtonClass}
             >
               Salvar
             </button>

@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileDown, FileText, Search, Trash2 } from "lucide-react";
+import { FileDown, FileText, Search, Trash2, Wallet } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { SearchableOption } from "@/components/ui/searchable-select";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { Toast } from "@/components/ui/toast";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
+import { DateField } from "@/components/ui/date-field";
+import { comercialInputClass, comercialInputCompactClass, comercialLabelClass } from "./field-styles";
 import type {
   Lead,
   LeadInteraction,
@@ -46,6 +50,12 @@ const TIPO_MODELO_DOC_LABEL: Record<string, string> = {
   prestacao_contas: "Prestação de contas",
   relatorio: "Relatório",
 };
+
+const PAGAMENTO_NEGOCIACAO_OPTIONS: SearchableOption[] = [
+  { value: "mensal", label: "Mensal", icon: Wallet },
+  { value: "unica", label: "Única", icon: Wallet },
+  { value: "parcelado", label: "Parcelado", icon: Wallet },
+];
 
 const PREVIEW_DOC_CLASS =
   "max-w-none text-sm text-slate-800 dark:text-slate-100 [&_a]:text-[#6D28D9] [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_hr]:my-4 [&_img]:max-h-28 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6";
@@ -236,7 +246,6 @@ export function LeadDetailProposta({
   const [addingId, setAddingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [condicoesStr, setCondicoesStr] = useState("");
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [solucaoIdxParaRemover, setSolucaoIdxParaRemover] = useState<number | null>(null);
   const [modelosDocumento, setModelosDocumento] = useState<ModeloDocumentoLista[]>([]);
   const [modeloDocumentoId, setModeloDocumentoId] = useState("");
@@ -361,6 +370,16 @@ export function LeadDetailProposta({
     return disponiveis.filter((s) => s.nome.toLowerCase().includes(term)).slice(0, 8);
   }, [disponiveis, searchTerm]);
 
+  const modeloDocumentoOptions = useMemo<SearchableOption[]>(
+    () =>
+      modelosDocumento.map((m) => ({
+        value: m.id,
+        label: `${m.nome} (${TIPO_MODELO_DOC_LABEL[m.tipo] ?? m.tipo})`,
+        icon: FileText,
+      })),
+    [modelosDocumento]
+  );
+
   const addSolucao = (solId: string) => {
     const sol = catalogoSolucoes.find((s) => s.id === solId);
     if (!sol) return;
@@ -429,14 +448,6 @@ export function LeadDetailProposta({
       valorTotal: novoTotal,
       interactions: [...(lead.interactions ?? []), log],
     });
-  };
-
-  const gerarPdf = async () => {
-    setPdfLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setPdfLoading(false);
-    onUpdateLead({ propostaGeradaEm: new Date().toISOString() });
-    onGerarPdfSuccess();
   };
 
   const visualizarDocumentoModelo = async () => {
@@ -665,25 +676,23 @@ export function LeadDetailProposta({
 
       {needsPrevisaoFechamento && (
         <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-800/40">
-          <label
-            htmlFor="lead-previsao-fechamento-proposta"
-            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-          >
+          <label htmlFor="lead-previsao-fechamento-proposta" className={comercialLabelClass}>
             Previsão de fechamento *
           </label>
-          <input
-            id="lead-previsao-fechamento-proposta"
-            type="date"
-            value={lead.previsaoFechamento ?? ""}
-            onChange={(e) => {
-              const v = e.target.value.trim();
-              onUpdateLead(
-                { previsaoFechamento: v ? v : undefined },
-                { skipSuccessToast: true }
-              );
-            }}
-            className="w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-          />
+          <div className="max-w-xs">
+            <DateField
+              id="lead-previsao-fechamento-proposta"
+              value={lead.previsaoFechamento ?? ""}
+              onChange={(v) => {
+                const trimmed = v.trim();
+                onUpdateLead(
+                  { previsaoFechamento: trimmed ? trimmed : undefined },
+                  { skipSuccessToast: true }
+                );
+              }}
+              placeholder="Selecione a data"
+            />
+          </div>
           <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
             Obrigatória para avançar o funil a partir da proposta.
           </p>
@@ -702,7 +711,7 @@ export function LeadDetailProposta({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Digite o nome do produto/serviço..."
-              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/15"
+              className={`${comercialInputClass} py-2 pl-9 pr-3`}
             />
             {filteredDisponiveis.length > 0 && !addingId && (
               <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
@@ -751,7 +760,7 @@ export function LeadDetailProposta({
                 . Ajustável após incluir na oportunidade.
               </p>
               <div className="min-w-0 flex-1">
-                <label className="mb-0.5 block text-xs text-slate-600">Valor (R$) — apenas números</label>
+                <label className={comercialLabelClass}>Valor (R$) — apenas números</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -759,17 +768,17 @@ export function LeadDetailProposta({
                   value={valorMasked}
                   onChange={(e) => onChangeDigits(e.target.value)}
                   placeholder={formatCurrency(selectedCatalog.valorVenda)}
-                  className="w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-sm tabular-nums"
+                  className={`${comercialInputCompactClass} font-mono tabular-nums`}
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <label className="mb-0.5 block text-xs text-slate-600">Condições de pagamento *</label>
+                <label className={comercialLabelClass}>Condições de pagamento *</label>
                 <input
                   type="text"
                   value={condicoesStr}
                   onChange={(e) => setCondicoesStr(e.target.value)}
                   placeholder="Ex: 50% à vista, 50% em 30 dias"
-                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                  className={comercialInputCompactClass}
                 />
               </div>
               <button
@@ -795,88 +804,109 @@ export function LeadDetailProposta({
         )}
       </div>
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-slate-800">Soluções na oportunidade</h3>
+      <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-900">
+        <div className="border-b border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-600 dark:bg-slate-800/50">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Soluções na oportunidade</h3>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Cada linha é um item da proposta; ajuste pagamento e parcelas por solução.
+          </p>
+        </div>
         {solucoesNaOportunidade.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhuma solução adicionada ainda.</p>
+          <p className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">Nenhuma solução adicionada ainda.</p>
         ) : (
-          <ul className="space-y-2">
+          <div className="divide-y divide-slate-200 dark:divide-slate-600">
             {solucoesNaOportunidade.map((s, idx) => (
-              <li
-                key={s.id}
-                className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="min-w-0 flex-1 space-y-2">
-                  <span className="inline-flex min-w-0 items-center gap-2 font-medium text-slate-800">
+              <div key={s.id} className="px-4 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 flex-1 gap-3">
                     {s.logoUrl?.trim() ? (
                       <img
                         src={s.logoUrl.trim()}
                         alt=""
-                        className="h-8 w-8 shrink-0 rounded object-contain"
+                        className="mt-0.5 h-10 w-10 shrink-0 rounded-lg border border-slate-100 bg-white object-contain dark:border-slate-600"
                       />
-                    ) : null}
-                    <span className="truncate">{s.nome}</span>
-                  </span>
-                  {s.valor != null && (
-                    <p className="text-sm text-slate-600">{formatCurrency(s.valor)}</p>
-                  )}
-                  {s.condicoesPagamento && (
-                    <p className="text-xs text-slate-500">{s.condicoesPagamento}</p>
-                  )}
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div>
-                      <label className="mb-0.5 block text-[11px] font-medium text-slate-600">Pagamento (negociação)</label>
-                      <select
-                        value={s.recorrenciaPagamento ?? "unica"}
-                        onChange={(e) => {
-                          const r = e.target.value as LeadRecorrenciaPagamento;
-                          patchSolucao(idx, {
-                            recorrenciaPagamento: r,
-                            parcelas: r === "parcelado" ? Math.max(2, s.parcelas ?? 12) : null,
-                          });
-                        }}
-                        className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-                      >
-                        <option value="mensal">Mensal</option>
-                        <option value="unica">Única</option>
-                        <option value="parcelado">Parcelado</option>
-                      </select>
-                    </div>
-                    {(s.recorrenciaPagamento ?? "unica") === "parcelado" && (
-                      <div>
-                        <label className="mb-0.5 block text-[11px] font-medium text-slate-600">Parcelas</label>
-                        <input
-                          type="number"
-                          min={2}
-                          max={60}
-                          value={Math.max(2, s.parcelas ?? 12)}
-                          onChange={(e) =>
-                            patchSolucao(idx, {
-                              parcelas: Math.min(60, Math.max(2, parseInt(e.target.value, 10) || 2)),
-                            })
-                          }
-                          className="w-20 rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-                        />
+                    ) : (
+                      <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-400 dark:border-slate-600 dark:bg-slate-800">
+                        —
                       </div>
                     )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium leading-snug text-slate-900 dark:text-slate-100">{s.nome}</p>
+                      {s.valor != null && (
+                        <p className="mt-1 text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                          {formatCurrency(s.valor)}
+                        </p>
+                      )}
+                      {s.condicoesPagamento ? (
+                        <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                          <span className="font-medium text-slate-500 dark:text-slate-500">Condições: </span>
+                          {s.condicoesPagamento}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setSolucaoIdxParaRemover(idx)}
+                    className="shrink-0 self-start rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                    aria-label="Remover solução"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSolucaoIdxParaRemover(idx)}
-                  className="shrink-0 self-end rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 sm:self-start"
-                  aria-label="Remover"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
+                <div className="mt-4 flex flex-col gap-3 sm:mt-3 sm:flex-row sm:items-end">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Pagamento (negociação)
+                    </span>
+                    <SearchableSelect
+                      fullWidth={false}
+                      options={PAGAMENTO_NEGOCIACAO_OPTIONS}
+                      value={s.recorrenciaPagamento ?? "unica"}
+                      onChange={(v) => {
+                        const r = v as LeadRecorrenciaPagamento;
+                        patchSolucao(idx, {
+                          recorrenciaPagamento: r,
+                          parcelas: r === "parcelado" ? Math.max(2, s.parcelas ?? 12) : null,
+                        });
+                      }}
+                      placeholder="Selecione…"
+                      searchPlaceholder="Buscar…"
+                      searchable={false}
+                      leadingIcon={Wallet}
+                    />
+                  </div>
+                  {(s.recorrenciaPagamento ?? "unica") === "parcelado" && (
+                    <div className="w-full shrink-0 sm:w-[7.5rem]">
+                      <label className={comercialLabelClass}>Parcelas</label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={60}
+                        value={Math.max(2, s.parcelas ?? 12)}
+                        onChange={(e) =>
+                          patchSolucao(idx, {
+                            parcelas: Math.min(60, Math.max(2, parseInt(e.target.value, 10) || 2)),
+                          })
+                        }
+                        className={`${comercialInputCompactClass} w-full`}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
         {valorTotal > 0 && (
-          <p className="mt-2 text-sm font-semibold text-slate-800">
-            Valor total: {formatCurrency(valorTotal)}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-600 dark:bg-slate-800/50">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Total da oportunidade
+            </span>
+            <span className="text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+              {formatCurrency(valorTotal)}
+            </span>
+          </div>
         )}
       </div>
 
@@ -889,50 +919,49 @@ export function LeadDetailProposta({
             Usa os dados desta oportunidade e do cliente vinculado (quando houver) para preencher as variáveis do
             modelo criado em Configurações → Construtor de Documentos.
           </p>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[200px] flex-1">
-              <label className="mb-0.5 block text-[11px] font-medium text-slate-600 dark:text-slate-400">
+          <div className="space-y-3">
+            <div className="w-full">
+              <label className={comercialLabelClass}>
                 Modelo ativo
               </label>
-              <select
+              <SearchableSelect
+                options={modeloDocumentoOptions}
                 value={modeloDocumentoId}
-                onChange={(e) => setModeloDocumentoId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              >
-                <option value="">Selecione…</option>
-                {modelosDocumento.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome} ({TIPO_MODELO_DOC_LABEL[m.tipo] ?? m.tipo})
-                  </option>
-                ))}
-              </select>
+                onChange={setModeloDocumentoId}
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar modelo…"
+                emptyLabel="Nenhum modelo encontrado."
+                leadingIcon={FileText}
+              />
             </div>
-            <button
-              type="button"
-              onClick={() => void visualizarDocumentoModelo()}
-              disabled={docPreviewLoading || !modeloDocumentoId}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#6D28D9] bg-white px-4 py-2 text-sm font-medium text-[#6D28D9] hover:bg-violet-50 disabled:opacity-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
-            >
-              {docPreviewLoading ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                <FileText className="h-4 w-4" />
-              )}
-              Visualizar com dados do lead
-            </button>
-            <button
-              type="button"
-              onClick={() => void gerarDocumentoModelo()}
-              disabled={docGerarLoading || !modeloDocumentoId}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-medium text-white hover:bg-[#5B21B6] disabled:opacity-50"
-            >
-              {docGerarLoading ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <FileDown className="h-4 w-4" />
-              )}
-              Gerar e registrar no histórico
-            </button>
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                onClick={() => void visualizarDocumentoModelo()}
+                disabled={docPreviewLoading || !modeloDocumentoId}
+                className="inline-flex min-h-[2.625rem] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-[#6D28D9] bg-white px-3 py-2.5 text-center text-sm font-medium leading-snug text-[#6D28D9] hover:bg-violet-50 disabled:opacity-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
+              >
+                {docPreviewLoading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <FileText className="h-4 w-4 shrink-0" />
+                )}
+                <span className="min-w-0">Visualizar com dados do lead</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void gerarDocumentoModelo()}
+                disabled={docGerarLoading || !modeloDocumentoId}
+                className="inline-flex min-h-[2.625rem] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2.5 text-center text-sm font-medium leading-snug text-white hover:bg-[#5B21B6] disabled:opacity-50"
+              >
+                {docGerarLoading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <FileDown className="h-4 w-4 shrink-0" />
+                )}
+                <span className="min-w-0">Gerar e registrar no histórico</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -940,9 +969,8 @@ export function LeadDetailProposta({
       <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Documentos já gerados</h3>
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-          Lista persistida no banco. Cada documento é disponibilizado em PDF: abrir no navegador (visualização) ou baixar o
-          arquivo. O envio por e-mail também leva o PDF em anexo. Use os contatos do cliente e da oportunidade abaixo
-          para escolher o destinatário.
+          Use os contatos do cliente e da oportunidade abaixo para escolher o destinatário, envie por WhatsApp com mensagem
+          padrão prévia ou por e-mail.
         </p>
         {docDestinatarios.length === 0 && docsGerados.length > 0 ? (
           <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
@@ -1055,27 +1083,6 @@ export function LeadDetailProposta({
             ))}
           </ul>
         )}
-      </div>
-
-      <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4 dark:border-slate-600">
-        <button
-          type="button"
-          onClick={gerarPdf}
-          disabled={pdfLoading || solucoesNaOportunidade.length === 0}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-medium text-white hover:bg-[#5B21B6] disabled:opacity-50"
-        >
-          {pdfLoading ? (
-            <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Gerando PDF...
-            </>
-          ) : (
-            <>
-              <FileDown className="h-4 w-4" />
-              Gerar Proposta PDF
-            </>
-          )}
-        </button>
       </div>
     </div>
     <DrawerSheet

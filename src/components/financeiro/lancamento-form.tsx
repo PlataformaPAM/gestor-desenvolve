@@ -4,6 +4,25 @@ import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { motion } from "framer-motion";
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  Circle,
+  ClipboardList,
+  Clock,
+  CreditCard,
+  FileText,
+  Landmark,
+  ListOrdered,
+  RefreshCw,
+  Tags,
+  Text,
+  TrendingDown,
+  TrendingUp,
+  UserRound,
+  Wallet,
+} from "lucide-react";
 import type {
   FinanceiroCategoria,
   FinanceiroConta,
@@ -15,7 +34,20 @@ import type {
 } from "@/lib/financeiro/types";
 import type { Cliente } from "@/lib/clientes/types";
 import { buildLancamentosFromForm } from "@/components/financeiro/novo-lancamento-form";
-import { SearchableSelect, type SearchableSelectOption } from "@/components/financeiro/searchable-select";
+import {
+  SearchableSelect,
+  type SearchableOption,
+} from "@/components/ui/searchable-select";
+import { DateField } from "@/components/ui/date-field";
+import {
+  formInputClass,
+  formInputCompactClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
+import { iconForMeioPagamentoNome } from "@/lib/financeiro/meio-pagamento-icon";
 import { textoPrazoVencimento } from "@/lib/financeiro/vencimento-utils";
 
 function resolveMeioId(initial: Lancamento, meios: FinanceiroMeioPagamento[]): string {
@@ -26,10 +58,8 @@ function resolveMeioId(initial: Lancamento, meios: FinanceiroMeioPagamento[]): s
 
 export type LancamentoFormMode = "create" | "edit";
 
-const inputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500";
-
 const LEGACY_FORN_PREFIX = "legacy|||";
+const formInputWithIconClass = `${formInputClass} pl-9`;
 
 function generateId(prefix: string, i: number): string {
   return `nl-${Date.now()}-${prefix}-${i}`;
@@ -151,33 +181,40 @@ export function LancamentoForm({
     [clientes]
   );
 
-  const clienteOptions: SearchableSelectOption[] = useMemo(
-    () =>
-      clientesOrdenados.map((c) => ({
+  const clienteSelectOptions: SearchableOption[] = useMemo(
+    () => [
+      { value: "", label: "Sem cliente (avulso)", icon: Building2 },
+      ...clientesOrdenados.map((c) => ({
         value: c.id,
-        label: `${c.empresa || c.nome}${c.cpfCnpj ? ` · ${c.cpfCnpj}` : ""}`,
-        searchText: `${c.nome} ${c.empresa ?? ""} ${c.cpfCnpj ?? ""}`,
+        label: (c.empresa || c.nome).trim(),
+        subtitle: c.cpfCnpj,
+        icon: Building2,
       })),
+    ],
     [clientesOrdenados]
   );
 
-  const fornecedorOptions: SearchableSelectOption[] = useMemo(() => {
-    const base: SearchableSelectOption[] = fornecedoresRh.map((f) => ({
-      value: f.id,
-      label: `${f.nome}${f.cpfCnpj ? ` · ${f.cpfCnpj}` : ""}`,
-      searchText: `${f.nome} ${f.cpfCnpj ?? ""}`,
-    }));
+  const fornecedorSelectOptions: SearchableOption[] = useMemo(() => {
+    const rows: SearchableOption[] = [
+      { value: "", label: "Selecione um fornecedor", icon: UserRound },
+      ...fornecedoresRh.map((f) => ({
+        value: f.id,
+        label: f.nome.trim(),
+        subtitle: f.cpfCnpj,
+        icon: UserRound,
+      })),
+    ];
     if (fornecedorKey.startsWith(LEGACY_FORN_PREFIX)) {
       const nm = decodeLegacyFornecedor(fornecedorKey);
-      if (nm && !base.some((o) => o.value === fornecedorKey)) {
-        base.unshift({
+      if (nm && !rows.some((o) => o.value === fornecedorKey)) {
+        rows.splice(1, 0, {
           value: fornecedorKey,
           label: `${nm} (fora do cadastro RH)`,
-          searchText: nm,
+          icon: UserRound,
         });
       }
     }
-    return base;
+    return rows;
   }, [fornecedoresRh, fornecedorKey]);
 
   const prazoVenc = useMemo(() => textoPrazoVencimento(vencimento), [vencimento]);
@@ -194,6 +231,77 @@ export function LancamentoForm({
   const meiosAtivos = useMemo(
     () => meiosPagamento.filter((m) => m.ativo).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)),
     [meiosPagamento]
+  );
+
+  const tipoLancamentoOptions: SearchableOption[] = useMemo(
+    () => [
+      { value: "entrada", label: "Entrada (a receber)", icon: TrendingUp },
+      { value: "saida", label: "Saída (a pagar)", icon: TrendingDown },
+    ],
+    []
+  );
+
+  const tipoRecorrenciaOptions: SearchableOption[] = useMemo(
+    () => [
+      { value: "unico", label: "Único", icon: Circle },
+      { value: "fixo_mensal", label: "Fixo mensal", icon: RefreshCw },
+      { value: "parcelado", label: "Parcelado", icon: ListOrdered },
+    ],
+    []
+  );
+
+  const solucaoPropostaOptions = useMemo((): SearchableOption[] => {
+    if (!solucoesAprovacao?.length) return [];
+    return solucoesAprovacao.map((s) => ({
+      value: s.leadSolucaoId,
+      label: s.nome,
+      icon: FileText,
+    }));
+  }, [solucoesAprovacao]);
+
+  const contaSelectOptions = useMemo(
+    (): SearchableOption[] => [
+      { value: "", label: "— Selecione —", icon: Landmark },
+      ...contasAtivas.map((c) => ({
+        value: c.id,
+        label: `${c.nome}${c.padrao ? " (padrão)" : ""}`,
+        icon: Landmark,
+      })),
+    ],
+    [contasAtivas]
+  );
+
+  const categoriaSelectOptions = useMemo(
+    (): SearchableOption[] => [
+      { value: "", label: "— Selecione —", icon: Tags },
+      ...categoriasFiltradas.map((c) => ({
+        value: c.id,
+        label: `${c.nome} (${c.tipo})`,
+        icon: Tags,
+      })),
+    ],
+    [categoriasFiltradas]
+  );
+
+  const statusSelectOptions = useMemo(
+    (): SearchableOption[] => [
+      { value: "pendente", label: "Pendente", icon: Clock },
+      { value: "pago", label: "Pago", icon: CheckCircle2 },
+      { value: "atrasado", label: "Atrasado", icon: AlertCircle },
+    ],
+    []
+  );
+
+  const meioSelectOptions = useMemo(
+    (): SearchableOption[] => [
+      { value: "", label: "— Selecione —", icon: Wallet },
+      ...meiosAtivos.map((m) => ({
+        value: m.id,
+        label: m.nome,
+        icon: iconForMeioPagamentoNome(m.nome),
+      })),
+    ],
+    [meiosAtivos]
   );
 
   const handleTipoChange = (next: Lancamento["tipo"]) => {
@@ -269,7 +377,7 @@ export function LancamentoForm({
 
   return (
     <form
-      className="space-y-5"
+      className="flex h-full min-h-0 flex-col"
       onSubmit={(e) => {
         e.preventDefault();
         onSave(buildPayload());
@@ -278,11 +386,14 @@ export function LancamentoForm({
       <div
         role="tablist"
         aria-label="Seções do lançamento"
-        className="flex flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
+        className="flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50"
       >
-        {(["principal", "pagamento"] as const).map((tid) => {
-          const label =
-            tid === "principal" ? "1. Dados do lançamento" : "2. Pagamento e status";
+        {(
+          [
+            { id: "principal" as const, label: "Dados do lançamento", Icon: ClipboardList },
+            { id: "pagamento" as const, label: "Pagamento e status", Icon: CreditCard },
+          ] as const
+        ).map(({ id: tid, label, Icon }) => {
           const active = formTab === tid;
           return (
             <button
@@ -294,10 +405,8 @@ export function LancamentoForm({
               aria-controls={`${formTabId}-${tid}-panel`}
               onClick={() => setFormTab(tid)}
               className={clsx(
-                "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors sm:px-4",
-                active
-                  ? "text-[#6D28D9] dark:text-violet-400"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors",
+                active ? "text-[#6D28D9]" : "text-slate-500 hover:text-slate-700"
               )}
             >
               {active && (
@@ -307,18 +416,20 @@ export function LancamentoForm({
                   transition={{ type: "spring", bounce: 0.2, duration: 0.3 }}
                 />
               )}
+              <Icon className="h-4 w-4 shrink-0" />
               <span className="truncate">{label}</span>
             </button>
           );
         })}
       </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {formTab === "principal" && (
         <div
           id={`${formTabId}-principal-panel`}
           role="tabpanel"
           aria-labelledby={`${formTabId}-tab-principal`}
-          className="space-y-5"
+          className="space-y-5 p-4 lg:p-6"
         >
           {isCreate &&
             initial.leadIdOrigem &&
@@ -332,112 +443,111 @@ export function LancamentoForm({
                 >
                   Solução da proposta (este lançamento)
                 </label>
-                <select
-                  id="lanc-linha-proposta"
+                <SearchableSelect
+                  options={solucaoPropostaOptions}
                   value={linhaAprovacaoSelecionada ?? solucoesAprovacao[0]?.leadSolucaoId ?? ""}
-                  onChange={(e) => onLinhaAprovacaoChange(e.target.value)}
-                  className={inputClass}
-                >
-                  {solucoesAprovacao.map((s) => (
-                    <option key={s.leadSolucaoId} value={s.leadSolucaoId}>
-                      {s.nome}
-                    </option>
-                  ))}
-                </select>
+                  onChange={onLinhaAprovacaoChange}
+                  placeholder="Selecione a solução…"
+                  searchPlaceholder="Buscar solução…"
+                  searchable={solucaoPropostaOptions.length > 6}
+                  leadingIcon={FileText}
+                />
               </div>
             )}
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Tipo</p>
-            <div className="mt-3">
-              <label htmlFor="lanc-tipo" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Entrada ou saída *
-              </label>
-              <select
-                id="lanc-tipo"
-                value={tipo}
-                onChange={(e) => handleTipoChange(e.target.value as Lancamento["tipo"])}
-                className={inputClass}
-              >
-                <option value="entrada">Entrada (a receber)</option>
-                <option value="saida">Saída (a pagar)</option>
-              </select>
-            </div>
+          <div>
+            <label htmlFor="lanc-tipo" className={formLabelClass}>
+              Entrada ou saída *
+            </label>
+            <SearchableSelect
+              options={tipoLancamentoOptions}
+              value={tipo}
+              onChange={(v) => handleTipoChange(v as Lancamento["tipo"])}
+              placeholder="Selecione…"
+              searchPlaceholder="Buscar…"
+              searchable={false}
+              leadingIcon={TrendingUp}
+            />
           </div>
 
           {tipo === "entrada" ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente (recebimento)</label>
-              <p className="mb-2 text-xs text-slate-500">Busque por nome, empresa ou CPF/CNPJ.</p>
+            <div>
+              <label className={formLabelClass}>Cliente (recebimento)</label>
               <SearchableSelect
-                id="lanc-cliente"
-                options={clienteOptions}
+                options={clienteSelectOptions}
                 value={clienteId}
                 onChange={setClienteId}
-                placeholder="Digite para filtrar clientes…"
-                emptyOptionLabel="— Sem cliente (avulso) —"
+                placeholder="Selecionar cliente…"
+                searchPlaceholder="Buscar por CNPJ ou nome…"
+                emptyLabel="Nenhum cliente encontrado na base."
+                leadingIcon={Building2}
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fornecedor (RH)</label>
-              <p className="mb-2 text-xs text-slate-500">
-                Cadastro da aba <strong>RH → Fornecedores</strong>. Busque por nome ou CPF/CNPJ.
+            <div>
+              <label className={formLabelClass}>Fornecedor (RH)</label>
+              <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                Cadastro da aba <strong>RH → Fornecedores</strong>.
               </p>
               <SearchableSelect
-                id="lanc-fornecedor"
-                options={fornecedorOptions}
+                options={fornecedorSelectOptions}
                 value={fornecedorKey}
                 onChange={setFornecedorKey}
-                placeholder="Digite para filtrar fornecedores…"
-                emptyOptionLabel="— Selecione um fornecedor —"
+                placeholder="Selecionar fornecedor…"
+                searchPlaceholder="Buscar por CNPJ ou nome…"
+                emptyLabel="Nenhum fornecedor encontrado."
+                leadingIcon={UserRound}
               />
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <label htmlFor="lanc-desc" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <div>
+            <label htmlFor="lanc-desc" className={formLabelClass}>
               Descrição *
             </label>
-            <input
-              id="lanc-desc"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              className={inputClass}
-              required
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="lanc-desc"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                className={formInputWithIconClass}
+                required
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <label htmlFor="lanc-valor" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <div>
+              <label htmlFor="lanc-valor" className={formLabelClass}>
                 Valor (R$) *
               </label>
-              <input
-                id="lanc-valor"
-                type="text"
-                inputMode="numeric"
-                value={formatCurrencyFromCents(Number.parseInt(valorDigits || "0", 10) || 0)}
-                onChange={(e) => setValorDigits(digitsOnly(e.target.value))}
-                className={inputClass}
-                required
-              />
+              <div className="relative">
+                <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="lanc-valor"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyFromCents(Number.parseInt(valorDigits || "0", 10) || 0)}
+                  onChange={(e) => setValorDigits(digitsOnly(e.target.value))}
+                  className={formInputWithIconClass}
+                  required
+                />
+              </div>
               {isCreate && tipoRecorrencia === "parcelado" && (
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   Informe o valor total do acordo: o sistema divide igualmente entre as parcelas (cada linha na grade mostra o valor da parcela e o indicador Parcela k/N).
                 </p>
               )}
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <label htmlFor="lanc-venc" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <div>
+              <label htmlFor="lanc-venc" className={formLabelClass}>
                 Vencimento *
               </label>
-              <input
+              <DateField
                 id="lanc-venc"
-                type="date"
                 value={vencimento}
-                onChange={(e) => setVencimento(e.target.value)}
-                className={inputClass}
-                required
+                onChange={setVencimento}
+                placeholder="Selecione a data"
               />
               <div
                 className={clsx(
@@ -460,28 +570,25 @@ export function LancamentoForm({
 
           {isCreate && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Recorrência
               </p>
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="lanc-tipo-rec" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Tipo
-                  </label>
-                  <select
-                    id="lanc-tipo-rec"
+              <div className="mt-4 flex flex-col gap-3 sm:mt-3 sm:flex-row sm:items-end">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</span>
+                  <SearchableSelect
+                    fullWidth={false}
+                    options={tipoRecorrenciaOptions}
                     value={tipoRecorrencia}
-                    onChange={(e) => setTipoRecorrencia(e.target.value as TipoRecorrencia)}
-                    className={inputClass}
-                  >
-                    <option value="unico">Único</option>
-                    <option value="fixo_mensal">Fixo mensal</option>
-                    <option value="parcelado">Parcelado</option>
-                  </select>
+                    onChange={(v) => setTipoRecorrencia(v as TipoRecorrencia)}
+                    placeholder="Selecione…"
+                    searchable={false}
+                    leadingIcon={Wallet}
+                  />
                 </div>
                 {tipoRecorrencia === "parcelado" && (
-                  <div>
-                    <label htmlFor="lanc-parcelas" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <div className="w-full shrink-0 sm:w-[7.5rem]">
+                    <label htmlFor="lanc-parcelas" className={formLabelClass}>
                       Parcelas
                     </label>
                     <input
@@ -491,7 +598,7 @@ export function LancamentoForm({
                       max={60}
                       value={parcelas}
                       onChange={(e) => setParcelas(Math.max(2, parseInt(e.target.value, 10) || 2))}
-                      className={inputClass}
+                      className={`${formInputCompactClass} mt-1 w-full`}
                     />
                   </div>
                 )}
@@ -530,141 +637,118 @@ export function LancamentoForm({
           id={`${formTabId}-pagamento-panel`}
           role="tabpanel"
           aria-labelledby={`${formTabId}-tab-pagamento`}
-          className="space-y-5"
+          className="space-y-5 p-4 lg:p-6"
         >
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Conta e categoria</p>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="lanc-conta" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="lanc-conta" className={formLabelClass}>
                   Conta
                 </label>
-                <select
-                  id="lanc-conta"
+                <SearchableSelect
+                  options={contaSelectOptions}
                   value={contaId}
-                  onChange={(e) => setContaId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">— Selecione —</option>
-                  {contasAtivas.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome}
-                      {c.padrao ? " (padrão)" : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setContaId}
+                  placeholder="— Selecione —"
+                  searchPlaceholder="Buscar conta…"
+                  leadingIcon={Landmark}
+                />
               </div>
               <div>
-                <label htmlFor="lanc-cat" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="lanc-cat" className={formLabelClass}>
                   Categoria
                 </label>
-                <select
-                  id="lanc-cat"
+                <SearchableSelect
+                  options={categoriaSelectOptions}
                   value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">— Selecione —</option>
-                  {categoriasFiltradas.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome} ({c.tipo})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCategoriaId}
+                  placeholder="— Selecione —"
+                  searchPlaceholder="Buscar categoria…"
+                  leadingIcon={Tags}
+                />
               </div>
-            </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</p>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="lanc-status" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="lanc-status" className={formLabelClass}>
                   Situação *
                 </label>
-                <select
-                  id="lanc-status"
+                <SearchableSelect
+                  options={statusSelectOptions}
                   value={status}
-                  onChange={(e) => handleStatusChange(e.target.value as Lancamento["status"])}
-                  className={inputClass}
-                >
-                  <option value="pendente">Pendente</option>
-                  <option value="pago">Pago</option>
-                  <option value="atrasado">Atrasado</option>
-                </select>
+                  onChange={(v) => handleStatusChange(v as Lancamento["status"])}
+                  placeholder="Situação"
+                  searchPlaceholder="Buscar…"
+                  searchable={false}
+                  leadingIcon={Clock}
+                />
               </div>
               <div>
-                <label htmlFor="lanc-data-pg" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="lanc-data-pg" className={formLabelClass}>
                   Data do pagamento / recebimento
                 </label>
-                <input
+                <DateField
                   id="lanc-data-pg"
-                  type="date"
                   value={dataPagamento}
-                  onChange={(e) => setDataPagamento(e.target.value)}
-                  className={inputClass}
+                  onChange={setDataPagamento}
+                  placeholder="Selecione a data"
                   disabled={status !== "pago"}
                 />
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Disponível quando o status for &quot;Pago&quot;.
                 </p>
               </div>
-            </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Condições</p>
-            <div className="mt-3 space-y-4">
+          <div className="space-y-4">
               <div>
-                <label htmlFor="lanc-meio" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="lanc-meio" className={formLabelClass}>
                   Meio de pagamento
                 </label>
-                <select
-                  id="lanc-meio"
+                <SearchableSelect
+                  options={meioSelectOptions}
                   value={meioPagamentoId}
-                  onChange={(e) => setMeioPagamentoId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">— Selecione —</option>
-                  {meiosAtivos.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.nome}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setMeioPagamentoId}
+                  placeholder="— Selecione —"
+                  searchable={false}
+                  leadingIcon={Wallet}
+                />
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Cadastre novos meios em Configurações do Financeiro (ícone de engrenagem no topo).
                 </p>
               </div>
               <div>
-                <label htmlFor="lanc-cond" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="lanc-cond" className={formLabelClass}>
                   Condições de pagamento
                 </label>
-                <textarea
-                  id="lanc-cond"
-                  value={condicoesPagamento}
-                  onChange={(e) => setCondicoesPagamento(e.target.value)}
-                  rows={4}
-                  placeholder="Parcelamento, desconto, observações…"
-                  className={`${inputClass} min-h-[100px] resize-y`}
-                />
+                <div className="relative">
+                  <Text className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <textarea
+                    id="lanc-cond"
+                    value={condicoesPagamento}
+                    onChange={(e) => setCondicoesPagamento(e.target.value)}
+                    rows={4}
+                    placeholder="Parcelamento, desconto, observações…"
+                    className={`${formTextareaClass} min-h-[100px] resize-y pl-9`}
+                  />
+                </div>
               </div>
-            </div>
           </div>
         </div>
       )}
+      </div>
 
-      <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
+      <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 px-4 py-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          className={formModalCancelButtonClass}
         >
           Cancelar
         </button>
         <button
           type="submit"
-          className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+          className={formModalSubmitButtonClass}
         >
           {isCreate ? "Criar lançamento(s)" : "Salvar alterações"}
         </button>

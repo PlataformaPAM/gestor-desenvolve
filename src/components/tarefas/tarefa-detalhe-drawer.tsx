@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { FileText, History, Paperclip, Eye, X } from "lucide-react";
+import type { ElementType } from "react";
+import { useId, useRef, useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { FileText, MessageSquare, Paperclip, Eye, X } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import { STATUS_LABELS, PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
@@ -87,6 +89,7 @@ export function TarefaDetalheDrawer({
   onAdicionarHistorico,
   onSalvar,
 }: TarefaDetalheDrawerProps) {
+  const tabBaseId = useId();
   const [activeTab, setActiveTab] = useState<TabId>("detalhes");
   const [comentario, setComentario] = useState("");
   const [arquivosComentario, setArquivosComentario] = useState<File[]>([]);
@@ -204,43 +207,57 @@ export function TarefaDetalheDrawer({
     "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
   const labelClass = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300";
 
+  const TABS: { id: TabId; label: string; Icon: ElementType }[] = [
+    { id: "detalhes", label: "Detalhes", Icon: FileText },
+    { id: "historico", label: "Histórico & Comentários", Icon: MessageSquare },
+  ];
+
   return (
-    <div className="flex h-full flex-col min-h-0">
-      {/* Tabs */}
-      <div className="shrink-0 border-b border-slate-200 dark:border-slate-700">
-        <nav className="flex gap-1 p-2" aria-label="Abas do detalhe da tarefa">
-          <button
-            type="button"
-            onClick={() => setActiveTab("detalhes")}
-            className={clsx(
-              "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-              activeTab === "detalhes"
-                ? "bg-[#6D28D9]/10 text-[#6D28D9] dark:bg-violet-950/50 dark:text-violet-300"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            )}
-          >
-            <FileText className="h-4 w-4" />
-            Detalhes
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("historico")}
-            className={clsx(
-              "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-              activeTab === "historico"
-                ? "bg-[#6D28D9]/10 text-[#6D28D9] dark:bg-violet-950/50 dark:text-violet-300"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            )}
-          >
-            <History className="h-4 w-4" />
-            Histórico & Comentários
-          </button>
-        </nav>
+    <div className="flex h-full min-h-0 flex-col">
+      <div
+        role="tablist"
+        aria-label="Abas do detalhe da tarefa"
+        className="flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50"
+      >
+        {TABS.map((tab) => {
+          const Icon = tab.Icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`${tabBaseId}-${tab.id}`}
+              aria-selected={isActive}
+              aria-controls={`${tabBaseId}-${tab.id}-panel`}
+              onClick={() => setActiveTab(tab.id)}
+              className={clsx(
+                "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors",
+                isActive ? "text-[#6D28D9]" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="tarefa-detalhe-tab-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.3 }}
+                />
+              )}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === "detalhes" && (
-        <div className="flex flex-1 flex-col min-h-0 overflow-y-auto">
-          <div className="flex-1 p-4 lg:p-6 space-y-4">
+        <div
+          id={`${tabBaseId}-detalhes-panel`}
+          role="tabpanel"
+          aria-labelledby={`${tabBaseId}-detalhes`}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex-1 space-y-4 p-4 lg:p-6">
             <div>
               <label htmlFor="t-titulo" className={labelClass}>Título</label>
               <input
@@ -345,7 +362,12 @@ export function TarefaDetalheDrawer({
       )}
 
       {activeTab === "historico" && (
-        <div className="flex flex-1 flex-col min-h-0">
+        <div
+          id={`${tabBaseId}-historico-panel`}
+          role="tabpanel"
+          aria-labelledby={`${tabBaseId}-historico`}
+          className="flex min-h-0 flex-1 flex-col"
+        >
           <p className="shrink-0 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Linha do tempo (mais recente no topo)
           </p>

@@ -22,6 +22,8 @@ import {
   Barcode,
   ArrowRightLeft,
   FileText,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { Toast } from "@/components/ui/toast";
@@ -37,14 +39,28 @@ import {
   CONTA_PRESETS,
   type ContaPreset,
   defaultCategoriaVisual,
-  defaultMeioVisual,
   normalizeContaPresetId,
   type VisualMeta,
   visualStorageKey,
 } from "@/lib/financeiro/visuals";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalSubmitButtonClass,
+} from "@/components/ui/field-patterns";
+import {
+  SearchableSelect,
+  type SearchableOption,
+} from "@/components/ui/searchable-select";
+import { iconForMeioPagamentoNome } from "@/lib/financeiro/meio-pagamento-icon";
 
-const inputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
+const formInputWithIconClass = `${formInputClass} pl-9`;
+
+const CATEGORIA_TIPO_OPTIONS: SearchableOption[] = [
+  { value: "entrada", label: "Entrada", icon: TrendingUp },
+  { value: "saida", label: "Saída", icon: TrendingDown },
+  { value: "ambos", label: "Ambos", icon: GitCompareArrows },
+];
 
 type TabId = "contas" | "categorias" | "meios";
 
@@ -440,11 +456,11 @@ export function FinanceiroConfigDrawer({
 
   return (
     <DrawerSheet open={open} onClose={onClose} title="Configurações do Financeiro">
-      <div className="space-y-4 overflow-y-auto p-4 lg:p-6">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
         <div
           role="tablist"
           aria-label="Configurações do financeiro"
-          className="flex border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
+          className="flex w-full flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
         >
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -479,24 +495,42 @@ export function FinanceiroConfigDrawer({
 
         {tab === "contas" && (
           <section id={`${tabId}-contas-panel`} role="tabpanel" aria-labelledby={`${tabId}-contas`} className="space-y-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <input
-                  className={inputClass}
-                  placeholder="Nome da conta"
-                  value={novaConta.nome}
-                  onChange={(e) => setNovaConta((p) => ({ ...p, nome: e.target.value }))}
-                />
-                <input
-                  className={inputClass}
-                  placeholder="R$ 0,00"
-                  value={formatCurrencyFromCents(novaConta.saldoInicialCents)}
-                  onChange={(e) => setNovaConta((p) => ({ ...p, saldoInicialCents: centsFromCurrencyInput(e.target.value) }))}
-                  inputMode="numeric"
-                />
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor={`${tabId}-nova-conta-nome`} className={formLabelClass}>
+                    Nome da conta
+                  </label>
+                  <div className="relative mt-1">
+                    <Landmark className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id={`${tabId}-nova-conta-nome`}
+                      className={formInputWithIconClass}
+                      placeholder="Ex.: Conta corrente"
+                      value={novaConta.nome}
+                      onChange={(e) => setNovaConta((p) => ({ ...p, nome: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor={`${tabId}-nova-conta-saldo`} className={formLabelClass}>
+                    Saldo inicial
+                  </label>
+                  <div className="relative mt-1">
+                    <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id={`${tabId}-nova-conta-saldo`}
+                      className={formInputWithIconClass}
+                      placeholder="R$ 0,00"
+                      value={formatCurrencyFromCents(novaConta.saldoInicialCents)}
+                      onChange={(e) => setNovaConta((p) => ({ ...p, saldoInicialCents: centsFromCurrencyInput(e.target.value) }))}
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
                 <div className="sm:col-span-2">
-                  <p className="mb-2 text-xs font-medium text-slate-600 dark:text-slate-300">Ícone</p>
-                  <div className="grid grid-cols-4 gap-2 sm:max-w-md">
+                  <p className={formLabelClass}>Ícone</p>
+                  <div className="mt-1 grid grid-cols-4 gap-2 sm:max-w-md">
                     {CONTA_PRESETS.map((p) => {
                       const selected = contaPresetId === p.id;
                       return (
@@ -508,10 +542,10 @@ export function FinanceiroConfigDrawer({
                             setContaCorCustom(p.defaultColor);
                           }}
                           className={clsx(
-                            "inline-flex items-center justify-center rounded-lg border p-1.5",
+                            "inline-flex items-center justify-center rounded-xl border p-1.5",
                             selected
                               ? "border-[#6D28D9] ring-2 ring-[#6D28D9]/25"
-                              : "border-slate-300 hover:border-slate-400 dark:border-slate-600"
+                              : "border-slate-200 hover:border-slate-300 dark:border-slate-600"
                           )}
                           aria-label={p.label}
                           title={p.label}
@@ -523,8 +557,8 @@ export function FinanceiroConfigDrawer({
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <p className="mb-2 text-xs font-medium text-slate-600 dark:text-slate-300">Cor do ícone</p>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <p className={formLabelClass}>Cor do ícone</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
                     {COLOR_OPTIONS.map((c) => (
                       <button
                         key={c}
@@ -544,7 +578,7 @@ export function FinanceiroConfigDrawer({
                   type="button"
                   onClick={() => void criarConta()}
                   disabled={saving === "create-conta"}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 sm:col-span-2"
+                  className={clsx(formModalSubmitButtonClass, "inline-flex items-center justify-center gap-2 sm:col-span-2")}
                 >
                   <Plus className="h-4 w-4" />
                   Adicionar
@@ -554,23 +588,33 @@ export function FinanceiroConfigDrawer({
             {contasOrdenadas.map((c) => (
               <div
                 key={c.id}
-                className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-600 dark:bg-slate-800/70"
+                className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-600 dark:bg-slate-800/70"
               >
                 {editingContaId === c.id ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_180px_auto]">
-                    <input className={inputClass} value={editContaNome} onChange={(e) => setEditContaNome(e.target.value)} />
-                    <input
-                      className={inputClass}
-                      value={formatCurrencyFromCents(editContaSaldoCents)}
-                      onChange={(e) => setEditContaSaldoCents(centsFromCurrencyInput(e.target.value))}
-                      inputMode="numeric"
-                    />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_180px_auto]">
+                    <div className="relative min-w-0">
+                      <Landmark className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className={formInputWithIconClass}
+                        value={editContaNome}
+                        onChange={(e) => setEditContaNome(e.target.value)}
+                      />
+                    </div>
+                    <div className="relative min-w-0">
+                      <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className={formInputWithIconClass}
+                        value={formatCurrencyFromCents(editContaSaldoCents)}
+                        onChange={(e) => setEditContaSaldoCents(centsFromCurrencyInput(e.target.value))}
+                        inputMode="numeric"
+                      />
+                    </div>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => void salvarConta(c.id)}
                         disabled={saving === `edit-conta-${c.id}`}
-                        className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700"
+                        className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700 disabled:opacity-50"
                         aria-label="Salvar"
                       >
                         <Check className="h-4 w-4" />
@@ -578,7 +622,7 @@ export function FinanceiroConfigDrawer({
                       <button
                         type="button"
                         onClick={() => setEditingContaId("")}
-                        className="rounded-lg border border-slate-300 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                        className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                         aria-label="Cancelar"
                       >
                         <X className="h-4 w-4" />
@@ -637,14 +681,42 @@ export function FinanceiroConfigDrawer({
 
         {tab === "categorias" && (
           <section id={`${tabId}-categorias-panel`} role="tabpanel" aria-labelledby={`${tabId}-categorias`} className="space-y-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_170px_auto]">
-                <input className={inputClass} placeholder="Nome da categoria" value={novaCat.nome} onChange={(e) => setNovaCat((p) => ({ ...p, nome: e.target.value }))} />
-                <select className={inputClass} value={novaCat.tipo} onChange={(e) => setNovaCat((p) => ({ ...p, tipo: e.target.value as FinanceiroCategoriaTipo }))}>
-                  <option value="entrada">Entrada</option>
-                  <option value="saida">Saída</option>
-                </select>
-                <button type="button" onClick={() => void criarCategoria()} disabled={saving === "create-categoria"} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-purple-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(160px,220px)_auto] sm:items-end">
+                <div>
+                  <label htmlFor={`${tabId}-nova-cat-nome`} className={formLabelClass}>
+                    Nome
+                  </label>
+                  <div className="relative mt-1">
+                    <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id={`${tabId}-nova-cat-nome`}
+                      className={formInputWithIconClass}
+                      placeholder="Nome da categoria"
+                      value={novaCat.nome}
+                      onChange={(e) => setNovaCat((p) => ({ ...p, nome: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className={formLabelClass}>Tipo</label>
+                  <div className="mt-1">
+                    <SearchableSelect
+                      options={CATEGORIA_TIPO_OPTIONS}
+                      value={novaCat.tipo}
+                      onChange={(v) => setNovaCat((p) => ({ ...p, tipo: v as FinanceiroCategoriaTipo }))}
+                      placeholder="Tipo"
+                      searchable={false}
+                      leadingIcon={GitCompareArrows}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void criarCategoria()}
+                  disabled={saving === "create-categoria"}
+                  className={clsx(formModalSubmitButtonClass, "inline-flex items-center justify-center gap-2")}
+                >
                   <Plus className="h-4 w-4" />
                   Adicionar
                 </button>
@@ -657,23 +729,40 @@ export function FinanceiroConfigDrawer({
             {categoriasOrdenadas.map((c) => (
               <div
                 key={c.id}
-                className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-600 dark:bg-slate-800/70"
+                className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-600 dark:bg-slate-800/70"
               >
                 {editingCatId === c.id ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_170px_auto]">
-                    <input className={inputClass} value={editCatNome} onChange={(e) => setEditCatNome(e.target.value)} />
-                    <select className={inputClass} value={editCatTipo} onChange={(e) => setEditCatTipo(e.target.value as FinanceiroCategoriaTipo)}>
-                      <option value="entrada">Entrada</option>
-                      <option value="saida">Saída</option>
-                    </select>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_minmax(160px,220px)_auto] sm:items-end">
+                    <div className="relative min-w-0">
+                      <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className={formInputWithIconClass}
+                        value={editCatNome}
+                        onChange={(e) => setEditCatNome(e.target.value)}
+                      />
+                    </div>
+                    <SearchableSelect
+                      options={CATEGORIA_TIPO_OPTIONS}
+                      value={editCatTipo}
+                      onChange={(v) => setEditCatTipo(v as FinanceiroCategoriaTipo)}
+                      placeholder="Tipo"
+                      searchable={false}
+                      leadingIcon={GitCompareArrows}
+                    />
                     <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => void salvarCategoria(c.id)} disabled={saving === `edit-categoria-${c.id}`} className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700" aria-label="Salvar">
+                      <button
+                        type="button"
+                        onClick={() => void salvarCategoria(c.id)}
+                        disabled={saving === `edit-categoria-${c.id}`}
+                        className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700 disabled:opacity-50"
+                        aria-label="Salvar"
+                      >
                         <Check className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingCatId("")}
-                        className="rounded-lg border border-slate-300 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                        className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                         aria-label="Cancelar"
                       >
                         <X className="h-4 w-4" />
@@ -687,7 +776,7 @@ export function FinanceiroConfigDrawer({
                       onClick={() => {
                         setEditingCatId(c.id);
                         setEditCatNome(c.nome);
-                        setEditCatTipo(c.tipo === "ambos" ? "entrada" : c.tipo);
+                        setEditCatTipo(c.tipo);
                       }}
                       className="min-w-0 flex flex-1 items-center justify-between rounded-lg px-1 py-1 text-left hover:bg-slate-100/80 dark:hover:bg-slate-700/50"
                     >
@@ -732,10 +821,29 @@ export function FinanceiroConfigDrawer({
 
         {tab === "meios" && (
           <section id={`${tabId}-meios-panel`} role="tabpanel" aria-labelledby={`${tabId}-meios`} className="space-y-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                <input className={inputClass} placeholder="Nome do meio de pagamento" value={novoMeio} onChange={(e) => setNovoMeio(e.target.value)} />
-                <button type="button" onClick={() => void criarMeio()} disabled={saving === "create-meio"} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-purple-700">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <label htmlFor={`${tabId}-novo-meio`} className={formLabelClass}>
+                    Nome do meio
+                  </label>
+                  <div className="relative mt-1">
+                    <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id={`${tabId}-novo-meio`}
+                      className={formInputWithIconClass}
+                      placeholder="Ex.: PIX, Boleto, Cartão…"
+                      value={novoMeio}
+                      onChange={(e) => setNovoMeio(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void criarMeio()}
+                  disabled={saving === "create-meio"}
+                  className={clsx(formModalSubmitButtonClass, "inline-flex shrink-0 items-center justify-center gap-2")}
+                >
                   <Plus className="h-4 w-4" />
                   Adicionar
                 </button>
@@ -744,19 +852,32 @@ export function FinanceiroConfigDrawer({
             {meiosOrdenados.map((m) => (
               <div
                 key={m.id}
-                className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-600 dark:bg-slate-800/70"
+                className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-600 dark:bg-slate-800/70"
               >
                 {editingMeioId === m.id ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <input className={inputClass} value={editMeioNome} onChange={(e) => setEditMeioNome(e.target.value)} />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <div className="relative min-w-0">
+                      <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className={formInputWithIconClass}
+                        value={editMeioNome}
+                        onChange={(e) => setEditMeioNome(e.target.value)}
+                      />
+                    </div>
                     <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => void salvarMeio(m.id)} disabled={saving === `edit-meio-${m.id}`} className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700" aria-label="Salvar">
+                      <button
+                        type="button"
+                        onClick={() => void salvarMeio(m.id)}
+                        disabled={saving === `edit-meio-${m.id}`}
+                        className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700 disabled:opacity-50"
+                        aria-label="Salvar"
+                      >
                         <Check className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingMeioId("")}
-                        className="rounded-lg border border-slate-300 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                        className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                         aria-label="Cancelar"
                       >
                         <X className="h-4 w-4" />
@@ -767,14 +888,16 @@ export function FinanceiroConfigDrawer({
                   <div className="flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => { setEditingMeioId(m.id); setEditMeioNome(m.nome); }}
+                      onClick={() => {
+                        setEditingMeioId(m.id);
+                        setEditMeioNome(m.nome);
+                      }}
                       className="min-w-0 flex flex-1 items-center justify-between rounded-lg px-1 py-1 text-left hover:bg-slate-100/80 dark:hover:bg-slate-700/50"
                     >
                       <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                         {(() => {
-                          const v = defaultMeioVisual(m.nome);
-                          const Icon = iconFromKey(v.icon);
-                          return <Icon className="mr-1 inline h-4 w-4" style={{ color: v.color }} />;
+                          const MeioIcon = iconForMeioPagamentoNome(m.nome);
+                          return <MeioIcon className="mr-1 inline h-4 w-4 shrink-0 text-slate-400" />;
                         })()}
                         {m.nome}
                       </p>

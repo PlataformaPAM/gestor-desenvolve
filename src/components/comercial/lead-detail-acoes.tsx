@@ -3,6 +3,7 @@
 import { ArrowRightCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
 import type { Lead, PipelineStage, PipelineStageId } from "@/lib/comercial/types";
+import { comercialTextareaClass } from "./field-styles";
 
 type LeadDetailAcoesProps = {
   lead: Lead;
@@ -104,7 +105,7 @@ export function LeadDetailAcoes({
               onChange={(e) => setMotivoPerda(e.target.value)}
               rows={3}
               placeholder="Explique por que a venda não foi concluída..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+              className={comercialTextareaClass}
             />
           </div>
         )}
@@ -119,7 +120,7 @@ export function LeadDetailAcoes({
               onChange={(e) => setMotivoLiberacao(e.target.value)}
               rows={3}
               placeholder="Descreva o que precisa corrigir no lead..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+              className={comercialTextareaClass}
             />
             <button
               type="button"

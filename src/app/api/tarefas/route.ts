@@ -161,12 +161,17 @@ export async function POST(req: Request) {
     modulo: "tarefas",
     detalhes: `Tarefa ${saved.titulo} (${saved.id})`,
   });
-  await emitAlert(prisma, {
-    modulo: "tarefas",
-    titulo: "Nova tarefa interna criada",
-    descricao: `Tarefa "${saved.titulo}" criada para acompanhamento da equipe.`,
-    dedupeKey: `tarefa-criada-${saved.id}`,
-  });
+  try {
+    await emitAlert(prisma, {
+      modulo: "tarefas",
+      titulo: "Nova tarefa interna criada",
+      descricao: `Tarefa "${saved.titulo}" criada para acompanhamento da equipe.`,
+      dedupeKey: `tarefa-criada-${saved.id}`,
+    });
+  } catch (error) {
+    // Alerta não pode impedir persistência da tarefa em produção.
+    console.error("[tarefas/create] falha ao emitir alerta:", error);
+  }
   return ok({ tarefa: mapTarefaFromDb(saved) }, 201);
 }
 

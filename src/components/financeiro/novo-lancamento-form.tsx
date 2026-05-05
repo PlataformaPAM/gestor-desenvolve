@@ -4,6 +4,14 @@ import { useState } from "react";
 import type { Lancamento, LancamentoTipo, TipoRecorrencia } from "@/lib/financeiro/types";
 import { splitValorTotalEmParcelas } from "@/lib/financeiro/lancamento-utils";
 import clsx from "clsx";
+import { DateField } from "@/components/ui/date-field";
+import {
+  formLabelClass,
+  formInputClass,
+  formNativeSelectClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "@/components/ui/field-patterns";
 
 const TIPO_RECORRENCIA_OPTIONS: { value: TipoRecorrencia; label: string }[] = [
   { value: "unico", label: "Único" },
@@ -61,7 +69,7 @@ export function buildLancamentosFromForm(
     tipoRecorrencia === "parcelado" ? splitValorTotalEmParcelas(valor, n) : null;
   const list: Lancamento[] = [];
 
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < n; i += 1) {
     const venc = nextMonth(vencimento, i);
     const isFirst = i === 0;
     list.push({
@@ -111,7 +119,7 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="novo-tipo" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="novo-tipo" className={formLabelClass}>
           Tipo
         </label>
         <select
@@ -119,10 +127,10 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
           value={tipo}
           onChange={(e) => setTipo(e.target.value as LancamentoTipo)}
           className={clsx(
-            "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            formNativeSelectClass,
             tipo === "entrada"
-              ? "border-emerald-200 bg-emerald-50/50 text-emerald-900 focus:ring-emerald-500"
-              : "border-red-200 bg-red-50/50 text-red-900 focus:ring-red-500"
+              ? "border-emerald-200 bg-emerald-50/50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : "border-red-200 bg-red-50/50 text-red-900 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-200"
           )}
         >
           <option value="entrada">Entrada (Receber)</option>
@@ -131,7 +139,7 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
       </div>
 
       <div>
-        <label htmlFor="novo-desc" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="novo-desc" className={formLabelClass}>
           Descrição
         </label>
         <input
@@ -140,34 +148,32 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
           value={descricao}
           onChange={(e) => setDescricao(e.target.value)}
           placeholder="Ex.: Mensalidade Nov/2025"
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+          className={formInputClass}
           required
         />
       </div>
 
       <div>
-        <label htmlFor="novo-venc" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="novo-venc" className={formLabelClass}>
           Vencimento
         </label>
-        <input
+        <DateField
           id="novo-venc"
-          type="date"
           value={vencimento}
-          onChange={(e) => setVencimento(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
-          required
+          onChange={setVencimento}
+          placeholder="Selecione a data"
         />
       </div>
 
       <div>
-        <label htmlFor="novo-tipo-rec" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="novo-tipo-rec" className={formLabelClass}>
           Tipo de Lançamento
         </label>
         <select
           id="novo-tipo-rec"
           value={tipoRecorrencia}
           onChange={(e) => setTipoRecorrencia(e.target.value as TipoRecorrencia)}
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          className={formNativeSelectClass}
         >
           {TIPO_RECORRENCIA_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -186,7 +192,7 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
 
       {tipoRecorrencia === "parcelado" && (
         <div>
-          <label htmlFor="novo-parcelas" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor="novo-parcelas" className={formLabelClass}>
             Quantidade de Parcelas
           </label>
           <input
@@ -196,13 +202,13 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
             max={60}
             value={parcelas}
             onChange={(e) => setParcelas(Math.max(2, parseInt(e.target.value, 10) || 2))}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            className={formInputClass}
           />
         </div>
       )}
 
       <div>
-        <label htmlFor="novo-valor" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="novo-valor" className={formLabelClass}>
           Valor (R$)
         </label>
         <input
@@ -214,27 +220,20 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
           onChange={(e) => setValor(e.target.value)}
           placeholder="0,00"
           className={clsx(
-            "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            formInputClass,
             tipo === "entrada"
-              ? "border-emerald-200 bg-emerald-50/30 text-emerald-900 focus:ring-emerald-500 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200 dark:focus:ring-emerald-600"
-              : "border-red-200 bg-red-50/30 text-red-900 focus:ring-red-500 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-200 dark:focus:ring-red-600"
+              ? "border-emerald-200 bg-emerald-50/30 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200"
+              : "border-red-200 bg-red-50/30 text-red-900 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-200"
           )}
           required
         />
       </div>
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
+        <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
           Cancelar
         </button>
-        <button
-          type="submit"
-          className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-        >
+        <button type="submit" className={formModalSubmitButtonClass}>
           Salvar
         </button>
       </div>

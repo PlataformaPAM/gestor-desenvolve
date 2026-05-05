@@ -25,6 +25,8 @@ type AditivoRow = {
 type ContratoDetalhe = {
   id: string;
   codigo: string;
+  codigoSistema?: string;
+  codigoPersonalizado?: string | null;
   leadId: string | null;
   clienteId: string;
   origem: string;
@@ -100,6 +102,7 @@ export default function ContratoDetalhePage() {
   const [editPosVenda, setEditPosVenda] = useState(true);
   const [editObs, setEditObs] = useState("");
   const [editCond, setEditCond] = useState("");
+  const [editCodigoPersonalizado, setEditCodigoPersonalizado] = useState("");
   const [adTipo, setAdTipo] = useState("ajuste_valor");
   const [adTitulo, setAdTitulo] = useState("");
   const [adDesc, setAdDesc] = useState("");
@@ -128,6 +131,7 @@ export default function ContratoDetalhePage() {
       setEditPosVenda(c.geraPosVenda);
       setEditObs(c.observacoes ?? "");
       setEditCond(c.condicoesGerais ?? "");
+      setEditCodigoPersonalizado(c.codigoPersonalizado ?? "");
     }
   }, [id]);
 
@@ -179,6 +183,7 @@ export default function ContratoDetalhePage() {
           geraPosVenda: editPosVenda,
           observacoes: editObs.trim() || null,
           condicoesGerais: editCond.trim() || null,
+          codigoPersonalizado: editCodigoPersonalizado.trim() || null,
         }),
       });
       if (!res.ok) return;
@@ -514,6 +519,19 @@ export default function ContratoDetalhePage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Código personalizado (exceção)</label>
+            <input
+              value={editCodigoPersonalizado}
+              onChange={(e) => setEditCodigoPersonalizado(e.target.value)}
+              placeholder="Ex.: LEG-2022/XPTO-44"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Quando informado, o código final fica: {contrato?.codigoSistema ?? contrato?.codigo ?? "CTT-AAAA-0000"}_
+              {editCodigoPersonalizado.trim() || "personalizado"}
+            </p>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Valor total</label>

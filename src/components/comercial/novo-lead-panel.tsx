@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle, BadgeHelp, CircleMinus, Text } from "lucide-react";
 import { DrawerSheet } from "./drawer-sheet";
 import type { Lead, LeadPriority, LeadOrigem, PipelineStageId } from "@/lib/comercial/types";
 import { ORIGEM_OPCOES, ORIGEM_COM_DETALHE } from "@/lib/comercial/constants";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { comercialInputClass, comercialLabelClass } from "./field-styles";
+import { iconForOrigem } from "./origem-icons";
 
 type NovoLeadPanelProps = {
   open: boolean;
@@ -67,58 +71,65 @@ export function NovoLeadPanel({
       <div className="max-h-[85vh] overflow-y-auto p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="novo-lead-origem" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="novo-lead-origem" className={comercialLabelClass}>
               Origem
             </label>
-            <select
-              id="novo-lead-origem"
+            <SearchableSelect
+              options={ORIGEM_OPCOES.map((opt) => ({
+                value: opt.value,
+                label: opt.label,
+                icon: iconForOrigem(opt.value),
+              }))}
               value={origem}
-              onChange={(e) => setOrigem(e.target.value as LeadOrigem)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            >
-              {ORIGEM_OPCOES.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setOrigem(v as LeadOrigem)}
+              placeholder="Selecione a origem..."
+              searchPlaceholder="Buscar origem..."
+              searchable={false}
+              leadingIcon={BadgeHelp}
+            />
           </div>
 
           {showOrigemDetalhe && (
             <div>
-              <label htmlFor="novo-lead-origem-detalhe" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="novo-lead-origem-detalhe" className={comercialLabelClass}>
                 Detalhar origem
               </label>
-              <input
-                id="novo-lead-origem-detalhe"
-                type="text"
-                value={origemDetalhe}
-                onChange={(e) => setOrigemDetalhe(e.target.value)}
-                placeholder={
-                  origem === "evento"
-                    ? "Ex: Feira XPTO 2025"
-                    : origem === "indicacao"
-                    ? "Ex: João Silva"
-                    : "Ex: Detalhes da origem"
-                }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-              />
+              <div className="relative">
+                <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="novo-lead-origem-detalhe"
+                  type="text"
+                  value={origemDetalhe}
+                  onChange={(e) => setOrigemDetalhe(e.target.value)}
+                  placeholder={
+                    origem === "evento"
+                      ? "Ex: Feira XPTO 2025"
+                      : origem === "indicacao"
+                      ? "Ex: João Silva"
+                      : "Ex: Detalhes da origem"
+                  }
+                  className={`${comercialInputClass} pl-9`}
+                />
+              </div>
             </div>
           )}
 
           <div>
-            <label htmlFor="novo-lead-name" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="novo-lead-name" className={comercialLabelClass}>
               Nome do Lead (Assunto + Entidade) *
             </label>
-            <input
-              id="novo-lead-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Implantação ERP - Empresa XYZ"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-              required
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="novo-lead-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Implantação ERP - Empresa XYZ"
+                className={`${comercialInputClass} pl-9`}
+                required
+              />
+            </div>
           </div>
 
           <div>
@@ -134,6 +145,9 @@ export function NovoLeadPanel({
                   }`}
                   aria-pressed={priority === opt.value}
                 >
+                  {opt.value === "alta" ? <AlertTriangle className="mr-1 h-3.5 w-3.5" /> : null}
+                  {opt.value === "media" ? <BadgeHelp className="mr-1 h-3.5 w-3.5" /> : null}
+                  {opt.value === "baixa" ? <CircleMinus className="mr-1 h-3.5 w-3.5" /> : null}
                   {opt.label}
                 </button>
               ))}
@@ -141,45 +155,54 @@ export function NovoLeadPanel({
           </div>
 
           <div>
-            <label htmlFor="novo-lead-contact" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="novo-lead-contact" className={comercialLabelClass}>
               Contato
             </label>
-            <input
-              id="novo-lead-contact"
-              type="text"
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              placeholder="Nome do contato"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="novo-lead-contact"
+                type="text"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="Nome do contato"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="novo-lead-phone" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="novo-lead-phone" className={comercialLabelClass}>
               Telefone
             </label>
-            <input
-              id="novo-lead-phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(00) 00000-0000"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="novo-lead-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(00) 00000-0000"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="novo-lead-email" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="novo-lead-email" className={comercialLabelClass}>
               E-mail
             </label>
-            <input
-              id="novo-lead-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@empresa.com"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-            />
+            <div className="relative">
+              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="novo-lead-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@empresa.com"
+                className={`${comercialInputClass} pl-9`}
+              />
+            </div>
           </div>
 
           <div className="shrink-0 bg-white px-4 py-3 lg:px-6 lg:py-3">

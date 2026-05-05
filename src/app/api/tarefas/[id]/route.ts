@@ -114,20 +114,28 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     detalhes: `Tarefa ${saved.titulo} (${saved.id})`,
   });
   if (previous?.status !== "concluido" && saved.status === "concluido") {
-    await emitAlert(prisma, {
-      modulo: "tarefas",
-      titulo: "Tarefa interna concluída",
-      descricao: `A tarefa "${saved.titulo}" foi concluída.`,
-      dedupeKey: `tarefa-concluida-${saved.id}`,
-    });
+    try {
+      await emitAlert(prisma, {
+        modulo: "tarefas",
+        titulo: "Tarefa interna concluída",
+        descricao: `A tarefa "${saved.titulo}" foi concluída.`,
+        dedupeKey: `tarefa-concluida-${saved.id}`,
+      });
+    } catch (error) {
+      console.error("[tarefas/update] falha ao emitir alerta de conclusão:", error);
+    }
   }
   if (previous?.status !== "impedimento" && saved.status === "impedimento") {
-    await emitAlert(prisma, {
-      modulo: "tarefas",
-      titulo: "Tarefa interna com impedimento",
-      descricao: `A tarefa "${saved.titulo}" foi movida para impedimento e precisa de ação.`,
-      dedupeKey: `tarefa-impedimento-${saved.id}`,
-    });
+    try {
+      await emitAlert(prisma, {
+        modulo: "tarefas",
+        titulo: "Tarefa interna com impedimento",
+        descricao: `A tarefa "${saved.titulo}" foi movida para impedimento e precisa de ação.`,
+        dedupeKey: `tarefa-impedimento-${saved.id}`,
+      });
+    } catch (error) {
+      console.error("[tarefas/update] falha ao emitir alerta de impedimento:", error);
+    }
   }
   return ok({ tarefa: mapTarefaFromDb(saved) });
 }

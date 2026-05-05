@@ -2,6 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { getSessionUserId } from "@/lib/server/request-session";
+import {
+  composeCodigoContrato,
+  getContratoCodigoPersonalizadoMap,
+  setContratoCodigoPersonalizado,
+} from "@/lib/contratos/codigo-personalizado";
 import type { ContratoStatus } from "@prisma/client";
 
 function formatContratoCode(year: number, seq: number): string {
@@ -21,7 +26,7 @@ async function resolveContratoCodeByCreatedAt(id: string, createdAt: Date): Prom
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapContratoDetalhe(c: any, codigo: string) {
+function mapContratoDetalhe(c: any, codigo: string, codigoPersonalizado?: string | null) {
   const lead = c.lead ?? null;
   const aditivos = Array.isArray(c.aditivos)
     ? c.aditivos.map(
@@ -47,7 +52,9 @@ function mapContratoDetalhe(c: any, codigo: string) {
 
   return {
     id: c.id,
-    codigo,
+    codigo: composeCodigoContrato(codigo, codigoPersonalizado),
+    codigoSistema: codigo,
+    codigoPersonalizado: codigoPersonalizado ?? null,
     leadId: c.leadId,
     clienteId: c.clienteId,
     origem: c.origem,
@@ -166,7 +173,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     }
 
     const codigo = await resolveContratoCodeByCreatedAt(c.id, c.createdAt);
-    const payload = mapContratoDetalhe(c, codigo);
+    const customMap = await getContratoCodigoPersonalizadoMap();
+    const payload = mapContratoDetalhe(c, codigo, customMap[c.id] ?? null);
     return ok({ contrato: payload, data: { contrato: payload } });
   } catch {
     return fail("INTERNAL_ERROR", "Falha ao carregar contrato.", 500);
@@ -182,6 +190,7 @@ type PatchBody = {
   observacoes?: string | null;
   condicoesGerais?: string | null;
   geraPosVenda?: boolean;
+  codigoPersonalizado?: string | null;
   aditivo?: {
     tipo: string;
     titulo: string;
@@ -262,6 +271,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         },
       });
     });
+
+    if (b.codigoPersonalizado !== undefined) {
+      await setContratoCodigoPersonalizado(id, b.codigoPersonalizado);
+    }
   } catch (e) {
     if (e instanceof Error && e.message === "DATA_INVALIDA") {
       return fail("BAD_REQUEST", "Data inválida. Use AAAA-MM-DD.", 400);
@@ -302,6 +315,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   });
 
   const codigo = await resolveContratoCodeByCreatedAt(saved.id, saved.createdAt);
-  const out = mapContratoDetalhe(saved, codigo);
+  const customMap = await getContratoCodigoPersonalizadoMap();
+  const out = mapContratoDetalhe(saved, codigo, customMap[saved.id] ?? null);
   return ok({ contrato: out, data: { contrato: out } });
 }
