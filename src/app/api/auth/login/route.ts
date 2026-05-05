@@ -101,24 +101,39 @@ export async function POST(req: Request) {
       detalhes: `Usuário ${usuario.nomeExibicao ?? usuario.id}`,
     });
 
-    const perfil = await prisma.perfilAcesso.findUnique({
-      where: { id: usuario.perfilId },
-      include: { permissoes: true },
-    });
-    const permissoes = Object.fromEntries(
-      (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
-    ) as Partial<Record<ModuloPermissao, boolean>>;
-    const vinculosCliente = await prisma.usuarioVinculo.findMany({
-      where: { usuarioId: usuario.id, tipo: "cliente" },
-      select: { pessoaId: true },
-    });
-    const clienteIds = Array.from(new Set(vinculosCliente.map((v) => v.pessoaId)));
-    const perfilNome = (perfil?.nome ?? "").toLowerCase();
+    // Enriquecimentos de sessão não podem derrubar autenticação.
+    let permissoes: Partial<Record<ModuloPermissao, boolean>> | undefined = undefined;
+    let clienteIds: string[] = [];
+    let perfilNome = "";
+    try {
+      const perfil = await prisma.perfilAcesso.findUnique({
+        where: { id: usuario.perfilId },
+        include: { permissoes: true },
+      });
+      permissoes = Object.fromEntries(
+        (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
+      ) as Partial<Record<ModuloPermissao, boolean>>;
+      perfilNome = (perfil?.nome ?? "").toLowerCase();
+    } catch (error) {
+      console.error("[auth/login] falha ao carregar perfil/permissões:", error);
+      permissoes = undefined;
+      perfilNome = "";
+    }
+    try {
+      const vinculosCliente = await prisma.usuarioVinculo.findMany({
+        where: { usuarioId: usuario.id, tipo: "cliente" },
+        select: { pessoaId: true },
+      });
+      clienteIds = Array.from(new Set(vinculosCliente.map((v) => v.pessoaId)));
+    } catch (error) {
+      console.error("[auth/login] falha ao carregar vínculos do usuário:", error);
+      clienteIds = [];
+    }
     const isPortalCliente = clienteIds.length > 0;
     const isAdminCliente =
       isPortalCliente &&
       (
-        permissoes.configuracoes === true ||
+        permissoes?.configuracoes === true ||
         perfilNome.includes("admin") ||
         perfilNome.includes("administrador")
       );
@@ -151,7 +166,8 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 7,
     });
     return response;
-  } catch {
+  } catch (error) {
+    console.error("[auth/login] erro interno:", error);
     return fail("INTERNAL_ERROR", "Falha ao autenticar.", 500);
   }
 }
