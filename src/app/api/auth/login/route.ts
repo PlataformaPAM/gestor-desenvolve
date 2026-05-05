@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
-import { verifyPassword } from "@/lib/server/password";
+import { hashPassword, verifyPassword } from "@/lib/server/password";
 import { COOKIE_NAME, encodeSession } from "@/lib/auth";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
@@ -16,6 +16,15 @@ const IS_PROD = process.env.NODE_ENV === "production";
 
 function normalizeCpf(cpf: string): string {
   return cpf.replace(/\D/g, "");
+}
+
+function needsPasswordRehash(storedHash: string): boolean {
+  return (
+    storedHash.startsWith("$2a$") ||
+    storedHash.startsWith("$2b$") ||
+    storedHash.startsWith("$2y$") ||
+    !storedHash.startsWith("scrypt$")
+  );
 }
 
 export async function POST(req: Request) {
@@ -71,6 +80,18 @@ export async function POST(req: Request) {
         detalhes: `CPF ${cpf} inválido ou senha incorreta`,
       });
       return fail("UNAUTHORIZED", "CPF ou senha inválidos.", 401);
+    }
+
+    // Migração silenciosa: ao autenticar com hash legado, converte para scrypt.
+    if (needsPasswordRehash(usuario.senhaHash)) {
+      try {
+        await prisma.usuario.update({
+          where: { id: usuario.id },
+          data: { senhaHash: hashPassword(senha), atualizadoEmSistema: new Date() },
+        });
+      } catch {
+        // Não bloqueia login em caso de falha na migração do hash.
+      }
     }
 
     await writeAuditLog(prisma, {

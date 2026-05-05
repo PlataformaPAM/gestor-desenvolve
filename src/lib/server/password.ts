@@ -1,4 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { compareSync as bcryptCompareSync } from "bcryptjs";
 import { validatePasswordPolicy as validatePasswordPolicyImpl } from "@/lib/password-policy";
 
 const KEY_LEN = 64;
@@ -10,6 +11,14 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, storedHash: string): boolean {
+  // Compatibilidade legada: ambientes antigos usavam bcrypt.
+  if (storedHash.startsWith("$2a$") || storedHash.startsWith("$2b$") || storedHash.startsWith("$2y$")) {
+    try {
+      return bcryptCompareSync(password, storedHash);
+    } catch {
+      return false;
+    }
+  }
   const parts = storedHash.split("$");
   // Compatibilidade legada: bancos antigos podem ter senha em texto puro.
   // Se não for hash scrypt, compara literal para não bloquear login após migração.
