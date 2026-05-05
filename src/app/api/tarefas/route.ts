@@ -23,7 +23,7 @@ function buildCodigoFrom(ano: number, sequencial: number): string {
 async function proximoCodigoTarefa(
   tx: TxTarefaCompat,
   ano: number
-): Promise<string | null> {
+): Promise<string> {
   const prefixo = `TAR-${ano}-`;
   try {
     const ultimo = (await tx.tarefa.findFirst({
@@ -34,9 +34,10 @@ async function proximoCodigoTarefa(
     const ultimoSequencial = Number.parseInt(ultimo?.codigo?.slice(-4) ?? "0", 10);
     return buildCodigoFrom(ano, Number.isFinite(ultimoSequencial) ? ultimoSequencial + 1 : 1);
   } catch (error) {
-    // Compatibilidade com ambientes onde a coluna codigo ainda não existe.
-    console.warn("[tarefas/create] não foi possível gerar código TAR; prosseguindo sem código.", error);
-    return null;
+    // Fallback para não bloquear criação se a consulta do último código falhar.
+    console.warn("[tarefas/create] não foi possível consultar último código TAR; usando fallback.", error);
+    const seed = Number.parseInt(String(Date.now()).slice(-4), 10);
+    return buildCodigoFrom(ano, Number.isFinite(seed) ? seed : 1);
   }
 }
 
@@ -48,6 +49,8 @@ export async function POST(req: Request) {
     return fail("BAD_REQUEST", "Payload de tarefa inválido.", 400);
   }
 
+  let created = false;
+  let lastCreateError: unknown = null;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       await prisma.$transaction(async (tx) => {
@@ -74,6 +77,7 @@ export async function POST(req: Request) {
 
     const data: Record<string, unknown> = {
       id: tarefa.id,
+      codigo,
       titulo: tarefa.titulo,
       descricao: tarefa.descricao ?? null,
       status: tarefa.status,
@@ -84,7 +88,6 @@ export async function POST(req: Request) {
       solucaoId: tarefa.solucaoId ?? null,
       responsavelId: tarefa.responsavel.id,
     };
-    if (codigo) data.codigo = codigo;
     await tx.tarefa.create({
       data: data as unknown as Prisma.TarefaCreateArgs["data"],
     });
@@ -128,6 +131,7 @@ export async function POST(req: Request) {
       });
     }
       });
+      created = true;
       break;
     } catch (error) {
       const target =
@@ -141,21 +145,64 @@ export async function POST(req: Request) {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002" &&
         targetIncludesCodigo;
-      if (!isUniqueCodigoConflict || attempt === 4) throw error;
+      if (!isUniqueCodigoConflict || attempt === 4) {
+        lastCreateError = error;
+        break;
+      }
     }
   }
 
-  const saved = await prisma.tarefa.findUniqueOrThrow({
-    where: { id: tarefa.id },
-    include: {
-      cliente: { select: { id: true, nome: true, empresa: true } },
-      clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
-      responsavel: true,
-      colaboradores: { include: { usuario: true } },
-      anexos: true,
-      historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
-    },
-  });
+  if (!created) {
+    console.error("[tarefas/create] falha na criação completa; tentando fallback mínimo.", lastCreateError);
+    try {
+      const now = new Date();
+      await prisma.tarefa.create({
+        data: {
+          id: tarefa.id,
+          codigo: buildCodigoFrom(now.getFullYear(), Number.parseInt(String(Date.now()).slice(-4), 10) || 1),
+          titulo: tarefa.titulo,
+          descricao: tarefa.descricao ?? null,
+          status: tarefa.status as unknown as Prisma.TarefaCreateInput["status"],
+          prioridade: tarefa.prioridade as unknown as Prisma.TarefaCreateInput["prioridade"],
+          dataInicio: new Date(tarefa.dataInicio),
+          dataFim: new Date(tarefa.dataFim),
+          clienteId: tarefa.clienteId ?? null,
+          solucaoId: tarefa.solucaoId ?? null,
+          responsavelId: tarefa.responsavel.id,
+        },
+      });
+    } catch (fallbackError) {
+      console.error("[tarefas/create] fallback mínimo também falhou.", fallbackError);
+      return fail("INTERNAL_ERROR", "Não foi possível salvar a tarefa interna.", 500);
+    }
+  }
+
+  let saved: any;
+  try {
+    saved = await prisma.tarefa.findUniqueOrThrow({
+      where: { id: tarefa.id },
+      include: {
+        cliente: { select: { id: true, nome: true, empresa: true } },
+        clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
+        responsavel: true,
+        colaboradores: { include: { usuario: true } },
+        anexos: true,
+        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+      },
+    });
+  } catch (error) {
+    console.warn("[tarefas/create] include completo indisponível; usando fallback de leitura.", error);
+    saved = await prisma.tarefa.findUniqueOrThrow({
+      where: { id: tarefa.id },
+      include: {
+        cliente: { select: { id: true, nome: true, empresa: true } },
+        responsavel: true,
+        colaboradores: { include: { usuario: true } },
+        anexos: true,
+        historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
+      },
+    });
+  }
   await writeAuditLog(prisma, {
     acao: "Tarefa criada",
     modulo: "tarefas",
