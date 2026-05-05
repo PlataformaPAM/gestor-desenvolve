@@ -1,11 +1,11 @@
 "use client";
 
-import type { ElementType } from "react";
+import type { ElementType, RefObject } from "react";
 import { useId, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FileText, MessageSquare, Paperclip, Eye, X } from "lucide-react";
+import { FileText, MessageSquare, Paperclip, Eye, X, User, Users, Building2, Tags } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
-import { STATUS_LABELS, PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
+import { STATUS_LABELS } from "@/lib/tarefas/constants";
 import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import { AlertDialog } from "@/components/ui/alert-dialog";
@@ -16,6 +16,42 @@ import {
 } from "@/components/ui/searchable-select";
 import { DateField } from "@/components/ui/date-field";
 import clsx from "clsx";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalSubmitButtonClass,
+} from "@/components/ui/field-patterns";
+import {
+  iconForCategoria,
+  iconForStatus,
+  STATUS_LEADING_ICON,
+} from "@/lib/tarefas/option-icons";
+
+/** Destaque suave para campo obrigatório não preenchido após tentativa de salvar */
+function requiredFieldWarningWrap(active: boolean): string {
+  return clsx(
+    "w-full rounded-xl border-2 transition-[border-color,background-color,box-shadow] duration-150",
+    active
+      ? "border-red-400/55 bg-red-50/40 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.12)] dark:border-red-500/45 dark:bg-red-950/25 dark:shadow-[inset_0_0_0_1px_rgba(248,113,113,0.08)]"
+      : "border-transparent bg-transparent"
+  );
+}
+
+function scrollToFirstInvalidTaskField(
+  steps: ReadonlyArray<{
+    invalid: boolean;
+    sectionRef: RefObject<HTMLElement | null>;
+    focusSelector: string;
+  }>
+) {
+  const step = steps.find((s) => s.invalid);
+  const section = step?.sectionRef.current;
+  if (!step || !section) return;
+  section.scrollIntoView({ behavior: "smooth", block: "center" });
+  requestAnimationFrame(() => {
+    section.querySelector<HTMLElement>(step.focusSelector)?.focus({ preventScroll: true });
+  });
+}
 
 function iniciais(nome: string): string {
   return nome
@@ -100,6 +136,10 @@ export function TarefaDetalheDrawer({
     nome: string;
   } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const sectionTituloRef = useRef<HTMLDivElement>(null);
+  const sectionCategoriaRef = useRef<HTMLDivElement>(null);
+  const sectionPrazoRef = useRef<HTMLDivElement>(null);
+  const sectionResponsavelRef = useRef<HTMLDivElement>(null);
 
   // Form state (aba Detalhes) — sincronizado com tarefa quando abre/muda
   const [titulo, setTitulo] = useState("");
@@ -114,6 +154,9 @@ export function TarefaDetalheDrawer({
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
   // EXACT COPY (Helpdesk-style): 'arquivos' representa NOVOS arquivos selecionados (pendentes).
   const [arquivos, setArquivos] = useState<File[]>([]);
+  /** Após tentar salvar com dados incompletos, destaca os campos que faltam */
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
   useEffect(() => {
     if (!tarefa) return;
     setTitulo(tarefa.titulo);
@@ -128,6 +171,7 @@ export function TarefaDetalheDrawer({
     setColaboradorIds(tarefa.colaboradores?.map((c) => c.id) ?? []);
     setArquivosComentario([]);
     setArquivos([]);
+    setSubmitAttempted(false);
   }, [tarefa?.id]);
 
   useEffect(() => {
@@ -135,6 +179,13 @@ export function TarefaDetalheDrawer({
   }, [tarefa?.historico?.length, activeTab]);
 
   if (!tarefa) return null;
+
+  const errTitulo = submitAttempted && !titulo.trim();
+  const errCategoria = submitAttempted && !categoria.trim();
+  const errPrazo = submitAttempted && !dataFim.trim();
+  const errResponsavel =
+    submitAttempted &&
+    (!responsavelId || !usuariosMap.has(responsavelId));
 
   const usuariosList = Array.from(usuariosMap.values());
 
@@ -162,12 +213,35 @@ export function TarefaDetalheDrawer({
   };
 
   const handleSalvar = () => {
+    const invalid =
+      !titulo.trim() ||
+      !categoria.trim() ||
+      !dataFim.trim() ||
+      !responsavelId ||
+      !usuariosMap.has(responsavelId);
+    if (invalid) {
+      setSubmitAttempted(true);
+      queueMicrotask(() => {
+        requestAnimationFrame(() => {
+          scrollToFirstInvalidTaskField([
+            { invalid: !titulo.trim(), sectionRef: sectionTituloRef, focusSelector: "#t-titulo" },
+            { invalid: !categoria.trim(), sectionRef: sectionCategoriaRef, focusSelector: "button[type='button']" },
+            { invalid: !dataFim.trim(), sectionRef: sectionPrazoRef, focusSelector: "#t-data-fim" },
+            {
+              invalid: !responsavelId || !usuariosMap.has(responsavelId),
+              sectionRef: sectionResponsavelRef,
+              focusSelector: "button[type='button']",
+            },
+          ]);
+        });
+      });
+      return;
+    }
     const dataInicioIso = dataInicio
       ? new Date(`${dataInicio}T00:00:00`).toISOString()
       : tarefa.dataInicio;
-    const dataFimIso = dataFim
-      ? new Date(`${dataFim}T23:59:59`).toISOString()
-      : tarefa.dataFim;
+    const dataFimIso = new Date(`${dataFim.trim()}T23:59:59`).toISOString();
+    setSubmitAttempted(false);
     onSalvar?.(tarefa.id, {
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
@@ -188,14 +262,12 @@ export function TarefaDetalheDrawer({
   const historicoOrdenado = [...tarefa.historico].sort(
     (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
   );
-  const responsavelOptions: SearchableOption[] = usuariosList.map((u) => ({ value: u.id, label: u.nome }));
+  const responsavelOptions: SearchableOption[] = usuariosList.map((u) => ({ value: u.id, label: u.nome, icon: User }));
   const colaboradorOptions: SearchableOption[] = usuariosList
     .filter((u) => u.id !== responsavelId)
-    .map((u) => ({ value: u.id, label: u.nome }));
+    .map((u) => ({ value: u.id, label: u.nome, icon: Users }));
   const statusOptions: SearchableOption[] = (Object.entries(STATUS_LABELS) as [Tarefa["status"], string][])
-    .map(([value, label]) => ({ value, label }));
-  const prioridadeOptions: SearchableOption[] = (Object.entries(PRIORIDADE_LABELS) as [Tarefa["prioridade"], string][])
-    .map(([value, label]) => ({ value, label }));
+    .map(([value, label]) => ({ value, label, icon: iconForStatus(value) }));
   const clienteOptions: SearchableOption[] = [...clientes]
     .sort((a, b) =>
       (a.empresa?.trim() || a.nome).localeCompare((b.empresa?.trim() || b.nome), "pt-BR", {
@@ -206,11 +278,8 @@ export function TarefaDetalheDrawer({
       value: c.id,
       label: (c.empresa?.trim() || c.nome).trim(),
       subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
+      icon: Building2,
     }));
-
-  const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
-  const labelClass = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300";
 
   const TABS: { id: TabId; label: string; Icon: ElementType }[] = [
     { id: "detalhes", label: "Detalhes", Icon: FileText },
@@ -263,76 +332,105 @@ export function TarefaDetalheDrawer({
           className="flex min-h-0 flex-1 flex-col overflow-y-auto"
         >
           <div className="flex-1 space-y-4 p-4 lg:p-6">
-            <div>
-              <label htmlFor="t-titulo" className={labelClass}>Título</label>
-              <input
-                id="t-titulo"
-                type="text"
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-                className={inputClass}
-              />
+            <div ref={sectionTituloRef}>
+              <label htmlFor="t-titulo" className={formLabelClass}>
+                Título{" "}
+                <span className="text-red-600 dark:text-red-400" aria-hidden>
+                  *
+                </span>
+              </label>
+              <div className={requiredFieldWarningWrap(errTitulo)}>
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="t-titulo"
+                    type="text"
+                    value={titulo}
+                    onChange={(e) => setTitulo(e.target.value)}
+                    aria-invalid={errTitulo}
+                    className={`${formInputClass} pl-10`}
+                  />
+                </div>
+              </div>
             </div>
             <div>
-              <label htmlFor="t-categoria" className={labelClass}>Categoria</label>
-              <SearchableSelect
-                options={TAREFA_CATEGORIAS.map((c) => ({ value: c, label: c }))}
-                value={categoria}
-                onChange={setCategoria}
-                placeholder="Selecione a categoria..."
-                searchable={false}
-              />
+              <label htmlFor="t-descricao" className={formLabelClass}>Descrição</label>
+              <div className="relative">
+                <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                <textarea
+                  id="t-descricao"
+                  value={descricao}
+                  onChange={(e) => setDescricao(e.target.value)}
+                  rows={3}
+                  className={`${formInputClass} min-h-[80px] resize-y pl-10`}
+                />
+              </div>
+            </div>
+            <div ref={sectionCategoriaRef}>
+              <label htmlFor="t-categoria" className={formLabelClass}>
+                Categoria{" "}
+                <span className="text-red-600 dark:text-red-400" aria-hidden>
+                  *
+                </span>
+              </label>
+              <div className={requiredFieldWarningWrap(errCategoria)}>
+                <SearchableSelect
+                  options={TAREFA_CATEGORIAS.map((c) => ({ value: c, label: c, icon: iconForCategoria(c) }))}
+                  value={categoria}
+                  onChange={setCategoria}
+                  placeholder="Selecione a categoria..."
+                  searchPlaceholder="Filtrar categoria..."
+                  leadingIcon={Tags}
+                />
+              </div>
             </div>
             <div>
-              <label htmlFor="t-descricao" className={labelClass}>Descrição</label>
-              <textarea
-                id="t-descricao"
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                rows={3}
-                className={`${inputClass} min-h-[80px] resize-y`}
-              />
-            </div>
-            <div>
-              <label htmlFor="t-status" className={labelClass}>Status</label>
+              <label htmlFor="t-status" className={formLabelClass}>Status</label>
               <SearchableSelect
                 options={statusOptions}
                 value={status}
                 onChange={(v) => setStatus(v as Tarefa["status"])}
                 searchable={false}
-              />
-            </div>
-            <div>
-              <label htmlFor="t-prioridade" className={labelClass}>Prioridade</label>
-              <SearchableSelect
-                options={prioridadeOptions}
-                value={prioridade}
-                onChange={(v) => setPrioridade(v as Tarefa["prioridade"])}
-                searchable={false}
-              />
-            </div>
-            <div>
-              <label htmlFor="t-responsavel" className={labelClass}>Responsável</label>
-              <SearchableSelect
-                options={responsavelOptions}
-                value={responsavelId}
-                onChange={setResponsavelId}
-                placeholder="Selecione o responsável..."
-                searchPlaceholder="Buscar responsável..."
+                leadingIcon={STATUS_LEADING_ICON}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="t-data-inicio" className={labelClass}>Data início</label>
+                <label htmlFor="t-data-inicio" className={formLabelClass}>Data início</label>
                 <DateField id="t-data-inicio" value={dataInicio} onChange={setDataInicio} />
               </div>
-              <div>
-                <label htmlFor="t-data-fim" className={labelClass}>Prazo (data fim)</label>
-                <DateField id="t-data-fim" value={dataFim} onChange={setDataFim} />
+              <div ref={sectionPrazoRef}>
+                <label htmlFor="t-data-fim" className={formLabelClass}>
+                  Prazo final{" "}
+                  <span className="text-red-600 dark:text-red-400" aria-hidden>
+                    *
+                  </span>
+                </label>
+                <div className={requiredFieldWarningWrap(errPrazo)}>
+                  <DateField id="t-data-fim" value={dataFim} onChange={setDataFim} />
+                </div>
+              </div>
+            </div>
+            <div ref={sectionResponsavelRef}>
+              <label htmlFor="t-responsavel" className={formLabelClass}>
+                Responsável{" "}
+                <span className="text-red-600 dark:text-red-400" aria-hidden>
+                  *
+                </span>
+              </label>
+              <div className={requiredFieldWarningWrap(errResponsavel)}>
+                <SearchableSelect
+                  options={responsavelOptions}
+                  value={responsavelId}
+                  onChange={setResponsavelId}
+                  placeholder="Selecione o responsável..."
+                  searchPlaceholder="Buscar responsável..."
+                  leadingIcon={User}
+                />
               </div>
             </div>
             <div>
-              <label className={labelClass}>Colaboradores</label>
+              <label className={formLabelClass}>Colaboradores</label>
               <SearchableMultiSelect
                 options={colaboradorOptions}
                 values={colaboradorIds}
@@ -340,10 +438,11 @@ export function TarefaDetalheDrawer({
                 placeholder="Selecionar colaboradores..."
                 searchPlaceholder="Buscar colaborador..."
                 selectedLabel="Selecionados"
+                leadingIcon={Users}
               />
             </div>
             <div>
-              <label className={labelClass}>Clientes vinculados (opcional)</label>
+              <label className={formLabelClass}>Clientes vinculados</label>
               <SearchableMultiSelect
                 options={clienteOptions}
                 values={clienteIds}
@@ -351,6 +450,7 @@ export function TarefaDetalheDrawer({
                 placeholder="Selecionar clientes..."
                 searchPlaceholder="Buscar cliente..."
                 selectedLabel="Selecionados"
+                leadingIcon={Building2}
               />
             </div>
 
@@ -362,11 +462,11 @@ export function TarefaDetalheDrawer({
             />
 
             {onSalvar && (
-              <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
+              <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={handleSalvar}
-                  className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                  className={formModalSubmitButtonClass}
                 >
                   Salvar alterações
                 </button>

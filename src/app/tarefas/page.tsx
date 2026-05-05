@@ -10,6 +10,8 @@ import { TarefaDetalheDrawer, type TarefaSalvarPayload } from "@/components/tare
 import { NovaTarefaForm } from "@/components/tarefas/nova-tarefa-form";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Toast } from "@/components/ui/toast";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { formLabelClass } from "@/components/ui/field-patterns";
 import { usePageHeader } from "@/contexts/page-header-context";
 import {
   STATUS_LABELS,
@@ -24,6 +26,13 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import type { Cliente } from "@/lib/clientes/types";
 import type { DropResult } from "@hello-pangea/dnd";
+import { User } from "lucide-react";
+import {
+  iconForPrioridade,
+  iconForStatus,
+  PRIORIDADE_LEADING_ICON,
+  STATUS_LEADING_ICON,
+} from "@/lib/tarefas/option-icons";
 
 function generateId(): string {
   return `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -135,6 +144,28 @@ export default function TarefasPage() {
   const RESPONSAVEL_OPTIONS: { value: string; label: string }[] = useMemo(
     () => [{ value: "", label: "Todos" }, ...usuarios.map((u) => ({ value: u.id, label: u.nome }))],
     [usuarios]
+  );
+  const statusFilterOptions: SearchableOption[] = useMemo(
+    () =>
+      STATUS_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+        icon: o.value ? iconForStatus(o.value) : STATUS_LEADING_ICON,
+      })),
+    []
+  );
+  const prioridadeFilterOptions: SearchableOption[] = useMemo(
+    () =>
+      PRIORIDADE_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+        icon: o.value ? iconForPrioridade(o.value) : PRIORIDADE_LEADING_ICON,
+      })),
+    []
+  );
+  const responsavelFilterOptions: SearchableOption[] = useMemo(
+    () => RESPONSAVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label, icon: User })),
+    [RESPONSAVEL_OPTIONS]
   );
 
   useEffect(() => {
@@ -562,10 +593,6 @@ export default function TarefasPage() {
     "Nova Tarefa"
   );
 
-  const filterInputClass =
-    "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
-  const labelClass = "text-sm font-medium text-slate-700 dark:text-slate-300";
-
   return (
     <section className="w-full min-w-0 space-y-6">
       <OperacaoViews value={operacaoView} onChange={setOperacaoView} closedLabel="Concluídas" />
@@ -573,28 +600,43 @@ export default function TarefasPage() {
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3">
         <div className="flex w-full min-w-0 flex-wrap items-end justify-start gap-x-2 gap-y-2 sm:flex-nowrap sm:gap-3 lg:flex-1">
           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label htmlFor="filter-status" className={`${labelClass} shrink-0`}>Status</label>
-            <select id="filter-status" value={statusFilter} onChange={(e) => setStatusFilter((e.target.value || "") as "" | StatusTarefa)} className={`${filterInputClass} w-full min-w-[9rem] sm:w-auto`}>
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value || "all"} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <label className={`${formLabelClass} mb-0 shrink-0`}>Status</label>
+            <div className="w-full min-w-[9rem] sm:w-auto sm:min-w-[11rem]">
+              <SearchableSelect
+                options={statusFilterOptions}
+                value={statusFilter}
+                onChange={(v) => setStatusFilter((v || "") as "" | StatusTarefa)}
+                searchable={false}
+                placeholder="Todos"
+                leadingIcon={STATUS_LEADING_ICON}
+              />
+            </div>
           </div>
           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label htmlFor="filter-prioridade" className={`${labelClass} shrink-0`}>Prioridade</label>
-            <select id="filter-prioridade" value={prioridadeFilter} onChange={(e) => setPrioridadeFilter((e.target.value || "") as "" | PrioridadeTarefa)} className={`${filterInputClass} w-full min-w-[9rem] sm:w-auto`}>
-              {PRIORIDADE_OPTIONS.map((o) => (
-                <option key={o.value || "all"} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <label className={`${formLabelClass} mb-0 shrink-0`}>Prioridade</label>
+            <div className="w-full min-w-[9rem] sm:w-auto sm:min-w-[11rem]">
+              <SearchableSelect
+                options={prioridadeFilterOptions}
+                value={prioridadeFilter}
+                onChange={(v) => setPrioridadeFilter((v || "") as "" | PrioridadeTarefa)}
+                searchable={false}
+                placeholder="Todas"
+                leadingIcon={PRIORIDADE_LEADING_ICON}
+              />
+            </div>
           </div>
           <div className="flex min-w-0 max-w-full flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label htmlFor="filter-responsavel" className={`${labelClass} shrink-0`}>Responsável</label>
-            <select id="filter-responsavel" value={responsavelFilter} onChange={(e) => setResponsavelFilter(e.target.value)} className={`${filterInputClass} min-w-0 w-full max-w-[min(100%,20rem)] sm:w-[min(20rem,42vw)]`}>
-              {RESPONSAVEL_OPTIONS.map((o) => (
-                <option key={o.value || "all"} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <label className={`${formLabelClass} mb-0 shrink-0`}>Responsável</label>
+            <div className="min-w-0 w-full max-w-[min(100%,20rem)] sm:w-[min(20rem,42vw)]">
+              <SearchableSelect
+                options={responsavelFilterOptions}
+                value={responsavelFilter}
+                onChange={setResponsavelFilter}
+                placeholder="Todos"
+                searchPlaceholder="Buscar responsável..."
+                leadingIcon={User}
+              />
+            </div>
           </div>
         </div>
         <div className="shrink-0 self-start lg:self-end">

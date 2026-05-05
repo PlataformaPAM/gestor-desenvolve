@@ -1,12 +1,22 @@
 export const TAREFA_CATEGORIAS = [
+  "Administrativo",
   "Assessoria",
+  "Atualizar Indicadores",
   "Capacitação",
+  "Comercial",
   "Consultoria",
+  "Dúvida",
+  "Financeiro",
   "GesConselho",
   "GesPlanos",
   "GestorAlerta",
   "InfoPolis",
-  "Reformulação Portais",
+  "Marketing",
+  "Material de Apoio",
+  "Outro",
+  "Painél Regional",
+  "Reformulação Portal",
+  "Suporte",
 ] as const;
 
 export type CategoriaTarefa = (typeof TAREFA_CATEGORIAS)[number];

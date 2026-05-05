@@ -1,11 +1,13 @@
 "use client";
 
+import type { RefObject } from "react";
 import { useRef, useState } from "react";
-import { Eye, Paperclip, X } from "lucide-react";
+import clsx from "clsx";
+import { Eye, Paperclip, X, User, Users, Building2, Tags, FileText } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import type { Cliente } from "@/lib/clientes/types";
-import { PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
 import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
+import { iconForCategoria, STATUS_LEADING_ICON } from "@/lib/tarefas/option-icons";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import {
   SearchableMultiSelect,
@@ -23,6 +25,32 @@ import {
   formSectionLabelClass,
 } from "@/components/ui/field-patterns";
 
+/** Destaque suave para campo obrigatório não preenchido após tentativa de salvar */
+const requiredFieldWarningWrap = (active: boolean) =>
+  clsx(
+    "w-full rounded-xl border-2 transition-[border-color,background-color,box-shadow] duration-150",
+    active
+      ? "border-red-400/55 bg-red-50/40 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.12)] dark:border-red-500/45 dark:bg-red-950/25 dark:shadow-[inset_0_0_0_1px_rgba(248,113,113,0.08)]"
+      : "border-transparent bg-transparent"
+  );
+
+/** Rola até o primeiro campo inválido (ordem: Título → Categoria → Prazo final → Responsável) e foca o controle. */
+function scrollToFirstInvalidTaskField(
+  steps: ReadonlyArray<{
+    invalid: boolean;
+    sectionRef: RefObject<HTMLElement | null>;
+    focusSelector: string;
+  }>
+) {
+  const step = steps.find((s) => s.invalid);
+  const section = step?.sectionRef.current;
+  if (!step || !section) return;
+  section.scrollIntoView({ behavior: "smooth", block: "center" });
+  requestAnimationFrame(() => {
+    section.querySelector<HTMLElement>(step.focusSelector)?.focus({ preventScroll: true });
+  });
+}
+
 type NovaTarefaFormProps = {
   usuarios: UsuarioTarefa[];
   clientes?: Pick<Cliente, "id" | "nome" | "empresa">[];
@@ -31,8 +59,6 @@ type NovaTarefaFormProps = {
   onSave: (tarefa: Omit<Tarefa, "id"> & { clienteIds?: string[] }) => void;
   onCancel: () => void;
 };
-
-const PRIORIDADES: Tarefa["prioridade"][] = ["baixa", "media", "alta", "urgente"];
 
 export function NovaTarefaForm({
   usuarios,
@@ -54,7 +80,20 @@ export function NovaTarefaForm({
     index: number;
     nome: string;
   } | null>(null);
+  /** Após tentar salvar com dados incompletos, destaca os campos que faltam */
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sectionTituloRef = useRef<HTMLDivElement>(null);
+  const sectionCategoriaRef = useRef<HTMLDivElement>(null);
+  const sectionPrazoRef = useRef<HTMLDivElement>(null);
+  const sectionResponsavelRef = useRef<HTMLDivElement>(null);
+
+  const errTitulo = submitAttempted && !titulo.trim();
+  const errCategoria = submitAttempted && !categoria.trim();
+  const errPrazo = submitAttempted && !dataFim.trim();
+  const errResponsavel =
+    submitAttempted &&
+    (!responsavelId || !usuarios.some((u) => u.id === responsavelId));
 
   const openFilePreview = (file: File) => {
     const url = URL.createObjectURL(file);
@@ -62,9 +101,9 @@ export function NovaTarefaForm({
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
-  const responsavelOptions: SearchableOption[] = usuarios.map((u) => ({ value: u.id, label: u.nome }));
+  const responsavelOptions: SearchableOption[] = usuarios.map((u) => ({ value: u.id, label: u.nome, icon: User }));
   const clienteOptions: SearchableOption[] = [
-    { value: "__TODOS__", label: "Selecionar Todos" },
+    { value: "__TODOS__", label: "Selecionar Todos", icon: Building2 },
     ...[...clientes]
       .sort((a, b) =>
         (a.empresa?.trim() || a.nome).localeCompare((b.empresa?.trim() || b.nome), "pt-BR", {
@@ -75,24 +114,48 @@ export function NovaTarefaForm({
         value: c.id,
         label: (c.empresa?.trim() || c.nome).trim(),
         subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
+        icon: Building2,
       })),
   ];
   const colaboradorOptions: SearchableOption[] = usuarios
     .filter((u) => u.id !== responsavelId)
-    .map((u) => ({ value: u.id, label: u.nome }));
+    .map((u) => ({ value: u.id, label: u.nome, icon: Users }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!titulo.trim() || !responsavelId) return;
     const responsavel = usuarios.find((u) => u.id === responsavelId);
-    if (!responsavel) return;
+    const invalid =
+      !titulo.trim() ||
+      !categoria.trim() ||
+      !dataFim.trim() ||
+      !responsavelId ||
+      !responsavel;
+    if (invalid) {
+      setSubmitAttempted(true);
+      queueMicrotask(() => {
+        requestAnimationFrame(() => {
+          scrollToFirstInvalidTaskField([
+            { invalid: !titulo.trim(), sectionRef: sectionTituloRef, focusSelector: "#tarefa-titulo" },
+            { invalid: !categoria.trim(), sectionRef: sectionCategoriaRef, focusSelector: "button[type='button']" },
+            { invalid: !dataFim.trim(), sectionRef: sectionPrazoRef, focusSelector: "#tarefa-prazo" },
+            {
+              invalid:
+                !responsavelId ||
+                !usuarios.some((u) => u.id === responsavelId),
+              sectionRef: sectionResponsavelRef,
+              focusSelector: "button[type='button']",
+            },
+          ]);
+        });
+      });
+      return;
+    }
     const colaboradores = colaboradorIds
       .map((id) => usuarios.find((u) => u.id === id))
       .filter(Boolean) as UsuarioTarefa[];
     const now = new Date().toISOString();
-    const fim = dataFim.trim()
-      ? new Date(`${dataFim.trim()}T23:59:59`).toISOString()
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    setSubmitAttempted(false);
+    const fim = new Date(`${dataFim.trim()}T23:59:59`).toISOString();
     const quemCriou =
       (currentUserId ? usuarios.find((u) => u.id === currentUserId) : undefined) ?? responsavel;
     const hasSelecionarTodos = clienteIds.includes("__TODOS__");
@@ -128,65 +191,118 @@ export function NovaTarefaForm({
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-6 p-4 lg:p-6">
-      <div>
+    <form onSubmit={handleSubmit} className="space-y-4 p-4 lg:p-6">
+      <div ref={sectionTituloRef}>
         <label htmlFor="tarefa-titulo" className={formLabelClass}>
-          Título
+          Título{" "}
+          <span className="text-red-600 dark:text-red-400" aria-hidden>
+            *
+          </span>
         </label>
-        <input
-          id="tarefa-titulo"
-          type="text"
-          value={titulo}
-          onChange={(e) => setTitulo(e.target.value)}
-          placeholder="Ex.: Revisar proposta comercial"
-          className={formInputClass}
-          required
-        />
-      </div>
-
-      <div>
-        <label className={formLabelClass}>
-          Categoria
-        </label>
-        <SearchableSelect
-          options={TAREFA_CATEGORIAS.map((c) => ({ value: c, label: c }))}
-          value={categoria}
-          onChange={setCategoria}
-          placeholder="Selecione a categoria..."
-          searchable={false}
-        />
+        <div className={requiredFieldWarningWrap(errTitulo)}>
+          <div className="relative">
+            <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="tarefa-titulo"
+              type="text"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ex.: Revisar proposta comercial"
+              aria-invalid={errTitulo}
+              className={`${formInputClass} pl-10`}
+            />
+          </div>
+        </div>
       </div>
 
       <div>
         <label htmlFor="tarefa-desc" className={formLabelClass}>
-          Descrição (opcional)
+          Descrição
         </label>
-        <textarea
-          id="tarefa-desc"
-          value={descricao}
-          onChange={(e) => setDescricao(e.target.value)}
-          rows={2}
-          placeholder="Detalhes da tarefa..."
-          className={formInputClass}
-        />
+        <div className="relative">
+          <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+          <textarea
+            id="tarefa-desc"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            rows={3}
+            placeholder="Detalhes da tarefa..."
+            className={`${formInputClass} min-h-[80px] resize-y pl-10`}
+          />
+        </div>
+      </div>
+
+      <div ref={sectionCategoriaRef}>
+        <label className={formLabelClass}>
+          Categoria{" "}
+          <span className="text-red-600 dark:text-red-400" aria-hidden>
+            *
+          </span>
+        </label>
+        <div className={requiredFieldWarningWrap(errCategoria)}>
+          <SearchableSelect
+            options={TAREFA_CATEGORIAS.map((c) => ({ value: c, label: c, icon: iconForCategoria(c) }))}
+            value={categoria}
+            onChange={setCategoria}
+            placeholder="Selecione a categoria..."
+            searchPlaceholder="Filtrar categoria..."
+            leadingIcon={Tags}
+          />
+        </div>
       </div>
 
       <div>
         <label className={formLabelClass}>
-          Responsável
+          Status
         </label>
         <SearchableSelect
-          options={responsavelOptions}
-          value={responsavelId}
-          onChange={setResponsavelId}
-          placeholder="Selecione o responsável..."
-          searchPlaceholder="Buscar responsável..."
+          options={[{ value: "a_fazer", label: "A Fazer" }]}
+          value="a_fazer"
+          onChange={() => undefined}
+          searchable={false}
+          leadingIcon={STATUS_LEADING_ICON}
+          disabled
         />
       </div>
 
+      <div ref={sectionPrazoRef}>
+        <label htmlFor="tarefa-prazo" className={formLabelClass}>
+          Prazo final{" "}
+          <span className="text-red-600 dark:text-red-400" aria-hidden>
+            *
+          </span>
+        </label>
+        <div className={requiredFieldWarningWrap(errPrazo)}>
+          <DateField
+            id="tarefa-prazo"
+            value={dataFim}
+            onChange={setDataFim}
+          />
+        </div>
+      </div>
+
+      <div ref={sectionResponsavelRef}>
+        <label className={formLabelClass}>
+          Responsável{" "}
+          <span className="text-red-600 dark:text-red-400" aria-hidden>
+            *
+          </span>
+        </label>
+        <div className={requiredFieldWarningWrap(errResponsavel)}>
+          <SearchableSelect
+            options={responsavelOptions}
+            value={responsavelId}
+            onChange={setResponsavelId}
+            placeholder="Selecione o responsável..."
+            searchPlaceholder="Buscar responsável..."
+            leadingIcon={User}
+          />
+        </div>
+      </div>
+
       <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Colaboradores (opcional)
+        <label className={formLabelClass}>
+          Colaboradores
         </label>
         <SearchableMultiSelect
           options={colaboradorOptions}
@@ -195,12 +311,13 @@ export function NovaTarefaForm({
           placeholder="Selecionar colaboradores..."
           searchPlaceholder="Buscar colaborador..."
           selectedLabel="Selecionados"
+          leadingIcon={Users}
         />
       </div>
 
       <div>
         <label className={formLabelClass}>
-          Clientes vinculados (opcional)
+          Clientes vinculados
         </label>
         <SearchableMultiSelect
           options={clienteOptions}
@@ -209,19 +326,8 @@ export function NovaTarefaForm({
           placeholder="Selecionar clientes..."
           searchPlaceholder="Buscar cliente..."
           selectedLabel="Selecionados"
+          leadingIcon={Building2}
         />
-      </div>
-
-      <div>
-        <label htmlFor="tarefa-prazo" className={formLabelClass}>
-          Prazo (data fim)
-        </label>
-        <DateField
-          id="tarefa-prazo"
-          value={dataFim}
-          onChange={setDataFim}
-        />
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Se vazio, será definido em 7 dias.</p>
       </div>
 
       <div className="space-y-1">
@@ -286,26 +392,12 @@ export function NovaTarefaForm({
         )}
       </div>
 
-      <div>
-        <label className={formLabelClass}>
-          Prioridade
-        </label>
-        <SearchableSelect
-          options={PRIORIDADES.map((p) => ({ value: p, label: PRIORIDADE_LABELS[p] }))}
-          value={prioridade}
-          onChange={(v) => setPrioridade(v as Tarefa["prioridade"])}
-          placeholder="Selecione a prioridade..."
-          searchable={false}
-        />
-      </div>
-
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
         <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
           Cancelar
         </button>
         <button
           type="submit"
-          disabled={!titulo.trim() || !responsavelId}
           className={formModalSubmitButtonClass}
         >
           Criar tarefa

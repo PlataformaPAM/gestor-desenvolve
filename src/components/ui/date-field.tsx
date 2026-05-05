@@ -164,10 +164,13 @@ export function DateField({
           disabled ? "cursor-not-allowed opacity-60 hover:border-slate-200 dark:hover:border-slate-600" : ""
         }`}
       >
-        <span className={value ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
-          {inputValue || placeholder}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className={value ? "min-w-0 truncate" : "min-w-0 truncate text-slate-400 dark:text-slate-500"}>
+            {inputValue || placeholder}
+          </span>
         </span>
-        <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
 
       {open && !disabled ? (
