@@ -41,7 +41,7 @@ export async function GET() {
   const mappedTarefas = tarefas
     .map((t) => {
       try {
-        return mapTarefaFromDb(t);
+        return mapTarefaFromDb(t as Parameters<typeof mapTarefaFromDb>[0]);
       } catch (e) {
         console.warn("[tarefas/bootstrap] falha ao mapear tarefa; item ignorado.", e);
         return null;
