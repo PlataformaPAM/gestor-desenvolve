@@ -173,7 +173,7 @@ export async function POST(req: Request) {
       });
     } catch (fallbackError) {
       console.error("[tarefas/create] fallback mínimo também falhou.", fallbackError);
-      return fail("INTERNAL_ERROR", "Não foi possível salvar a tarefa interna.", 500);
+      return fail("INTERNAL_ERROR", "Não foi possível salvar a tarefa interna (erro de persistência no banco).", 500);
     }
   }
 

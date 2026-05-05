@@ -9,6 +9,7 @@ import { TarefasTable } from "@/components/tarefas/tarefas-table";
 import { TarefaDetalheDrawer, type TarefaSalvarPayload } from "@/components/tarefas/tarefa-detalhe-drawer";
 import { NovaTarefaForm } from "@/components/tarefas/nova-tarefa-form";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
 import {
   STATUS_LABELS,
@@ -81,6 +82,16 @@ export default function TarefasPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null);
   const [tarefaToDelete, setTarefaToDelete] = useState<Tarefa | null>(null);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; variant: "success" | "error" }>({
+    visible: false,
+    message: "",
+    variant: "success",
+  });
+
+  const showToast = useCallback((message: string, variant: "success" | "error" = "success") => {
+    setToast({ visible: false, message: "", variant });
+    window.requestAnimationFrame(() => setToast({ visible: true, message, variant }));
+  }, []);
 
   const saveTarefa = useCallback(async (tarefa: Tarefa, isCreate = false): Promise<Tarefa> => {
     const url = isCreate ? "/api/tarefas" : `/api/tarefas/${tarefa.id}`;
@@ -90,8 +101,14 @@ export default function TarefasPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tarefa }),
     });
-    if (!res.ok) throw new Error("Falha ao persistir tarefa");
-    const payload = (await res.json()) as { tarefa?: Tarefa; data?: { tarefa?: Tarefa } };
+    const payload = (await res.json().catch(() => ({}))) as {
+      tarefa?: Tarefa;
+      data?: { tarefa?: Tarefa };
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new Error(payload?.error?.message || "Falha ao persistir tarefa");
+    }
     const saved = payload?.tarefa ?? payload?.data?.tarefa;
     if (!saved) throw new Error("Resposta inválida ao persistir tarefa");
     return saved;
@@ -259,14 +276,16 @@ export default function TarefasPage() {
     void saveTarefa(created, true)
       .then((saved) => {
         setTarefas((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
+        showToast("Tarefa interna salva com sucesso.", "success");
       })
-      .catch(() => {
+      .catch((error) => {
         // Evita “fantasma” no Kanban/lista quando o backend falha.
         setTarefas((prev) => prev.filter((t) => t.id !== created.id));
+        showToast(error instanceof Error ? error.message : "Falha ao salvar a tarefa interna.", "error");
       });
     setIsSheetOpen(false);
     setSelectedTarefa(null);
-  }, [saveTarefa, usuariosMap, clientes, session.userName, usuarioAtualId]);
+  }, [saveTarefa, usuariosMap, clientes, session.userName, usuarioAtualId, showToast]);
 
   const handleCloseSheet = useCallback(() => {
     setIsSheetOpen(false);
@@ -488,10 +507,13 @@ export default function TarefasPage() {
         .then((saved) => {
           setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
           setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+          showToast("Tarefa atualizada com sucesso.", "success");
         })
-        .catch(() => undefined);
+        .catch((error) => {
+          showToast(error instanceof Error ? error.message : "Falha ao atualizar a tarefa.", "error");
+        });
     },
-    [usuariosMap, selectedTarefa, tarefas, saveTarefa, autorEdicao, clientes]
+    [usuariosMap, selectedTarefa, tarefas, saveTarefa, autorEdicao, clientes, showToast]
   );
 
   const handleExcluirClick = useCallback((t: Tarefa) => {
@@ -507,8 +529,10 @@ export default function TarefasPage() {
       setIsSheetOpen(false);
     }
     setTarefaToDelete(null);
-    void deleteTarefa(id).catch(() => undefined);
-  }, [tarefaToDelete, selectedTarefa?.id, deleteTarefa]);
+    void deleteTarefa(id).catch((error) => {
+      showToast(error instanceof Error ? error.message : "Falha ao excluir a tarefa.", "error");
+    });
+  }, [tarefaToDelete, selectedTarefa?.id, deleteTarefa, showToast]);
 
   const sheetTitle = selectedTarefa ? (
     <span className="truncate font-semibold text-[#6D28D9] dark:text-violet-300">{selectedTarefa.codigo}</span>
@@ -660,6 +684,13 @@ export default function TarefasPage() {
         }
         confirmLabel="Sim, excluir permanentemente"
         destructive
+      />
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        variant={toast.variant}
+        onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
     </section>
   );
