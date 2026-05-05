@@ -117,6 +117,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }
     });
   } catch (error) {
+    const isMissingColumnError =
+      error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022";
+    if (isMissingColumnError) {
+      try {
+        // Hotfix para produção com schema legado: garante persistência do movimento no Kanban.
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Tarefa"
+           SET "status" = $1::"TarefaStatus",
+               "updatedAt" = $2
+           WHERE "id" = $3`,
+          tarefa.status,
+          new Date(),
+          id
+        );
+      } catch (fallbackStatusError) {
+        const detail =
+          fallbackStatusError instanceof Prisma.PrismaClientKnownRequestError
+            ? `Erro ${fallbackStatusError.code}`
+            : fallbackStatusError instanceof Error
+              ? fallbackStatusError.message
+              : "erro desconhecido";
+        return fail("INTERNAL_ERROR", `Falha ao persistir tarefa: ${detail}`, 500);
+      }
+    } else {
     const detail =
       error instanceof Prisma.PrismaClientKnownRequestError
         ? `Erro ${error.code}`
@@ -124,6 +148,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           ? error.message
           : "erro desconhecido";
     return fail("INTERNAL_ERROR", `Falha ao persistir tarefa: ${detail}`, 500);
+    }
   }
 
   let saved: any;
