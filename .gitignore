@@ -25,8 +25,9 @@
 # production
 /build
 
-# backups locais (não versionar zips)
+# backups locais (não versionar zips / bundles exportados)
 /backups/*.zip
+/backups/*.bundle
 
 # misc
 .DS_Store
