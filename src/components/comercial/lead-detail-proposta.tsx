@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileDown, FileText, Search, Trash2, Wallet } from "lucide-react";
+import { FileDown, FileText, Trash2, Wallet, Circle, RefreshCw, ListOrdered } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { SearchableOption } from "@/components/ui/searchable-select";
 import { AlertDialog } from "@/components/ui/alert-dialog";
@@ -56,9 +56,21 @@ const TIPO_MODELO_DOC_LABEL: Record<string, string> = {
 };
 
 const PAGAMENTO_NEGOCIACAO_OPTIONS: SearchableOption[] = [
-  { value: "mensal", label: "Mensal", icon: Wallet },
-  { value: "unica", label: "Única", icon: Wallet },
-  { value: "parcelado", label: "Parcelado", icon: Wallet },
+  {
+    value: "mensal",
+    label: "Mensal",
+    icon: ({ className }) => <RefreshCw className={`!text-blue-500 ${className ?? ""}`} />,
+  },
+  {
+    value: "unica",
+    label: "Única",
+    icon: ({ className }) => <Circle className={`!text-emerald-500 ${className ?? ""}`} />,
+  },
+  {
+    value: "parcelado",
+    label: "Parcelado",
+    icon: ({ className }) => <ListOrdered className={`!text-violet-500 ${className ?? ""}`} />,
+  },
 ];
 
 const PREVIEW_DOC_CLASS =
@@ -248,7 +260,6 @@ export function LeadDetailProposta({
   const [catalogoSolucoes, setCatalogoSolucoes] = useState<CatalogSolucao[]>([]);
 
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [condicoesStr, setCondicoesStr] = useState("");
   const [solucaoIdxParaRemover, setSolucaoIdxParaRemover] = useState<number | null>(null);
   const [modelosDocumento, setModelosDocumento] = useState<ModeloDocumentoLista[]>([]);
@@ -368,11 +379,16 @@ export function LeadDetailProposta({
     return solucoesNaOportunidade.reduce((acc, s) => acc + (s.valor ?? 0), 0);
   }, [solucoesNaOportunidade]);
 
-  const filteredDisponiveis = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return [];
-    return disponiveis.filter((s) => s.nome.toLowerCase().includes(term)).slice(0, 8);
-  }, [disponiveis, searchTerm]);
+  const solucoesDisponiveisOptions = useMemo<SearchableOption[]>(
+    () =>
+      disponiveis.map((s) => ({
+        value: s.id,
+        label: s.nome,
+        subtitle: formatCurrency(s.valorVenda),
+        icon: FileText,
+      })),
+    [disponiveis]
+  );
 
   const modeloDocumentoOptions = useMemo<SearchableOption[]>(
     () =>
@@ -416,7 +432,6 @@ export function LeadDetailProposta({
       valorTotal: valorTotal + (nova.valor ?? 0),
       interactions: [...(lead.interactions ?? []), log],
     });
-    setSearchTerm("");
     setAddingId(null);
     setCondicoesStr("");
   };
@@ -679,7 +694,7 @@ export function LeadDetailProposta({
       </p>
 
       {needsPrevisaoFechamento && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-800/40">
+        <div className="space-y-1">
           <FormDateField
             id="lead-previsao-fechamento-proposta"
             label="Previsão de fechamento"
@@ -702,47 +717,22 @@ export function LeadDetailProposta({
       )}
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-slate-800">Buscar solução para adicionar</h3>
+        <label className={comercialLabelClass}>Buscar solução para adicionar</label>
         {disponiveis.length === 0 ? (
           <p className="text-sm text-slate-500">Todas as soluções já foram adicionadas.</p>
         ) : (
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Digite o nome do produto/serviço..."
-              className={`${comercialInputClass} py-2 pl-9 pr-3`}
-            />
-            {filteredDisponiveis.length > 0 && !addingId && (
-              <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-                {filteredDisponiveis.map((sol) => (
-                  <button
-                    key={sol.id}
-                    type="button"
-                    onClick={() => setAddingId(sol.id)}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                  >
-                    <span className="flex min-w-0 items-center gap-2 font-medium text-slate-800">
-                      {sol.logoUrl?.trim() ? (
-                        <img
-                          src={sol.logoUrl.trim()}
-                          alt=""
-                          className="h-8 w-8 shrink-0 rounded object-contain"
-                        />
-                      ) : null}
-                      <span className="truncate">{sol.nome}</span>
-                    </span>
-                    <span className="text-slate-500">{formatCurrency(sol.valorVenda)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <SearchableSelect
+            options={solucoesDisponiveisOptions}
+            value={addingId ?? ""}
+            onChange={(v) => setAddingId(v || null)}
+            placeholder="Selecione uma solução..."
+            searchPlaceholder="Filtrar solução..."
+            emptyLabel="Nenhuma solução disponível."
+            leadingIcon={FileText}
+          />
         )}
         {addingId && selectedCatalog && (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex w-full min-w-0 items-center gap-2 text-sm font-medium text-slate-800">
                 {selectedCatalog.logoUrl?.trim() ? (
@@ -787,7 +777,7 @@ export function LeadDetailProposta({
                 type="button"
                 onClick={() => addSolucao(selectedCatalog.id)}
                 disabled={!condicoesStr.trim()}
-                className="rounded bg-[#6D28D9] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#5B21B6] disabled:opacity-50"
+                className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
               >
                 Adicionar
               </button>
@@ -797,7 +787,7 @@ export function LeadDetailProposta({
                   setAddingId(null);
                   setCondicoesStr("");
                 }}
-                className="text-sm text-slate-500 hover:text-slate-700"
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Cancelar
               </button>
@@ -806,17 +796,17 @@ export function LeadDetailProposta({
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-900">
-        <div className="border-b border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-600 dark:bg-slate-800/50">
+      <div>
+        <div className="mb-2">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Soluções na oportunidade</h3>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             Cada linha é um item da proposta; ajuste pagamento e parcelas por solução.
           </p>
         </div>
         {solucoesNaOportunidade.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">Nenhuma solução adicionada ainda.</p>
+          <p className="py-2 text-sm text-slate-500 dark:text-slate-400">Nenhuma solução adicionada ainda.</p>
         ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-600">
+          <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white dark:divide-slate-600 dark:border-slate-600 dark:bg-slate-900">
             {solucoesNaOportunidade.map((s, idx) => (
               <div key={s.id} className="px-4 py-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -901,7 +891,7 @@ export function LeadDetailProposta({
           </div>
         )}
         {valorTotal > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-600 dark:bg-slate-800/50">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Total da oportunidade
             </span>
@@ -913,7 +903,7 @@ export function LeadDetailProposta({
       </div>
 
       {modelosDocumento.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-600 dark:bg-slate-800/30">
+        <div>
           <h3 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
             Documento a partir de modelo
           </h3>
@@ -936,39 +926,39 @@ export function LeadDetailProposta({
                 leadingIcon={FileText}
               />
             </div>
-            <div className="flex w-full gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => void visualizarDocumentoModelo()}
                 disabled={docPreviewLoading || !modeloDocumentoId}
-                className="inline-flex min-h-[2.625rem] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-[#6D28D9] bg-white px-3 py-2.5 text-center text-sm font-medium leading-snug text-[#6D28D9] hover:bg-violet-50 disabled:opacity-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
+                className="inline-flex min-h-[2.625rem] min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {docPreviewLoading ? (
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : (
                   <FileText className="h-4 w-4 shrink-0" />
                 )}
-                <span className="min-w-0">Visualizar com dados do lead</span>
+                <span className="min-w-0">Visualizar prévia</span>
               </button>
               <button
                 type="button"
                 onClick={() => void gerarDocumentoModelo()}
                 disabled={docGerarLoading || !modeloDocumentoId}
-                className="inline-flex min-h-[2.625rem] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2.5 text-center text-sm font-medium leading-snug text-white hover:bg-[#5B21B6] disabled:opacity-50"
+                className="inline-flex min-h-[2.625rem] min-w-0 items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
               >
                 {docGerarLoading ? (
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
                   <FileDown className="h-4 w-4 shrink-0" />
                 )}
-                <span className="min-w-0">Gerar e registrar no histórico</span>
+                <span className="min-w-0">Gerar e registrar</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
+      <div>
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Documentos já gerados</h3>
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
           Use os contatos do cliente e da oportunidade abaixo para escolher o destinatário, envie por WhatsApp com mensagem
@@ -987,10 +977,7 @@ export function LeadDetailProposta({
         ) : (
           <ul className="mt-3 space-y-3">
             {docsGerados.map((d) => (
-              <li
-                key={d.id}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-800/40"
-              >
+              <li key={d.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-600/80">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">

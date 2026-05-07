@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import clsx from "clsx";
 import {
   BadgeHelp,
   Globe,
@@ -37,27 +38,52 @@ function FacebookBrandIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Ícones da origem com cores de marca (WhatsApp, Instagram, Facebook) ou paleta alinhada ao restante.
+ * Usa `!text-*` para prevalecer sobre o `text-slate-400` do `SearchableSelect`.
+ */
 export function iconForOrigem(value: string): ComponentType<{ className?: string }> {
   switch (value) {
-    case "email":
-      return Mail;
     case "whatsapp":
-      return WhatsappBrandIcon;
-    case "ligacao":
-      return PhoneCall;
+      return ({ className }) => (
+        <WhatsappBrandIcon className={clsx("!text-[#25D366]", className)} />
+      );
     case "instagram":
-      return InstagramBrandIcon;
+      return ({ className }) => (
+        <InstagramBrandIcon className={clsx("!text-[#E4405F]", className)} />
+      );
     case "facebook":
-      return FacebookBrandIcon;
+      return ({ className }) => (
+        <FacebookBrandIcon className={clsx("!text-[#1877F2]", className)} />
+      );
+    case "email":
+      return ({ className }) => (
+        <Mail className={clsx("!text-sky-600 dark:!text-sky-400", className)} />
+      );
+    case "ligacao":
+      return ({ className }) => (
+        <PhoneCall className={clsx("!text-emerald-600 dark:!text-emerald-400", className)} />
+      );
     case "site":
-      return Globe;
+      return ({ className }) => (
+        <Globe className={clsx("!text-indigo-600 dark:!text-indigo-400", className)} />
+      );
     case "email_marketing":
-      return MailPlus;
-    case "indicacao":
-      return UserCircle2;
+      return ({ className }) => (
+        <MailPlus className={clsx("!text-violet-600 dark:!text-violet-400", className)} />
+      );
     case "evento":
-      return Megaphone;
+      return ({ className }) => (
+        <Megaphone className={clsx("!text-rose-600 dark:!text-rose-400", className)} />
+      );
+    case "indicacao":
+      return ({ className }) => (
+        <UserCircle2 className={clsx("!text-cyan-600 dark:!text-cyan-400", className)} />
+      );
+    case "outro":
     default:
-      return BadgeHelp;
+      return ({ className }) => (
+        <BadgeHelp className={clsx("!text-slate-500 dark:!text-slate-400", className)} />
+      );
   }
 }

@@ -638,7 +638,7 @@ export default function ConstrutorDocumentosPage() {
         title={modeloAtual.id ? "Editar modelo de documento" : "Novo modelo de documento"}
         maxWidth="sm:max-w-5xl"
       >
-        <div className="space-y-4 p-1">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 p-1 pr-2">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Nome do modelo</label>

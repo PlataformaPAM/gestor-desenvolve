@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { UserCog, Users } from "lucide-react";
+import { User, Users } from "lucide-react";
 import type { Lead, LeadOwnershipSnapshot } from "@/lib/comercial/types";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 import { SearchableMultiSelect, SearchableSelect } from "@/components/ui/searchable-select";
-
-const labelClass = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300";
+import { formLabelClass } from "@/components/ui/field-patterns";
+import { FormSearchableSelectField } from "@/components/ui/form-fields";
 
 type Membro = { id: string; nome: string };
 
@@ -64,12 +64,16 @@ export function LeadResponsavelEquipe({
     setColaboradores((ownership.colaboradores ?? []).map((c) => ({ id: c.id, nome: c.nome })));
   }, [ownership, listaResponsaveisPrincipal, usuarioAtual]);
 
-  const colaboradoresDisponiveis = useMemo(
+  const colaboradoresOptions = useMemo(
     () =>
-      membrosEquipe.filter(
-        (m) => m.id !== responsavelPrincipal.id && !colaboradores.some((c) => c.id === m.id)
-      ),
-    [responsavelPrincipal.id, colaboradores, membrosEquipe]
+      membrosEquipe
+        .filter((m) => m.id !== responsavelPrincipal.id)
+        .map((m) => ({
+          value: m.id,
+          label: m.id === usuarioAtual.id ? `${m.nome} (você)` : m.nome,
+          icon: Users,
+        })),
+    [membrosEquipe, responsavelPrincipal.id, usuarioAtual.id]
   );
 
   const pushOwnership = (previous: LeadOwnershipSnapshot, next: LeadOwnershipSnapshot) => {
@@ -83,17 +87,14 @@ export function LeadResponsavelEquipe({
   });
 
   return (
-    <>
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <label htmlFor="lead-responsavel-principal" className={labelClass}>
-            Responsável Principal
-          </label>
+    <div className="space-y-4">
+      <div>
+        <FormSearchableSelectField id="lead-responsavel-principal" label="Responsável">
           <SearchableSelect
             options={listaResponsaveisPrincipal.map((r) => ({
               value: r.id,
               label: r.id === usuarioAtual.id ? `${r.nome} (você)` : r.nome,
-              icon: UserCog,
+              icon: User,
             }))}
             value={responsavelPrincipal.id}
             onChange={(id) => {
@@ -108,41 +109,31 @@ export function LeadResponsavelEquipe({
             }}
             placeholder="Selecione o responsável..."
             searchPlaceholder="Buscar responsável..."
-            leadingIcon={UserCog}
+            leadingIcon={User}
           />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Ao criar um novo lead, o usuário logado é o padrão. Altere para transferir a responsabilidade.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className={labelClass.replace("mb-1 ", "")}>Colaboradores</span>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Outros membros da equipe que atuam na oportunidade em conjunto.
-          </p>
-          <SearchableMultiSelect
-            options={colaboradoresDisponiveis.map((m) => ({ value: m.id, label: m.nome, icon: Users }))}
-            values={colaboradores.map((c) => c.id)}
-            onChange={(ids) => {
-              const previous = snapshotFromState(responsavelPrincipal, colaboradores);
-              const allMap = new Map(
-                membrosEquipe
-                  .filter((m) => m.id !== responsavelPrincipal.id)
-                  .map((m) => [m.id, m] as const)
-              );
-              const nextCols = ids.map((id) => allMap.get(id)).filter(Boolean) as Membro[];
-              setColaboradores(nextCols);
-              pushOwnership(previous, snapshotFromState(responsavelPrincipal, nextCols));
-            }}
-            placeholder="Selecionar colaboradores..."
-            searchPlaceholder="Buscar colaborador..."
-            selectedLabel="Selecionados"
-            leadingIcon={Users}
-          />
-        </div>
+        </FormSearchableSelectField>
       </div>
-    </>
+
+      <div className="space-y-1">
+        <label className={formLabelClass}>Colaboradores</label>
+        <SearchableMultiSelect
+          options={colaboradoresOptions}
+          values={colaboradores.map((c) => c.id)}
+          onChange={(ids) => {
+            const previous = snapshotFromState(responsavelPrincipal, colaboradores);
+            const allMap = new Map(
+              membrosEquipe.filter((m) => m.id !== responsavelPrincipal.id).map((m) => [m.id, m] as const)
+            );
+            const nextCols = ids.map((id) => allMap.get(id)).filter(Boolean) as Membro[];
+            setColaboradores(nextCols);
+            pushOwnership(previous, snapshotFromState(responsavelPrincipal, nextCols));
+          }}
+          placeholder="Selecionar colaboradores..."
+          searchPlaceholder="Buscar colaborador..."
+          selectedLabel="Selecionados"
+          leadingIcon={Users}
+        />
+      </div>
+    </div>
   );
 }

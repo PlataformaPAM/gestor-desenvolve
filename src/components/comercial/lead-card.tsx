@@ -4,28 +4,32 @@ import { memo } from "react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
 import type { Lead, LeadPriority, PipelineStageId } from "@/lib/comercial/types";
+import { PRIORIDADE_LABELS } from "@/lib/comercial/constants";
 import { formatCurrency } from "@/lib/comercial/utils";
 import { STAGE_COLORS } from "@/lib/comercial/stage-colors";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 
-const PRIORITY_STYLES: Record<
-  LeadPriority,
-  { label: string; className: string }
-> = {
-  alta: {
-    label: "Alta",
+/** Mesma hierarquia visual das prioridades em Tarefas (Kanban interno). */
+const PRIORITY_STYLES: Record<LeadPriority, { label: string; className: string }> = {
+  baixa: {
+    label: PRIORIDADE_LABELS.baixa,
     className:
-      "bg-[#6D28D9]/10 text-[#6D28D9] border border-[#6D28D9]/20 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/35",
+      "border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300",
   },
   media: {
-    label: "Média",
+    label: PRIORIDADE_LABELS.media,
     className:
-      "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600",
+      "border border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/50 dark:text-amber-300",
   },
-  baixa: {
-    label: "Baixa",
+  alta: {
+    label: PRIORIDADE_LABELS.alta,
     className:
-      "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700/50",
+      "border border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-700/50 dark:bg-orange-950/50 dark:text-orange-300",
+  },
+  urgente: {
+    label: PRIORIDADE_LABELS.urgente,
+    className:
+      "border border-red-200 bg-red-100 text-red-700 dark:border-red-700/50 dark:bg-red-950/50 dark:text-red-300",
   },
 };
 

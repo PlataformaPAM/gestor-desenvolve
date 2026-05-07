@@ -1,9 +1,10 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { Lead } from "@/lib/comercial/types";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import { useAuth } from "@/contexts/auth-context";
+import { comercialLabelClass } from "./field-styles";
 
 type LeadDetailContratosProps = {
   lead: Lead;
@@ -63,7 +64,6 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
   const total = itemList.length;
 
   const anexosOrdenados = anexosClienteList(lead);
-  const nomesAnexos = anexosOrdenados.map((a) => a.nome);
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
@@ -71,19 +71,24 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
         Conclua o checklist da etapa de contratação e anexe os documentos do cliente conforme o processo.
       </p>
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Checklist da etapa</h3>
-        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+      <div className="space-y-2">
+        <p className={comercialLabelClass}>Checklist da etapa</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {completed} de {total} concluídos
         </p>
         <ul className="space-y-2">
           {itemList.map(({ key, label }) => {
             const done = !!checklist[key];
             return (
-              <li key={key} className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
+              <li
+                key={key}
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800"
+              >
+                <input
+                  type="checkbox"
+                  id={`contrato-${key}`}
+                  checked={done}
+                  onChange={() => {
                     const next = !checklist[key];
                     onUpdateLead({
                       contratoChecklist: { ...checklist, [key]: next },
@@ -101,18 +106,14 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
                       ],
                     });
                   }}
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                    done
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-300 bg-white text-slate-400 hover:border-[#6D28D9] hover:text-[#6D28D9] dark:border-slate-600 dark:bg-slate-900"
-                  }`}
-                  aria-label={done ? "Desmarcar" : "Marcar como concluído"}
+                  className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
+                />
+                <label
+                  htmlFor={`contrato-${key}`}
+                  className={done ? "text-sm text-slate-500 line-through" : "text-sm text-slate-700 dark:text-slate-200"}
                 >
-                  {done ? <Check className="h-4 w-4" /> : null}
-                </button>
-                <span className={done ? "text-slate-500 line-through" : "text-slate-800 dark:text-slate-200"}>
                   {label}
-                </span>
+                </label>
               </li>
             );
           })}
@@ -122,7 +123,7 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
         )}
       </div>
 
-      <div>
+      <div className="space-y-2">
         <h3 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
           Anexar arquivos do Cliente
         </h3>
@@ -130,7 +131,7 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
           Inclua minutas, assinaturas e qualquer documento necessário. Cada envio registra data e nome do arquivo.
         </p>
         <MultiFileAttachment
-          existingFiles={nomesAnexos}
+          existingFiles={[]}
           newFiles={[]}
           onNewFilesChange={(files) => {
             const now = new Date().toISOString();
@@ -159,15 +160,42 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
         />
         {anexosOrdenados.length > 0 && (
           <ul className="mt-4 space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-            {anexosOrdenados.map((a) => (
+            {anexosOrdenados.map((a, idx) => (
               <li
-                key={`${a.nome}-${a.anexadoEm}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800/50"
+                key={`${a.nome}-${a.anexadoEm}-${idx}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800/40"
               >
-                <span className="font-medium text-slate-800 dark:text-slate-100">{a.nome}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {formatAnexoData(a.anexadoEm)}
-                </span>
+                <div className="min-w-0">
+                  <span className="block truncate font-medium text-slate-800 dark:text-slate-100">{a.nome}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatAnexoData(a.anexadoEm)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = anexosOrdenados.filter((_, i) => i !== idx);
+                    onUpdateLead({
+                      contratoAnexosCliente: next,
+                      interactions: [
+                        ...(lead.interactions ?? []),
+                        {
+                          id: createLogId(),
+                          date: new Date().toISOString(),
+                          user: currentUserName,
+                          userId: currentUserId,
+                          type: "sistema",
+                          action: "UPDATE",
+                          description: `Removeu arquivo do cliente: ${a.nome}.`,
+                        },
+                      ],
+                    });
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                  aria-label={`Excluir ${a.nome}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </li>
             ))}
           </ul>

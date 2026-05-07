@@ -21,11 +21,11 @@ export const STAGE_COLORS: Record<PipelineStageId, StageColorConfig> = {
     text: "text-slate-700 dark:text-slate-200",
   },
   qualificacao: {
-    bg: "bg-orange-50 dark:bg-orange-950/50",
-    borderTop: "border-t-4 border-orange-400 dark:border-orange-500",
-    borderLeft: "border-l-orange-400 dark:border-l-orange-500",
-    badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/60 dark:text-orange-300",
-    text: "text-orange-700 dark:text-orange-300",
+    bg: "bg-cyan-50 dark:bg-cyan-950/45",
+    borderTop: "border-t-4 border-cyan-500 dark:border-cyan-400",
+    borderLeft: "border-l-cyan-500 dark:border-l-cyan-400",
+    badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300",
+    text: "text-cyan-700 dark:text-cyan-300",
   },
   proposta: {
     bg: "bg-purple-50 dark:bg-violet-950/40",

@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import type { DropResult } from "@hello-pangea/dnd";
+import { AlertTriangle } from "lucide-react";
 import { TabsView, type ViewMode } from "@/components/comercial/tabs-view";
 import { LeadList } from "@/components/comercial/lead-list";
 import { LeadDetailPanel } from "@/components/comercial/lead-detail-panel";
@@ -58,6 +59,20 @@ function createSystemLog(
   };
 }
 
+function clearFinanceiroFluxoPendente(lead: Lead): NonNullable<Lead["financeiroFluxo"]> {
+  return {
+    ...(lead.financeiroFluxo ?? { status: "nenhum", bloqueadoEdicao: false }),
+    status: "nenhum",
+    bloqueadoEdicao: false,
+    solicitadoEm: undefined,
+    aprovadoEm: undefined,
+    devolvidoEm: undefined,
+    motivoDevolucao: undefined,
+    liberacaoSolicitadaEm: undefined,
+    motivoSolicitacaoLiberacao: undefined,
+  };
+}
+
 function ComercialPageContent() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
@@ -82,6 +97,15 @@ function ComercialPageContent() {
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
   const [pendingLeadCountById, setPendingLeadCountById] = useState<Record<string, number>>({});
   const [pendingStageCountById, setPendingStageCountById] = useState<Partial<Record<PipelineStageId, number>>>({});
+  const [kanbanPerdaModal, setKanbanPerdaModal] = useState<{
+    sourceId: PipelineStageId;
+    destId: PipelineStageId;
+    sourceIndex: number;
+    destIndex: number;
+    leadId: string;
+    leadName: string;
+  } | null>(null);
+  const [kanbanMotivoPerda, setKanbanMotivoPerda] = useState("");
   const orderKey = useMemo(() => `pam.comercial.order.${session.userId ?? session.userName ?? "user"}`, [session.userId, session.userName]);
 
   const showErrorToast = useCallback((message: string, duration = 12000) => {
@@ -331,6 +355,108 @@ function ComercialPageContent() {
     setSelectedLeadId(null);
   }, []);
 
+  const applyKanbanMove = useCallback(
+    (params: {
+      sourceId: PipelineStageId;
+      destId: PipelineStageId;
+      sourceIndex: number;
+      destIndex: number;
+      leadId?: string;
+      motivoPerda?: string;
+    }) => {
+      const { sourceId, destId, sourceIndex, destIndex, leadId, motivoPerda } = params;
+      let movedLeadForFechado: Lead | undefined;
+      let movedLeadPersist: Lead | undefined;
+      let gateMessage: string | null = null;
+
+      setColumns((prev) => {
+        const next: ColumnsState = {
+          prospecao: [...(prev.prospecao ?? [])],
+          qualificacao: [...(prev.qualificacao ?? [])],
+          proposta: [...(prev.proposta ?? [])],
+          contratacao: [...(prev.contratacao ?? [])],
+          fechado: [...(prev.fechado ?? [])],
+          perdido: [...(prev.perdido ?? [])],
+        };
+        const sourceList = next[sourceId];
+        const resolvedSourceIndex =
+          leadId != null ? sourceList.findIndex((l) => String(l.id) === String(leadId)) : sourceIndex;
+        if (resolvedSourceIndex < 0) return prev;
+        const [removed] = sourceList.splice(resolvedSourceIndex, 1);
+        if (!removed) return prev;
+
+        const movingAcrossStages = sourceId !== destId;
+        if (movingAcrossStages && removed.financeiroFluxo?.bloqueadoEdicao) {
+          sourceList.splice(resolvedSourceIndex, 0, removed);
+          gateMessage = "Lead bloqueado pelo Financeiro. Solicite liberação para editar ou mover.";
+          return prev;
+        }
+
+        if (movingAcrossStages) {
+          const gate = canTransitionStage(removed, sourceId, destId);
+          if (!gate.allowed) {
+            sourceList.splice(resolvedSourceIndex, 0, removed);
+            gateMessage = `Ação bloqueada. Pendências:\n${gate.reasons.join("\n")}`;
+            return prev;
+          }
+        }
+
+        movedLeadForFechado = removed;
+        const updated: Lead = movingAcrossStages
+          ? {
+              ...removed,
+              stageId: destId,
+              enteredStageAt: new Date().toISOString(),
+              financeiroFluxo:
+                destId === "fechado"
+                  ? {
+                      ...(removed.financeiroFluxo ?? { status: "nenhum", bloqueadoEdicao: false }),
+                      status: "pendente_aprovacao",
+                      bloqueadoEdicao: false,
+                      solicitadoEm: new Date().toISOString(),
+                    }
+                  : sourceId === "fechado" && !removed.financeiroFluxo?.bloqueadoEdicao
+                    ? clearFinanceiroFluxoPendente(removed)
+                  : removed.financeiroFluxo,
+              interactions:
+                destId === "perdido" && motivoPerda?.trim()
+                  ? [
+                      ...(removed.interactions ?? []),
+                      createSystemLog(
+                        { nome: currentUserName, userId: session.userId },
+                        `Lead marcado como Perdido. Motivo: ${motivoPerda.trim()}`
+                      ),
+                    ]
+                  : removed.interactions,
+            }
+          : removed;
+
+        movedLeadPersist = movingAcrossStages
+          ? withAudit(removed, updated, { nome: currentUserName, userId: session.userId })
+          : updated;
+        next[destId].splice(destIndex, 0, movedLeadPersist);
+        persistOrder(next);
+        return next;
+      });
+
+      if (gateMessage) {
+        showErrorToast(gateMessage, 10000);
+        return;
+      }
+      if (destId === "fechado" && sourceId !== destId && movedLeadForFechado) {
+        const valorTotal = movedLeadForFechado.valorTotal ?? movedLeadForFechado.value;
+        setFechadoCelebration({ show: true, valorTotal });
+      }
+      if (movedLeadPersist && sourceId !== destId) {
+        void persistLead(movedLeadPersist).catch(() => {
+          void rollbackFromServer();
+          showErrorToast("Não foi possível salvar a movimentação. Os dados foram recarregados.");
+        });
+      }
+    },
+    [currentUserName, session.userId, persistLead, rollbackFromServer, persistOrder, showErrorToast]
+  );
+
   const onDragEnd = useCallback((result: DropResult) => {
     const { source, destination } = result;
     if (!destination) return;
@@ -338,91 +464,28 @@ function ComercialPageContent() {
     const sourceId = source.droppableId as PipelineStageId;
     const destId = destination.droppableId as PipelineStageId;
     if (sourceId === destId && source.index === destination.index) return;
-    let movedLeadForFechado: Lead | undefined;
-    let movedLeadPersist: Lead | undefined;
-    let motivoPerdaKanban: string | null = null;
-    let gateMessage: string | null = null;
 
-    setColumns((prev) => {
-      const next: ColumnsState = {
-        prospecao: [...(prev.prospecao ?? [])],
-        qualificacao: [...(prev.qualificacao ?? [])],
-        proposta: [...(prev.proposta ?? [])],
-        contratacao: [...(prev.contratacao ?? [])],
-        fechado: [...(prev.fechado ?? [])],
-        perdido: [...(prev.perdido ?? [])],
-      };
-      const sourceList = next[sourceId];
-      const [removed] = sourceList.splice(source.index, 1);
-      if (!removed) return prev;
-      if (removed.financeiroFluxo?.bloqueadoEdicao) {
-        sourceList.splice(source.index, 0, removed);
-        gateMessage = "Lead bloqueado pelo Financeiro. Solicite liberação para editar ou mover.";
-        return prev;
-      }
-      if (destId === "perdido") {
-        const motivo = window.prompt("Informe o motivo da perda para mover este lead para Perdido:");
-        if (!motivo || !motivo.trim()) {
-          sourceList.splice(source.index, 0, removed);
-          gateMessage = "Ação bloqueada. Informe o motivo da perda para mover para Perdido.";
-          return prev;
-        }
-        motivoPerdaKanban = motivo.trim();
-      }
-      const gate = canTransitionStage(removed, sourceId, destId);
-      if (!gate.allowed) {
-        sourceList.splice(source.index, 0, removed);
-        gateMessage = `Ação bloqueada. Pendências:\n${gate.reasons.join("\n")}`;
-        return prev;
-      }
-      movedLeadForFechado = removed;
-
-      const updated: Lead = {
-        ...removed,
-        stageId: destId,
-        enteredStageAt: sourceId === destId ? removed.enteredStageAt : new Date().toISOString(),
-        financeiroFluxo:
-          destId === "fechado"
-            ? {
-                ...(removed.financeiroFluxo ?? { status: "nenhum", bloqueadoEdicao: false }),
-                status: "pendente_aprovacao",
-                bloqueadoEdicao: false,
-                solicitadoEm: new Date().toISOString(),
-              }
-            : removed.financeiroFluxo,
-        interactions:
-          destId === "perdido" && motivoPerdaKanban
-            ? [
-                ...(removed.interactions ?? []),
-                createSystemLog(
-                  { nome: currentUserName, userId: session.userId },
-                  `Lead marcado como Perdido. Motivo: ${motivoPerdaKanban}`
-                ),
-              ]
-            : removed.interactions,
-      };
-      movedLeadPersist = withAudit(removed, updated, { nome: currentUserName, userId: session.userId });
-      next[destId].splice(destination.index, 0, movedLeadPersist);
-      persistOrder(next);
-      return next;
-    });
-
-    if (gateMessage) {
-      showErrorToast(gateMessage, 10000);
+    if (sourceId !== destId && destId === "perdido" && sourceId !== "perdido") {
+      const sourceLead = columns[sourceId]?.[source.index];
+      setKanbanPerdaModal({
+        sourceId,
+        destId,
+        sourceIndex: source.index,
+        destIndex: destination.index,
+        leadId: String(sourceLead?.id ?? ""),
+        leadName: sourceLead?.name ?? "Lead",
+      });
+      setKanbanMotivoPerda("");
       return;
     }
 
-    if (destId === "fechado" && movedLeadForFechado) {
-      const valorTotal = movedLeadForFechado.valorTotal ?? movedLeadForFechado.value;
-      setFechadoCelebration({ show: true, valorTotal });
-    }
-    if (movedLeadPersist && sourceId !== destId) {
-      void persistLead(movedLeadPersist).catch(() => {
-        void rollbackFromServer();
-        showErrorToast("Não foi possível salvar a movimentação. Os dados foram recarregados.");
-      });
-    }
-  }, [currentUserName, session.userId, persistLead, rollbackFromServer, persistOrder, showErrorToast]);
+    applyKanbanMove({
+      sourceId,
+      destId,
+      sourceIndex: source.index,
+      destIndex: destination.index,
+    });
+  }, [columns, applyKanbanMove]);
 
   const handleNovoLeadSubmit = useCallback(
     (raw: Partial<Lead> & Pick<Lead, "name" | "value" | "stageId" | "priority">) => {
@@ -547,6 +610,8 @@ function ComercialPageContent() {
                   bloqueadoEdicao: false,
                   solicitadoEm: new Date().toISOString(),
                 }
+              : selectedLead.stageId === "fechado" && !selectedLead.financeiroFluxo?.bloqueadoEdicao
+                ? clearFinanceiroFluxoPendente(selectedLead)
               : selectedLead.financeiroFluxo,
           interactions:
             stageId === "perdido" && options?.motivoPerda?.trim()
@@ -731,7 +796,7 @@ function ComercialPageContent() {
 
   return (
     <section className="w-full min-w-0 space-y-6">
-      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:gap-3">
+      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end sm:gap-3">
         <TabsView value={viewMode} onChange={setViewMode} />
       </div>
 
@@ -792,6 +857,77 @@ function ComercialPageContent() {
         onVincularExistente={handleQualificarComExistente}
         onCadastrarEVincular={handleQualificarComNovo}
       />
+
+      {kanbanPerdaModal ? (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/40 px-4"
+          onMouseDown={() => {
+            setKanbanPerdaModal(null);
+            setKanbanMotivoPerda("");
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-5 shadow-2xl dark:border-red-500/40 dark:bg-slate-900"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" />
+              <div>
+                <h3 className="text-base font-semibold text-red-700 dark:text-red-300">
+                  Motivo da perda
+                </h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Informe o motivo para mover <strong>{kanbanPerdaModal.leadName}</strong> para
+                  Perdido.
+                </p>
+              </div>
+            </div>
+
+            <textarea
+              value={kanbanMotivoPerda}
+              onChange={(e) => setKanbanMotivoPerda(e.target.value)}
+              rows={4}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition focus:border-red-300 focus:ring-2 focus:ring-red-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-red-400 dark:focus:ring-red-900/40"
+              placeholder="Descreva o motivo da perda..."
+            />
+
+            <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setKanbanPerdaModal(null);
+                  setKanbanMotivoPerda("");
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!kanbanMotivoPerda.trim()) {
+                    showErrorToast("Informe o motivo da perda para mover para Perdido.");
+                    return;
+                  }
+                  applyKanbanMove({
+                    sourceId: kanbanPerdaModal.sourceId,
+                    destId: kanbanPerdaModal.destId,
+                    sourceIndex: kanbanPerdaModal.sourceIndex,
+                    destIndex: kanbanPerdaModal.destIndex,
+                    leadId: kanbanPerdaModal.leadId,
+                    motivoPerda: kanbanMotivoPerda.trim(),
+                  });
+                  setKanbanPerdaModal(null);
+                  setKanbanMotivoPerda("");
+                }}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Marcar como Perdido
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <Toast
         message={toastError.message}

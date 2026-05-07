@@ -6,7 +6,7 @@ export type PipelineStageId =
   | "fechado"
   | "perdido";
 
-export type LeadPriority = "alta" | "media" | "baixa";
+export type LeadPriority = "baixa" | "media" | "alta" | "urgente";
 
 export type LeadOrigem =
   | "email"

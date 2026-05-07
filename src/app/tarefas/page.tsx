@@ -670,6 +670,8 @@ export default function TarefasPage() {
               tarefa={selectedTarefa}
               usuariosMap={usuariosMap}
               clientes={clientes}
+              currentUserId={usuarioAtualId}
+              onClose={handleCloseSheet}
               onTrocarResponsavel={(t, novoId) => {
                 const u = usuariosMap.get(novoId);
                 if (!u) return;

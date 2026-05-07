@@ -285,7 +285,7 @@ export default function PapeisTimbradosPage() {
       {!!timbres.length && !timbresFiltrados.length && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">Nenhum timbrado corresponde à busca.</div>}
 
       <DrawerSheet open={drawerOpen} onClose={() => setDrawerOpen(false)} title={form.id ? "Editar timbrado" : "Novo timbrado"} maxWidth="sm:max-w-4xl">
-        <div className="space-y-4 p-1">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 p-1 pr-2">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
               Nome do timbrado

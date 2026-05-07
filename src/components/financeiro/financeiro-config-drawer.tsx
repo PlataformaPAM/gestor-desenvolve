@@ -42,6 +42,7 @@ import {
   normalizeContaPresetId,
   type VisualMeta,
   visualStorageKey,
+  FINANCEIRO_CONTA_VISUALS_UPDATE_EVENT,
 } from "@/lib/financeiro/visuals";
 import {
   formInputClass,
@@ -52,14 +53,32 @@ import {
   SearchableSelect,
   type SearchableOption,
 } from "@/components/ui/searchable-select";
-import { iconForMeioPagamentoNome } from "@/lib/financeiro/meio-pagamento-icon";
+import { iconForMeioPagamentoNome, meioPagamentoIconColorClass } from "@/lib/financeiro/meio-pagamento-icon";
 
 const formInputWithIconClass = `${formInputClass} pl-9`;
 
 const CATEGORIA_TIPO_OPTIONS: SearchableOption[] = [
-  { value: "entrada", label: "Entrada", icon: TrendingUp },
-  { value: "saida", label: "Saída", icon: TrendingDown },
-  { value: "ambos", label: "Ambos", icon: GitCompareArrows },
+  {
+    value: "entrada",
+    label: "Entrada",
+    icon: ({ className }) => (
+      <TrendingUp className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+    ),
+  },
+  {
+    value: "saida",
+    label: "Saída",
+    icon: ({ className }) => (
+      <TrendingDown className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+    ),
+  },
+  {
+    value: "ambos",
+    label: "Ambos",
+    icon: ({ className }) => (
+      <GitCompareArrows className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />
+    ),
+  },
 ];
 
 type TabId = "contas" | "categorias" | "meios";
@@ -207,6 +226,7 @@ export function FinanceiroConfigDrawer({
   useEffect(() => {
     try {
       window.localStorage.setItem(visualStorageKey("conta"), JSON.stringify(contaVisualById));
+      window.dispatchEvent(new Event(FINANCEIRO_CONTA_VISUALS_UPDATE_EVENT));
     } catch {
       // noop
     }
@@ -455,12 +475,18 @@ export function FinanceiroConfigDrawer({
   };
 
   return (
-    <DrawerSheet open={open} onClose={onClose} title="Configurações do Financeiro">
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
+    <DrawerSheet
+      open={open}
+      onClose={onClose}
+      title="Configurações do Financeiro"
+      mobileContentPaddingClassName="px-0"
+      desktopContentPaddingClassName="px-0"
+    >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           role="tablist"
           aria-label="Configurações do financeiro"
-          className="flex w-full flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
+          className="shrink-0 flex w-full flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
         >
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -476,7 +502,9 @@ export function FinanceiroConfigDrawer({
                 onClick={() => setTab(t.id)}
                 className={clsx(
                   "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors",
-                  isActive ? "text-[#6D28D9]" : "text-slate-500 hover:text-slate-700"
+                  isActive
+                    ? "text-[#6D28D9] dark:text-violet-300"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 {isActive && (
@@ -493,13 +521,14 @@ export function FinanceiroConfigDrawer({
           })}
         </div>
 
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
         {tab === "contas" && (
           <section id={`${tabId}-contas-panel`} role="tabpanel" aria-labelledby={`${tabId}-contas`} className="space-y-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-900">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor={`${tabId}-nova-conta-nome`} className={formLabelClass}>
-                    Nome da conta
+                    Nome
                   </label>
                   <div className="relative mt-1">
                     <Landmark className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -692,7 +721,7 @@ export function FinanceiroConfigDrawer({
                     <input
                       id={`${tabId}-nova-cat-nome`}
                       className={formInputWithIconClass}
-                      placeholder="Nome da categoria"
+                      placeholder="Ex.: Receita recorrente"
                       value={novaCat.nome}
                       onChange={(e) => setNovaCat((p) => ({ ...p, nome: e.target.value }))}
                     />
@@ -825,10 +854,20 @@ export function FinanceiroConfigDrawer({
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                   <label htmlFor={`${tabId}-novo-meio`} className={formLabelClass}>
-                    Nome do meio
+                    Nome
                   </label>
                   <div className="relative mt-1">
-                    <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    {(() => {
+                      const MeioIcon = iconForMeioPagamentoNome(novoMeio.trim() || " ");
+                      return (
+                        <MeioIcon
+                          className={clsx(
+                            "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2",
+                            meioPagamentoIconColorClass(novoMeio)
+                          )}
+                        />
+                      );
+                    })()}
                     <input
                       id={`${tabId}-novo-meio`}
                       className={formInputWithIconClass}
@@ -857,7 +896,17 @@ export function FinanceiroConfigDrawer({
                 {editingMeioId === m.id ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                     <div className="relative min-w-0">
-                      <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      {(() => {
+                        const MeioIcon = iconForMeioPagamentoNome(editMeioNome.trim() || " ");
+                        return (
+                          <MeioIcon
+                            className={clsx(
+                              "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2",
+                              meioPagamentoIconColorClass(editMeioNome)
+                            )}
+                          />
+                        );
+                      })()}
                       <input
                         className={formInputWithIconClass}
                         value={editMeioNome}
@@ -897,7 +946,14 @@ export function FinanceiroConfigDrawer({
                       <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                         {(() => {
                           const MeioIcon = iconForMeioPagamentoNome(m.nome);
-                          return <MeioIcon className="mr-1 inline h-4 w-4 shrink-0 text-slate-400" />;
+                          return (
+                            <MeioIcon
+                              className={clsx(
+                                "mr-1 inline h-4 w-4 shrink-0",
+                                meioPagamentoIconColorClass(m.nome)
+                              )}
+                            />
+                          );
                         })()}
                         {m.nome}
                       </p>
@@ -919,6 +975,7 @@ export function FinanceiroConfigDrawer({
             ))}
           </section>
         )}
+        </div>
       </div>
       <Toast
         visible={toast.visible}

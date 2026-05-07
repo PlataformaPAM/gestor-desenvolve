@@ -9,7 +9,7 @@ import {
 } from "@hello-pangea/dnd";
 import clsx from "clsx";
 import { Search, ListTodo } from "lucide-react";
-import { PIPELINE_STAGES } from "@/lib/comercial/constants";
+import { PIPELINE_STAGES, PRIORIDADE_LABELS } from "@/lib/comercial/constants";
 import type { Lead, PipelineStageId } from "@/lib/comercial/types";
 import type { Cliente } from "@/lib/clientes/types";
 import type { ColumnsState } from "@/lib/comercial/columns";
@@ -27,6 +27,11 @@ function formatUltimaAlteracao(iso: string | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatVencimento(value: string | undefined): string {
+  if (!value?.trim()) return "—";
+  return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
 }
 
 type ComercialKanbanProps = {
@@ -59,18 +64,16 @@ export function ComercialKanban({
   }, []);
 
   const getPriorityBadgeClass = (priority: Lead["priority"]) => {
+    if (priority === "urgente")
+      return "border border-red-200 bg-red-100 text-red-700 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-300";
     if (priority === "alta")
-      return "bg-[#6D28D9]/10 text-[#6D28D9] border border-[#6D28D9]/20 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/35";
+      return "border border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-500/40 dark:bg-orange-950/50 dark:text-orange-300";
     if (priority === "media")
-      return "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600";
-    return "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700/50";
+      return "border border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-300";
+    return "border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
   };
 
-  const getPriorityLabel = (priority: Lead["priority"]) => {
-    if (priority === "alta") return "Alta";
-    if (priority === "media") return "Média";
-    return "Baixa";
-  };
+  const getPriorityLabel = (priority: Lead["priority"]) => PRIORIDADE_LABELS[priority];
 
   if (!isMounted) {
     return (
@@ -82,10 +85,16 @@ export function ComercialKanban({
               <div
                 key={stage.id}
                 className={clsx(
-                  "flex-shrink-0 w-[280px] min-h-[140px] rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/40 lg:w-full"
+                  "flex-shrink-0 w-[300px] min-h-[140px] rounded-xl p-0 lg:w-full"
                 )}
               >
-                <div className="mb-3 rounded-lg bg-slate-50/80 px-3 py-2.5 backdrop-blur-sm dark:bg-slate-800/60">
+                <div
+                  className={clsx(
+                    "mb-3 rounded-xl border px-3 py-2.5 backdrop-blur-sm",
+                    stageColors.bg,
+                    stageColors.borderTop
+                  )}
+                >
                   <h3 className={clsx("text-sm font-semibold", stageColors.text)}>
                     {stage.label}
                   </h3>
@@ -125,15 +134,21 @@ export function ComercialKanban({
             return (
               <Droppable key={stage.id} droppableId={stage.id}>
                 {(provided, snapshot) => (
-                  <div className="flex-shrink-0 w-[280px] snap-center lg:snap-none lg:w-full lg:min-w-0">
+                  <div className="flex-shrink-0 w-[300px] snap-center lg:snap-none lg:w-full lg:min-w-0">
                     <div
                       className={clsx(
-                        "h-full min-h-[140px] rounded-xl border border-slate-200 bg-slate-50/50 p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-800/40",
+                        "h-full min-h-[140px] rounded-xl p-0 transition-all duration-200",
                         snapshot.isDraggingOver &&
-                          "bg-slate-100 border-dashed border-purple-300 dark:bg-slate-800/80 dark:border-violet-500/50"
+                          "bg-slate-100/40 dark:bg-slate-800/40"
                       )}
                     >
-                      <div className="rounded-lg bg-slate-50/80 px-3 py-2.5 backdrop-blur-sm dark:bg-slate-800/60">
+                      <div
+                        className={clsx(
+                          "rounded-xl border px-3 py-2.5 backdrop-blur-sm",
+                          stageColors.bg,
+                          stageColors.borderTop
+                        )}
+                      >
                         <div className="relative mb-2 flex items-center justify-between">
                           <h3 className={clsx("text-sm font-semibold", stageColors.text)}>
                             {stage.label}
@@ -198,14 +213,22 @@ export function ComercialKanban({
                                         ...dragProvided.draggableProps.style,
                                       }}
                                       className={clsx(
-                                        "relative mb-2 last:mb-0 cursor-grab rounded-lg border border-slate-200 bg-white p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-900",
+                                        "relative mb-2 last:mb-0 w-full cursor-grab rounded-lg border border-slate-200 bg-white p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-900",
                                         snapshot.isDragging
                                           ? "z-50 cursor-grabbing scale-105 rotate-1 shadow-xl ring-2 ring-purple-500 dark:ring-violet-400"
                                           : "shadow-sm",
                                         selectedLeadId === lead.id && "ring-2 ring-[#6D28D9]/20 dark:ring-violet-500/40"
                                       )}
                                     >
-                                      <p className="truncate pr-6 text-sm font-medium text-slate-900 dark:text-slate-100">
+                                      <p
+                                        className="pr-6 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
+                                        style={{
+                                          display: "-webkit-box",
+                                          WebkitLineClamp: 2,
+                                          WebkitBoxOrient: "vertical",
+                                          overflow: "hidden",
+                                        }}
+                                      >
                                         {lead.name}
                                       </p>
                                       {cliente ? (
@@ -243,6 +266,16 @@ export function ComercialKanban({
                                             {formatUltimaAlteracao(lead.registroAtualizadoEm)}
                                           </p>
                                         </div>
+                                        {(["proposta", "contratacao", "fechado", "perdido"] as PipelineStageId[]).includes(lead.stageId) && (
+                                          <div className="min-w-0">
+                                            <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                              Vencimento:
+                                            </p>
+                                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                              {formatVencimento(lead.previsaoFechamento)}
+                                            </p>
+                                          </div>
+                                        )}
                                       </div>
                                       <span
                                         className={clsx(

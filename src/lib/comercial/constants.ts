@@ -27,10 +27,12 @@ export const ORIGEM_OPCOES: { value: LeadOrigem; label: string }[] = [
 /** Origens que exibem campo "Detalhar origem" */
 export const ORIGEM_COM_DETALHE: LeadOrigem[] = ["evento", "indicacao", "outro"];
 
+/** Mesmas etiquetas que Tarefas Internas (`@/lib/tarefas/constants`). */
 export const PRIORIDADE_LABELS: Record<LeadPriority, string> = {
-  alta: "Alta",
-  media: "Média",
   baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
+  urgente: "Urgente",
 };
 
 /** Checklist da Etapa exibido na aba Dados Gerais (chaves: geral-0 .. geral-3) */

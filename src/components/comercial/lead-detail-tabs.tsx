@@ -21,7 +21,7 @@ const TABS: { id: LeadDetailTabId; label: string; icon: React.ElementType }[] = 
   { id: "acoes", label: "Ações", icon: Zap },
   { id: "proposta", label: "Proposta", icon: FileText },
   { id: "contrato", label: "Contrato", icon: FileCheck },
-  { id: "historico", label: "Interações / Histórico", icon: MessageSquare },
+  { id: "historico", label: "Interações", icon: MessageSquare },
 ];
 
 function getVisibleTabsByStage(stageId: Lead["stageId"]): LeadDetailTabId[] {
@@ -49,6 +49,7 @@ type LeadDetailTabsProps = {
   onClienteRegistrado?: (cliente: Cliente) => void;
   onAtualizarContatosCliente?: (clienteId: string, contatos: Contato[]) => void;
   usuarios?: UsuarioSistema[];
+  onClose?: () => void;
 };
 
 export function LeadDetailTabs({
@@ -62,6 +63,7 @@ export function LeadDetailTabs({
   onClienteRegistrado = () => {},
   onAtualizarContatosCliente = () => {},
   usuarios = [],
+  onClose,
 }: LeadDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<LeadDetailTabId>("dados");
   const id = useId();
@@ -76,7 +78,7 @@ export function LeadDetailTabs({
   }, [activeTab, visibleTabIds]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div
         role="tablist"
         aria-label="Abas do lead"
@@ -115,8 +117,8 @@ export function LeadDetailTabs({
         })}
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {activeTab === "dados" && (
+      {activeTab === "dados" && (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <LeadDetailDados
             key={lead.id}
             lead={lead}
@@ -125,20 +127,27 @@ export function LeadDetailTabs({
             onClienteRegistrado={onClienteRegistrado}
             onAtualizarContatosCliente={onAtualizarContatosCliente}
             usuarios={usuarios}
+            onClose={onClose}
           />
-        )}
-        {activeTab === "proposta" && (
+        </div>
+      )}
+      {activeTab === "proposta" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <LeadDetailProposta
             lead={lead}
             onUpdateLead={onUpdateLead}
             onGerarPdfSuccess={onGerarPdfSuccess}
             clientes={clientes}
           />
-        )}
-        {activeTab === "contrato" && (
+        </div>
+      )}
+      {activeTab === "contrato" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <LeadDetailContratos lead={lead} onUpdateLead={onUpdateLead} />
-        )}
-        {activeTab === "historico" && (
+        </div>
+      )}
+      {activeTab === "historico" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <LeadDetailHistorico
             interactions={lead.interactions ?? []}
             onAddInteraction={(entry) =>
@@ -157,16 +166,18 @@ export function LeadDetailTabs({
               })
             }
           />
-        )}
-        {activeTab === "acoes" && (
+        </div>
+      )}
+      {activeTab === "acoes" && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <LeadDetailAcoes
             lead={lead}
             stages={stages}
             onMudarEtapa={onMudarEtapa}
             onSolicitarLiberacaoFinanceiro={onSolicitarLiberacaoFinanceiro}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

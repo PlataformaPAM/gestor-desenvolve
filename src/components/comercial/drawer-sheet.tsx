@@ -12,6 +12,10 @@ type DrawerSheetProps = {
   children: React.ReactNode;
   /** Largura máxima no desktop. Padrão global: igual Helpdesk (sm:max-w-3xl) */
   maxWidth?: string;
+  /** Classe de padding horizontal no conteúdo (mobile). */
+  mobileContentPaddingClassName?: string;
+  /** Classe de padding horizontal no conteúdo (desktop). */
+  desktopContentPaddingClassName?: string;
 };
 
 export function DrawerSheet({
@@ -20,6 +24,8 @@ export function DrawerSheet({
   title,
   children,
   maxWidth = "sm:max-w-3xl",
+  mobileContentPaddingClassName = "px-2 sm:px-3",
+  desktopContentPaddingClassName = "px-3",
 }: DrawerSheetProps) {
   useEffect(() => {
     if (!open) return;
@@ -79,7 +85,7 @@ export function DrawerSheet({
             className="fixed inset-x-0 bottom-0 z-[60] flex max-h-[85vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 lg:hidden"
           >
             {header}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden px-2 sm:px-3">
+            <div className={`flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden ${mobileContentPaddingClassName}`}>
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
             </div>
           </motion.div>
@@ -95,7 +101,7 @@ export function DrawerSheet({
             className={`fixed right-0 top-0 z-[60] hidden h-full w-full flex-col border-l border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 lg:flex ${maxWidth}`}
           >
             {header}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden px-3">
+            <div className={`flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden ${desktopContentPaddingClassName}`}>
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
             </div>
           </motion.div>

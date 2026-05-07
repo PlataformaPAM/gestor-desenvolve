@@ -2,6 +2,7 @@
 
 import { Dialog } from "@/components/ui/dialog";
 import type { RecurrenceScope } from "@/lib/financeiro/recurrence-save";
+import { formModalCancelButtonClass } from "@/components/ui/field-patterns";
 
 type RecurrenceScopeDialogProps = {
   open: boolean;
@@ -39,7 +40,15 @@ export function RecurrenceScopeDialog({ open, onClose, onConfirm, disabled }: Re
           Valores já pagos não têm o valor monetário alterado em lote (exceto na linha que você editou). Texto e
           dados de cadastro replicam conforme a opção.
         </p>
-        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:flex-wrap sm:justify-end">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onClose}
+            className={formModalCancelButtonClass}
+          >
+            Cancelar
+          </button>
           <button
             type="button"
             disabled={disabled}

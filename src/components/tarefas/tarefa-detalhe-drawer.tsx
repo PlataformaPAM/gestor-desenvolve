@@ -19,6 +19,7 @@ import clsx from "clsx";
 import {
   formInputClass,
   formLabelClass,
+  formModalCancelButtonClass,
   formModalSubmitButtonClass,
 } from "@/components/ui/field-patterns";
 import {
@@ -113,6 +114,8 @@ type TarefaDetalheDrawerProps = {
   tarefa: Tarefa | null;
   usuariosMap: Map<string, UsuarioTarefa>;
   clientes?: Array<{ id: string; nome: string; empresa?: string }>;
+  currentUserId?: string;
+  onClose?: () => void;
   onTrocarResponsavel?: (tarefa: Tarefa, novoResponsavelId: string) => void;
   onAdicionarHistorico?: (tarefaId: string, acao: string, anexos?: string[]) => void;
   /** Chamado ao clicar Salvar na aba Detalhes com os valores atuais do formulário */
@@ -123,6 +126,8 @@ export function TarefaDetalheDrawer({
   tarefa,
   usuariosMap,
   clientes = [],
+  currentUserId = "",
+  onClose,
   onTrocarResponsavel,
   onAdicionarHistorico,
   onSalvar,
@@ -262,10 +267,18 @@ export function TarefaDetalheDrawer({
   const historicoOrdenado = [...tarefa.historico].sort(
     (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
   );
-  const responsavelOptions: SearchableOption[] = usuariosList.map((u) => ({ value: u.id, label: u.nome, icon: User }));
+  const responsavelOptions: SearchableOption[] = usuariosList.map((u) => ({
+    value: u.id,
+    label: u.id === currentUserId ? `${u.nome} (você)` : u.nome,
+    icon: User,
+  }));
   const colaboradorOptions: SearchableOption[] = usuariosList
     .filter((u) => u.id !== responsavelId)
-    .map((u) => ({ value: u.id, label: u.nome, icon: Users }));
+    .map((u) => ({
+      value: u.id,
+      label: u.id === currentUserId ? `${u.nome} (você)` : u.nome,
+      icon: Users,
+    }));
   const statusOptions: SearchableOption[] = (Object.entries(STATUS_LABELS) as [Tarefa["status"], string][])
     .map(([value, label]) => ({ value, label, icon: iconForStatus(value) }));
   const clienteOptions: SearchableOption[] = [...clientes]
@@ -291,7 +304,7 @@ export function TarefaDetalheDrawer({
       <div
         role="tablist"
         aria-label="Abas do detalhe da tarefa"
-        className="flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50"
+        className="-mx-2 flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50 sm:-mx-3"
       >
         {TABS.map((tab) => {
           const Icon = tab.Icon;
@@ -329,9 +342,9 @@ export function TarefaDetalheDrawer({
           id={`${tabBaseId}-detalhes-panel`}
           role="tabpanel"
           aria-labelledby={`${tabBaseId}-detalhes`}
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="flex-1 space-y-4 p-4 lg:p-6">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
             <div ref={sectionTituloRef}>
               <label htmlFor="t-titulo" className={formLabelClass}>
                 Título{" "}
@@ -461,18 +474,21 @@ export function TarefaDetalheDrawer({
               onNewFilesChange={setArquivos}
             />
 
-            {onSalvar && (
-              <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-slate-700">
-                <button
-                  type="button"
-                  onClick={handleSalvar}
-                  className={formModalSubmitButtonClass}
-                >
-                  Salvar alterações
-                </button>
-              </div>
-            )}
           </div>
+          {(onSalvar || onClose) && (
+            <div className="-mx-2 shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:-mx-3 lg:-mx-3 lg:px-6">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+                <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
+                  Cancelar
+                </button>
+                {onSalvar ? (
+                  <button type="button" onClick={handleSalvar} className={formModalSubmitButtonClass}>
+                    Salvar alterações
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -536,7 +552,7 @@ export function TarefaDetalheDrawer({
           {onAdicionarHistorico && (
             <form
               onSubmit={handleEnviarComentario}
-              className="shrink-0 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+              className="-mx-2 shrink-0 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:-mx-3"
             >
               <input
                 id="file-upload-tarefa"

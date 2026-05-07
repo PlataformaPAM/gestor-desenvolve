@@ -1217,10 +1217,12 @@ export default function FinanceiroPage() {
           setAprovacaoLinhaSolucaoId(null);
         }}
         title={aprovacaoParaLancar ? `Novo Lançamento — ${aprovacaoParaLancar.leadNome}` : "Novo Lançamento"}
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {aprovacaoParaLancar && aprovacaoParaLancar.solucoes.length > 0 && (
-            <div className="shrink-0 px-1 pb-3 pt-0 text-sm sm:px-0">
+            <div className="shrink-0 px-4 pb-3 pt-0 text-sm lg:px-6">
               <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-500/30 dark:bg-amber-950/35">
               <p className="font-medium text-amber-900 dark:text-amber-200">Soluções da proposta</p>
               <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90">
@@ -1363,6 +1365,8 @@ export default function FinanceiroPage() {
           setLancamentoEmEdicao(null);
         }}
         title={lancamentoEmEdicao ? `Editar Lançamento — ${lancamentoEmEdicao.descricao}` : "Editar Lançamento"}
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {lancamentoEmEdicao && (

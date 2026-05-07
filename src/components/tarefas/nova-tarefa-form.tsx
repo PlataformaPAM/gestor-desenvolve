@@ -101,7 +101,11 @@ export function NovaTarefaForm({
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
-  const responsavelOptions: SearchableOption[] = usuarios.map((u) => ({ value: u.id, label: u.nome, icon: User }));
+  const responsavelOptions: SearchableOption[] = usuarios.map((u) => ({
+    value: u.id,
+    label: u.id === currentUserId ? `${u.nome} (você)` : u.nome,
+    icon: User,
+  }));
   const clienteOptions: SearchableOption[] = [
     { value: "__TODOS__", label: "Selecionar Todos", icon: Building2 },
     ...[...clientes]
@@ -119,7 +123,11 @@ export function NovaTarefaForm({
   ];
   const colaboradorOptions: SearchableOption[] = usuarios
     .filter((u) => u.id !== responsavelId)
-    .map((u) => ({ value: u.id, label: u.nome, icon: Users }));
+    .map((u) => ({
+      value: u.id,
+      label: u.id === currentUserId ? `${u.nome} (você)` : u.nome,
+      icon: Users,
+    }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,7 +199,8 @@ export function NovaTarefaForm({
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 lg:p-6">
+    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
       <div ref={sectionTituloRef}>
         <label htmlFor="tarefa-titulo" className={formLabelClass}>
           Título{" "}
@@ -392,7 +401,10 @@ export function NovaTarefaForm({
         )}
       </div>
 
-      <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
+      </div>
+
+      <div className="-mx-2 shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:-mx-3 lg:px-6">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
           Cancelar
         </button>
@@ -402,6 +414,7 @@ export function NovaTarefaForm({
         >
           Criar tarefa
         </button>
+        </div>
       </div>
     </form>
     <AlertDialog

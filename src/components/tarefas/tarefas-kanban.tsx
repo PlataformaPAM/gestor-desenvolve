@@ -19,28 +19,28 @@ const COLUNAS_ORDER: StatusTarefa[] = [
   "concluido",
 ];
 
-const COLUNA_STYLES: Record<StatusTarefa, { bg: string; border: string; header: string; badge: string }> = {
+const COLUNA_STYLES: Record<StatusTarefa, { bg: string; borderTop: string; header: string; badge: string }> = {
   em_andamento: {
-    bg: "bg-blue-50/80 dark:bg-blue-950/40",
-    border: "border-blue-200 dark:border-blue-700/50",
+    bg: "bg-blue-50 dark:bg-blue-950/45",
+    borderTop: "border-t-4 border-blue-500 dark:border-blue-400",
     header: "text-blue-800 dark:text-blue-300",
     badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
   },
   impedimento: {
-    bg: "bg-orange-50/80 dark:bg-orange-950/40",
-    border: "border-orange-200 dark:border-orange-700/50",
+    bg: "bg-orange-50 dark:bg-orange-950/45",
+    borderTop: "border-t-4 border-orange-500 dark:border-orange-400",
     header: "text-orange-800 dark:text-orange-300",
     badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
   },
   concluido: {
-    bg: "bg-emerald-50/80 dark:bg-emerald-950/40",
-    border: "border-emerald-200 dark:border-emerald-700/50",
+    bg: "bg-emerald-50 dark:bg-emerald-950/45",
+    borderTop: "border-t-4 border-emerald-500 dark:border-emerald-400",
     header: "text-emerald-800 dark:text-emerald-300",
     badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
   },
   a_fazer: {
-    bg: "bg-slate-50/80 dark:bg-slate-800/50",
-    border: "border-slate-200 dark:border-slate-600",
+    bg: "bg-slate-100 dark:bg-slate-800/90",
+    borderTop: "border-t-4 border-slate-400 dark:border-slate-500",
     header: "text-slate-700 dark:text-slate-200",
     badge: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
   },
@@ -113,16 +113,21 @@ export function TarefasKanban({
         {porColuna.map((col) => (
           <Droppable key={col.id} droppableId={col.id}>
             {(provided, snapshot) => (
-              <div className="flex-shrink-0 w-[280px] snap-center lg:snap-none lg:w-full lg:min-w-0">
+              <div className="flex-shrink-0 w-[300px] snap-center lg:snap-none lg:w-full lg:min-w-0">
                 <div
                   className={clsx(
-                    "h-full min-h-[140px] rounded-xl border border-slate-200 bg-slate-50/50 p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-800/40",
-                    col.styles.border,
+                    "h-full min-h-[140px] rounded-xl p-0 transition-all duration-200",
                     snapshot.isDraggingOver &&
-                      "bg-slate-100 border-dashed border-purple-300 dark:bg-slate-800/80 dark:border-violet-500/50"
+                      "bg-slate-100/40 dark:bg-slate-800/40"
                   )}
                 >
-                  <div className="rounded-lg bg-slate-50/80 px-3 py-2.5 backdrop-blur-sm dark:bg-slate-800/60">
+                  <div
+                    className={clsx(
+                      "rounded-xl border px-3 py-2.5 backdrop-blur-sm",
+                      col.styles.bg,
+                      col.styles.borderTop
+                    )}
+                  >
                     <div className="mb-2 flex items-center justify-between">
                       <h3 className={clsx("text-sm font-semibold", col.styles.header)}>{col.label}</h3>
                       <span className={clsx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", col.styles.badge)}>
@@ -155,7 +160,7 @@ export function TarefasKanban({
                             onKeyDown={(e) => e.key === "Enter" && onAbrirTarefa(t)}
                             style={{ ...dragProvided.draggableProps.style }}
                             className={clsx(
-                              "mb-2 last:mb-0 cursor-grab rounded-lg border border-slate-200 bg-white p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-900",
+                              "relative mb-2 last:mb-0 w-full cursor-grab rounded-lg border border-slate-200 bg-white p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-900",
                               dragSnapshot.isDragging
                                 ? "z-50 cursor-grabbing scale-105 rotate-1 shadow-xl ring-2 ring-purple-500 dark:ring-violet-400"
                                 : "shadow-sm"
@@ -166,7 +171,17 @@ export function TarefasKanban({
                                 {t.codigo}
                               </p>
                             ) : null}
-                            <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</p>
+                            <p
+                              className="text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
+                              style={{
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {t.titulo}
+                            </p>
                             <div className="mt-2 space-y-2">
                               <div className="min-w-0">
                                 <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">

@@ -5,15 +5,23 @@ import clsx from "clsx";
 import { Building2, ChevronRight, MapPin } from "lucide-react";
 import type { Lead, LeadPriority, PipelineStage } from "@/lib/comercial/types";
 import type { Cliente } from "@/lib/clientes/types";
+import { PRIORIDADE_LABELS } from "@/lib/comercial/constants";
 import { formatCurrency } from "@/lib/comercial/utils";
 import { STAGE_COLORS } from "@/lib/comercial/stage-colors";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 
-const PRIORITY_LABELS: Record<LeadPriority, string> = {
-  alta: "Alta",
-  media: "Média",
-  baixa: "Baixa",
-};
+function prioridadeBadgeClass(priority: LeadPriority): string {
+  return clsx(
+    priority === "urgente" &&
+      "border-red-200 bg-red-100 text-red-700 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-300",
+    priority === "alta" &&
+      "border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-500/40 dark:bg-orange-950/50 dark:text-orange-300",
+    priority === "media" &&
+      "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-300",
+    priority === "baixa" &&
+      "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+  );
+}
 
 function iniciaisLead(name: string): string {
   const trimmed = name.trim();
@@ -32,6 +40,11 @@ function formatUltimaAlteracao(iso: string | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatVencimento(value: string | undefined): string {
+  if (!value?.trim()) return "—";
+  return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
 }
 
 type LeadListProps = {
@@ -103,7 +116,7 @@ export const LeadList = memo(function LeadList({
                     Lead
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Responsável
+                    Responsável / Prazos
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Valor
@@ -127,12 +140,7 @@ export const LeadList = memo(function LeadList({
                     const ownership = getLeadOwnership(lead);
                     const cliente = lead.clienteId ? clienteMap.get(lead.clienteId) : undefined;
                     const stageColors = STAGE_COLORS[lead.stageId];
-                    const priorityStyle =
-                      lead.priority === "alta"
-                        ? "border border-[#6D28D9]/20 bg-[#6D28D9]/10 text-[#6D28D9] dark:border-violet-500/30 dark:bg-violet-950/50 dark:text-violet-300"
-                        : lead.priority === "media"
-                          ? "border border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                          : "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-300";
+                    const priorityStyle = prioridadeBadgeClass(lead.priority);
 
                     return (
                       <tr
@@ -170,6 +178,11 @@ export const LeadList = memo(function LeadList({
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             Última alteração: {formatUltimaAlteracao(lead.registroAtualizadoEm)}
                           </p>
+                          {(["proposta", "contratacao", "fechado", "perdido"] as Lead["stageId"][]).includes(lead.stageId) && (
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              Vencimento: {formatVencimento(lead.previsaoFechamento)}
+                            </p>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-slate-700 dark:text-slate-200">
                           {formatCurrency(lead.valorTotal > 0 ? lead.valorTotal : lead.value)}
@@ -181,7 +194,7 @@ export const LeadList = memo(function LeadList({
                               priorityStyle
                             )}
                           >
-                            {PRIORITY_LABELS[lead.priority]}
+                            {PRIORIDADE_LABELS[lead.priority]}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -282,6 +295,11 @@ export const LeadList = memo(function LeadList({
                     <p className="mt-0.5 text-xs text-slate-500">
                       Última alteração: {formatUltimaAlteracao(lead.registroAtualizadoEm)}
                     </p>
+                    {(["proposta", "contratacao", "fechado", "perdido"] as Lead["stageId"][]).includes(lead.stageId) && (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Vencimento: {formatVencimento(lead.previsaoFechamento)}
+                      </p>
+                    )}
                     <p className="mt-2 text-sm font-bold text-[#6D28D9]">
                       {formatCurrency(lead.valorTotal > 0 ? lead.valorTotal : lead.value)}
                     </p>
@@ -291,14 +309,10 @@ export const LeadList = memo(function LeadList({
                   <span
                     className={clsx(
                       "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
-                      lead.priority === "alta"
-                        ? "border-[#6D28D9]/20 bg-[#6D28D9]/10 text-[#6D28D9]"
-                        : lead.priority === "media"
-                          ? "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      prioridadeBadgeClass(lead.priority)
                     )}
                   >
-                    {PRIORITY_LABELS[lead.priority]}
+                    {PRIORIDADE_LABELS[lead.priority]}
                   </span>
                   <span
                     className={clsx(

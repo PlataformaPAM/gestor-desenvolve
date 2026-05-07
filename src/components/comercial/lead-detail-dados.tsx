@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { AlertTriangle, BadgeHelp, CircleMinus, Text } from "lucide-react";
+import { AlertTriangle, Globe2, Mail, Phone, Text, User } from "lucide-react";
 import type { Lead, LeadOrigem, LeadPriority } from "@/lib/comercial/types";
+import type { PrioridadeTarefa } from "@/lib/tarefas/types";
+import { iconForPrioridade, PRIORIDADE_LEADING_ICON } from "@/lib/tarefas/option-icons";
 import type { Cliente, Contato } from "@/lib/clientes/types";
 import type { UsuarioSistema } from "@/lib/configuracoes/types";
 import {
@@ -17,10 +19,13 @@ import { LeadResponsavelEquipe } from "./lead-responsavel-equipe";
 import { useAuth } from "@/contexts/auth-context";
 import { buildOwnershipInteraction, getLeadOwnership } from "@/lib/comercial/ownership";
 import {
-  comercialInputClass,
-  comercialLabelClass,
   comercialReadOnlyClass,
+  FormSearchableSelectField,
+  FormTextInput,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
 } from "./field-styles";
+import { formLabelClass } from "@/components/ui/field-patterns";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { iconForOrigem } from "./origem-icons";
 
@@ -37,6 +42,7 @@ type LeadDetailDadosProps = {
   /** Atualiza contatos no cadastro do cliente vinculado. */
   onAtualizarContatosCliente?: (clienteId: string, contatos: Contato[]) => void;
   usuarios?: UsuarioSistema[];
+  onClose?: () => void;
 };
 
 function deepCloneLead(l: Lead): Lead {
@@ -58,6 +64,14 @@ function createLogId(): string {
     : `log-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const PRIORIDADE_SEARCH_OPTIONS = (
+  Object.entries(PRIORIDADE_LABELS) as [LeadPriority, string][]
+).map(([value, label]) => ({
+  value,
+  label,
+  icon: iconForPrioridade(value as PrioridadeTarefa),
+}));
+
 export function LeadDetailDados({
   lead,
   onPersistLead,
@@ -65,6 +79,7 @@ export function LeadDetailDados({
   onClienteRegistrado,
   onAtualizarContatosCliente = () => {},
   usuarios = [],
+  onClose,
 }: LeadDetailDadosProps) {
   const { session } = useAuth();
   const usuarioAtual = { nome: session.userName ?? "Usuário", userId: session.userId };
@@ -101,6 +116,16 @@ export function LeadDetailDados({
   const isQualificacao = formData.stageId === "qualificacao";
   const isAfterProspecao = !isProspecao;
   const hasContatoOficial = (formData.contatosOportunidade?.length ?? 0) > 0;
+  const motivoPerdaDestaque = useMemo(() => {
+    if (formData.stageId !== "perdido") return null;
+    const interactions = formData.interactions ?? [];
+    for (let i = interactions.length - 1; i >= 0; i -= 1) {
+      const desc = interactions[i]?.description ?? "";
+      const match = desc.match(/Lead marcado como Perdido\.\s*Motivo:\s*(.+)$/i);
+      if (match?.[1]?.trim()) return match[1].trim();
+    }
+    return null;
+  }, [formData.stageId, formData.interactions]);
   const clienteSelecionado = draftClientes.find((c) => c.id === formData.clienteId);
   const contatosClienteDisponiveis = clienteSelecionado?.contatos ?? [];
 
@@ -292,7 +317,8 @@ export function LeadDetailDados({
   };
 
   return (
-    <form onSubmit={handleSalvar} className="space-y-5 p-4 lg:p-6">
+    <form onSubmit={handleSalvar} className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 lg:p-6">
       {saveFeedback && (
         <div
           role="status"
@@ -307,37 +333,26 @@ export function LeadDetailDados({
       )}
 
       <div className="space-y-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-          <h4 className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Responsável e equipe
-          </h4>
-          <LeadResponsavelEquipe
-            usuarioAtual={{ id: session.userId ?? "", nome: session.userName ?? "Usuário" }}
-            membrosEquipe={membrosEquipe}
-            leadContext={{
-              interactions: formData.interactions,
-              criadoPorId: formData.criadoPorId,
-              registroCriadoPorNome: formData.registroCriadoPorNome,
-            }}
-            onApplyOwnership={(previous, next) => {
-              setFormData((prev) => ({
-                ...prev,
-                interactions: buildOwnershipInteraction({
-                  base: prev.interactions ?? [],
-                  previous,
-                  next,
-                  userName: usuarioAtual.nome,
-                  userId: usuarioAtual.userId ?? null,
-                }),
-              }));
-            }}
-          />
-        </div>
+        {motivoPerdaDestaque && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-900/60 dark:bg-red-950/30">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
+              <AlertTriangle className="h-4 w-4" />
+              Motivo da perda
+            </p>
+            <p className="mt-1 text-sm font-medium text-red-800 dark:text-red-200">{motivoPerdaDestaque}</p>
+          </div>
+        )}
+        <FormTextInput
+          id="lead-nome"
+          label="Nome do Lead (Assunto + Entidade)"
+          required
+          icon={Text}
+          value={formData.name}
+          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+          placeholder="Ex: Implantação ERP - Empresa XYZ"
+        />
 
-        <div>
-          <label htmlFor="lead-origem" className={comercialLabelClass}>
-            Origem
-          </label>
+        <FormSearchableSelectField id="lead-origem" label="Origem">
           <SearchableSelect
             options={ORIGEM_OPCOES.map((opt) => ({
               value: opt.value,
@@ -349,76 +364,58 @@ export function LeadDetailDados({
             placeholder="Selecione a origem..."
             searchPlaceholder="Buscar origem..."
             searchable={false}
-            leadingIcon={BadgeHelp}
+            leadingIcon={Globe2}
           />
-        </div>
+        </FormSearchableSelectField>
 
         {showOrigemDetalhe && (
-          <div>
-            <label htmlFor="lead-origem-detalhe" className={comercialLabelClass}>
-              Detalhar origem
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="lead-origem-detalhe"
-                type="text"
-                value={formData.notes ?? ""}
-                onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                placeholder="Ex: Evento, indicador ou outro detalhe"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
+          <FormTextInput
+            id="lead-origem-detalhe"
+            label="Detalhar origem"
+            icon={Text}
+            value={formData.notes ?? ""}
+            onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+            placeholder="Ex: Evento, indicador ou outro detalhe"
+          />
         )}
 
-        <div>
-          <label htmlFor="lead-nome" className={comercialLabelClass}>
-            Nome do Lead (Assunto + Entidade) *
-          </label>
-          <div className="relative">
-            <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              id="lead-nome"
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="Ex: Implantação ERP - Empresa XYZ"
-              className={`${comercialInputClass} pl-9`}
-              required
-            />
-          </div>
-        </div>
+        <FormSearchableSelectField id="lead-prioridade" label="Prioridade">
+          <SearchableSelect
+            options={PRIORIDADE_SEARCH_OPTIONS}
+            value={formData.priority}
+            onChange={(v) => setFormData((prev) => ({ ...prev, priority: v as LeadPriority }))}
+            placeholder="Selecione a prioridade..."
+            searchPlaceholder="Buscar prioridade..."
+            searchable={false}
+            leadingIcon={PRIORIDADE_LEADING_ICON}
+          />
+        </FormSearchableSelectField>
 
-        <div>
-          <p className="mb-1 block text-sm font-medium text-slate-700">Prioridade</p>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {(Object.keys(PRIORIDADE_LABELS) as LeadPriority[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, priority: p }))}
-                className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium transition-all ${
-                  p === "alta"
-                    ? "bg-red-100 text-red-800 border-red-200"
-                    : p === "media"
-                      ? "bg-amber-100 text-amber-800 border-amber-200"
-                      : "bg-slate-100 text-slate-700 border-slate-200"
-                } ${formData.priority === p ? "ring-2 ring-offset-1 ring-[#6D28D9]" : "hover:opacity-90"}`}
-                aria-pressed={formData.priority === p}
-              >
-                {p === "alta" ? <AlertTriangle className="mr-1 h-3.5 w-3.5" /> : null}
-                {p === "media" ? <BadgeHelp className="mr-1 h-3.5 w-3.5" /> : null}
-                {p === "baixa" ? <CircleMinus className="mr-1 h-3.5 w-3.5" /> : null}
-                {PRIORIDADE_LABELS[p]}
-              </button>
-            ))}
-          </div>
-        </div>
+        <LeadResponsavelEquipe
+          usuarioAtual={{ id: session.userId ?? "", nome: session.userName ?? "Usuário" }}
+          membrosEquipe={membrosEquipe}
+          leadContext={{
+            interactions: formData.interactions,
+            criadoPorId: formData.criadoPorId,
+            registroCriadoPorNome: formData.registroCriadoPorNome,
+          }}
+          onApplyOwnership={(previous, next) => {
+            setFormData((prev) => ({
+              ...prev,
+              interactions: buildOwnershipInteraction({
+                base: prev.interactions ?? [],
+                previous,
+                next,
+                userName: usuarioAtual.nome,
+                userId: usuarioAtual.userId ?? null,
+              }),
+            }));
+          }}
+        />
       </div>
 
       {isAfterProspecao ? (
-        <>
+        <div className="space-y-4">
           {isQualificacao && !formData.clienteId && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               Vincule ou cadastre um cliente para avançar na etapa de Qualificação.
@@ -445,28 +442,38 @@ export function LeadDetailDados({
             }}
           />
           {!hasContatoOficial && (
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-              <p className="text-sm font-medium text-slate-700">Contato original da prospecção</p>
-              <input
-                type="text"
+            <div className="space-y-4">
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                Contato original da prospecção
+              </p>
+              <FormTextInput
+                id="lead-co-contact"
+                label="Contato"
+                icon={User}
                 value={formData.contact ?? ""}
                 readOnly
                 disabled
-                className={comercialReadOnlyClass}
+                inputClassName={comercialReadOnlyClass}
               />
-              <input
-                type="text"
+              <FormTextInput
+                id="lead-co-phone"
+                label="Telefone"
+                icon={Phone}
+                type="tel"
                 value={formData.phone ?? ""}
                 readOnly
                 disabled
-                className={comercialReadOnlyClass}
+                inputClassName={comercialReadOnlyClass}
               />
-              <input
+              <FormTextInput
+                id="lead-co-email"
+                label="E-mail"
+                icon={Mail}
                 type="email"
                 value={formData.email ?? ""}
                 readOnly
                 disabled
-                className={comercialReadOnlyClass}
+                inputClassName={comercialReadOnlyClass}
               />
             </div>
           )}
@@ -490,72 +497,55 @@ export function LeadDetailDados({
               );
             }}
           />
-        </>
+        </div>
       ) : (
-        <>
-          <div>
-            <label htmlFor="lead-contact" className={comercialLabelClass}>
-              Contato
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="lead-contact"
-                type="text"
-                value={formData.contact ?? ""}
-                onChange={(e) => setFormData((prev) => ({ ...prev, contact: e.target.value }))}
-                placeholder="Nome do contato"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="lead-phone" className={comercialLabelClass}>
-              Telefone
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="lead-phone"
-                type="text"
-                value={formData.phone ?? ""}
-                onChange={(e) => setFormData((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
-                placeholder="(00) 00000-0000"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="lead-email" className={comercialLabelClass}>
-              E-mail
-            </label>
-            <div className="relative">
-              <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="lead-email"
-                type="email"
-                value={formData.email ?? ""}
-                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                placeholder="email@empresa.com"
-                className={`${comercialInputClass} pl-9`}
-              />
-            </div>
-          </div>
-        </>
+        <div className="space-y-4">
+          <FormTextInput
+            id="lead-contact"
+            label="Contato"
+            icon={User}
+            value={formData.contact ?? ""}
+            onChange={(e) => setFormData((prev) => ({ ...prev, contact: e.target.value }))}
+            placeholder="Nome do contato"
+          />
+          <FormTextInput
+            id="lead-phone"
+            label="Telefone"
+            icon={Phone}
+            type="tel"
+            value={formData.phone ?? ""}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))
+            }
+            placeholder="(00) 00000-0000"
+          />
+          <FormTextInput
+            id="lead-email"
+            label="E-mail"
+            icon={Mail}
+            type="email"
+            value={formData.email ?? ""}
+            onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+            placeholder="email@empresa.com"
+          />
+        </div>
       )}
 
       {isQualificacao && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-          <h4 className="mb-2 text-sm font-semibold text-slate-800">Checklist da Etapa</h4>
-          <p className="mb-3 text-xs text-slate-500">Conclua os itens para qualificar o lead.</p>
+        <div className="space-y-2">
+          <p className={formLabelClass}>Checklist da Etapa</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Conclua os itens para qualificar o lead.
+          </p>
           <ul className="space-y-2">
             {CHECKLIST_DADOS_GERAIS.map((label, idx) => {
               const key = `geral-${idx}`;
               const checked = !!(formData.checklistProgress ?? {})[key];
               return (
-                <li key={key} className="flex items-center gap-3">
+                <li
+                  key={key}
+                  className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800"
+                >
                   <input
                     type="checkbox"
                     id={key}
@@ -563,7 +553,7 @@ export function LeadDetailDados({
                     onChange={() => toggleChecklistItem(idx)}
                     className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
                   />
-                  <label htmlFor={key} className="text-sm text-slate-700">
+                  <label htmlFor={key} className="text-sm text-slate-700 dark:text-slate-200">
                     {label}
                   </label>
                 </li>
@@ -573,12 +563,20 @@ export function LeadDetailDados({
         </div>
       )}
 
-      <button
-        type="submit"
-        className="w-full rounded-xl bg-[#6D28D9] px-4 py-3 font-semibold text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2"
-      >
-        Salvar alterações
-      </button>
+      </div>
+
+      <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+        {onClose ? (
+          <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
+            Cancelar
+          </button>
+        ) : null}
+        <button type="submit" className={formModalSubmitButtonClass}>
+          Salvar
+        </button>
+        </div>
+      </div>
     </form>
   );
 }

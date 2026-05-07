@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { motion } from "framer-motion";
@@ -46,9 +46,28 @@ import {
   formModalCancelButtonClass,
   formModalSubmitButtonClass,
   formTextareaClass,
+  formTextareaLeadingIconTopClass,
 } from "@/components/ui/field-patterns";
-import { iconForMeioPagamentoNome } from "@/lib/financeiro/meio-pagamento-icon";
+import {
+  iconForMeioPagamentoNome,
+  meioPagamentoIconColorClass,
+} from "@/lib/financeiro/meio-pagamento-icon";
+import {
+  defaultCategoriaVisual,
+  financeiroLucideFromIconKey,
+  FINANCEIRO_CONTA_VISUALS_UPDATE_EVENT,
+  readContaVisualMapFromLocalStorage,
+  resolveContaVisual,
+  visualStorageKey,
+  type VisualMeta,
+} from "@/lib/financeiro/visuals";
 import { textoPrazoVencimento } from "@/lib/financeiro/vencimento-utils";
+
+const formHelperTextClass =
+  "mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400";
+
+const formSectionHeadingClass =
+  "text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
 
 function resolveMeioId(initial: Lancamento, meios: FinanceiroMeioPagamento[]): string {
   if (initial.meioPagamentoId) return initial.meioPagamentoId;
@@ -173,6 +192,28 @@ export function LancamentoForm({
   const [tipoRecorrencia, setTipoRecorrencia] = useState<TipoRecorrencia>(initial.tipoRecorrencia ?? "unico");
   const [parcelas, setParcelas] = useState(initial.parcelas ?? 12);
 
+  const [contaVisualById, setContaVisualById] = useState<Record<string, VisualMeta>>({});
+
+  useEffect(() => {
+    const refresh = () => setContaVisualById(readContaVisualMapFromLocalStorage());
+    refresh();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === visualStorageKey("conta") || e.key === null) refresh();
+    };
+    const onVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") refresh();
+    };
+    const onContaVisualsUpdate = () => refresh();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(FINANCEIRO_CONTA_VISUALS_UPDATE_EVENT, onContaVisualsUpdate);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(FINANCEIRO_CONTA_VISUALS_UPDATE_EVENT, onContaVisualsUpdate);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
   const clientesOrdenados = useMemo(
     () =>
       [...clientes].sort((a, b) =>
@@ -235,17 +276,52 @@ export function LancamentoForm({
 
   const tipoLancamentoOptions: SearchableOption[] = useMemo(
     () => [
-      { value: "entrada", label: "Entrada (a receber)", icon: TrendingUp },
-      { value: "saida", label: "Saída (a pagar)", icon: TrendingDown },
+      {
+        value: "entrada",
+        label: "Entrada (a receber)",
+        icon: ({ className }) => (
+          <TrendingUp className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+        ),
+      },
+      {
+        value: "saida",
+        label: "Saída (a pagar)",
+        icon: ({ className }) => (
+          <TrendingDown className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+        ),
+      },
     ],
     []
   );
 
+  const tipoLeadingIcon = useMemo(() => {
+    if (tipo === "entrada") {
+      return ({ className }: { className?: string }) => (
+        <TrendingUp className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+      );
+    }
+    return ({ className }: { className?: string }) => (
+      <TrendingDown className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+    );
+  }, [tipo]);
+
   const tipoRecorrenciaOptions: SearchableOption[] = useMemo(
     () => [
-      { value: "unico", label: "Único", icon: Circle },
-      { value: "fixo_mensal", label: "Fixo mensal", icon: RefreshCw },
-      { value: "parcelado", label: "Parcelado", icon: ListOrdered },
+      {
+        value: "unico",
+        label: "Único",
+        icon: ({ className }) => <Circle className={`!text-emerald-500 ${className ?? ""}`} />,
+      },
+      {
+        value: "fixo_mensal",
+        label: "Fixo mensal",
+        icon: ({ className }) => <RefreshCw className={`!text-blue-500 ${className ?? ""}`} />,
+      },
+      {
+        value: "parcelado",
+        label: "Parcelado",
+        icon: ({ className }) => <ListOrdered className={`!text-violet-500 ${className ?? ""}`} />,
+      },
     ],
     []
   );
@@ -259,50 +335,163 @@ export function LancamentoForm({
     }));
   }, [solucoesAprovacao]);
 
-  const contaSelectOptions = useMemo(
-    (): SearchableOption[] => [
-      { value: "", label: "— Selecione —", icon: Landmark },
-      ...contasAtivas.map((c) => ({
-        value: c.id,
-        label: `${c.nome}${c.padrao ? " (padrão)" : ""}`,
-        icon: Landmark,
-      })),
-    ],
-    [contasAtivas]
-  );
+  const contaSelectOptions = useMemo((): SearchableOption[] => {
+    const empty: SearchableOption = {
+      value: "",
+      label: "— Selecione —",
+      icon: ({ className }) => <Landmark className={clsx(className, "text-slate-400")} />,
+    };
+    return [
+      empty,
+      ...contasAtivas.map((c) => {
+        const v = resolveContaVisual(c.id, contaVisualById);
+        const Icon = financeiroLucideFromIconKey(v.icon);
+        return {
+          value: c.id,
+          label: `${c.nome}${c.padrao ? " (padrão)" : ""}`,
+          icon: ({ className }: { className?: string }) => (
+            <Icon className={className} style={{ color: v.color }} />
+          ),
+        };
+      }),
+    ];
+  }, [contasAtivas, contaVisualById]);
 
-  const categoriaSelectOptions = useMemo(
-    (): SearchableOption[] => [
-      { value: "", label: "— Selecione —", icon: Tags },
-      ...categoriasFiltradas.map((c) => ({
-        value: c.id,
-        label: `${c.nome} (${c.tipo})`,
-        icon: Tags,
-      })),
-    ],
-    [categoriasFiltradas]
-  );
+  const contaLeadingIcon = useMemo(() => {
+    if (!contaId) {
+      return ({ className }: { className?: string }) => (
+        <Landmark className={clsx(className, "text-slate-400")} />
+      );
+    }
+    const v = resolveContaVisual(contaId, contaVisualById);
+    const Icon = financeiroLucideFromIconKey(v.icon);
+    return ({ className }: { className?: string }) => (
+      <Icon className={className} style={{ color: v.color }} />
+    );
+  }, [contaId, contaVisualById]);
+
+  const categoriaSelectOptions = useMemo((): SearchableOption[] => {
+    const empty: SearchableOption = {
+      value: "",
+      label: "— Selecione —",
+      icon: ({ className }) => <Tags className={clsx(className, "text-slate-400")} />,
+    };
+    return [
+      empty,
+      ...categoriasFiltradas.map((c) => {
+        const v = defaultCategoriaVisual(c.tipo);
+        const Icon = financeiroLucideFromIconKey(v.icon);
+        return {
+          value: c.id,
+          label: `${c.nome} (${c.tipo})`,
+          icon: ({ className }: { className?: string }) => (
+            <Icon className={className} style={{ color: v.color }} />
+          ),
+        };
+      }),
+    ];
+  }, [categoriasFiltradas]);
+
+  const categoriaLeadingIcon = useMemo(() => {
+    if (!categoriaId) {
+      return ({ className }: { className?: string }) => (
+        <Tags className={clsx(className, "text-slate-400")} />
+      );
+    }
+    const cat = categoriasFiltradas.find((c) => c.id === categoriaId);
+    if (!cat) {
+      return ({ className }: { className?: string }) => (
+        <Tags className={clsx(className, "text-slate-400")} />
+      );
+    }
+    const v = defaultCategoriaVisual(cat.tipo);
+    const Icon = financeiroLucideFromIconKey(v.icon);
+    return ({ className }: { className?: string }) => (
+      <Icon className={className} style={{ color: v.color }} />
+    );
+  }, [categoriaId, categoriasFiltradas]);
 
   const statusSelectOptions = useMemo(
     (): SearchableOption[] => [
-      { value: "pendente", label: "Pendente", icon: Clock },
-      { value: "pago", label: "Pago", icon: CheckCircle2 },
-      { value: "atrasado", label: "Atrasado", icon: AlertCircle },
+      {
+        value: "pendente",
+        label: "Pendente",
+        icon: ({ className }) => (
+          <Clock className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />
+        ),
+      },
+      {
+        value: "pago",
+        label: "Pago",
+        icon: ({ className }) => (
+          <CheckCircle2 className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+        ),
+      },
+      {
+        value: "atrasado",
+        label: "Atrasado",
+        icon: ({ className }) => (
+          <AlertCircle className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+        ),
+      },
     ],
     []
   );
 
+  const statusLeadingIcon = useMemo(() => {
+    if (status === "pago") {
+      return ({ className }: { className?: string }) => (
+        <CheckCircle2 className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+      );
+    }
+    if (status === "atrasado") {
+      return ({ className }: { className?: string }) => (
+        <AlertCircle className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+      );
+    }
+    return ({ className }: { className?: string }) => (
+      <Clock className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />
+    );
+  }, [status]);
+
   const meioSelectOptions = useMemo(
     (): SearchableOption[] => [
-      { value: "", label: "— Selecione —", icon: Wallet },
-      ...meiosAtivos.map((m) => ({
-        value: m.id,
-        label: m.nome,
-        icon: iconForMeioPagamentoNome(m.nome),
-      })),
+      {
+        value: "",
+        label: "— Selecione —",
+        icon: ({ className }) => <Wallet className={clsx(className, "text-slate-400")} />,
+      },
+      ...meiosAtivos.map((m) => {
+        const I = iconForMeioPagamentoNome(m.nome);
+        return {
+          value: m.id,
+          label: m.nome,
+          icon: ({ className }: { className?: string }) => (
+            <I className={clsx(className, meioPagamentoIconColorClass(m.nome))} />
+          ),
+        };
+      }),
     ],
     [meiosAtivos]
   );
+
+  const meioLeadingIcon = useMemo(() => {
+    if (!meioPagamentoId) {
+      return ({ className }: { className?: string }) => (
+        <Wallet className={clsx(className, "text-slate-400")} />
+      );
+    }
+    const m = meiosAtivos.find((x) => x.id === meioPagamentoId);
+    if (!m) {
+      return ({ className }: { className?: string }) => (
+        <Wallet className={clsx(className, "text-slate-400")} />
+      );
+    }
+    const I = iconForMeioPagamentoNome(m.nome);
+    return ({ className }: { className?: string }) => (
+      <I className={clsx(className, meioPagamentoIconColorClass(m.nome))} />
+    );
+  }, [meioPagamentoId, meiosAtivos]);
 
   const handleTipoChange = (next: Lancamento["tipo"]) => {
     setTipo(next);
@@ -386,7 +575,7 @@ export function LancamentoForm({
       <div
         role="tablist"
         aria-label="Seções do lançamento"
-        className="flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50"
+        className="flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
       >
         {(
           [
@@ -406,7 +595,7 @@ export function LancamentoForm({
               onClick={() => setFormTab(tid)}
               className={clsx(
                 "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors",
-                active ? "text-[#6D28D9]" : "text-slate-500 hover:text-slate-700"
+                active ? "text-[#6D28D9] dark:text-violet-300" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               )}
             >
               {active && (
@@ -443,60 +632,68 @@ export function LancamentoForm({
                 >
                   Solução da proposta (este lançamento)
                 </label>
-                <SearchableSelect
-                  options={solucaoPropostaOptions}
-                  value={linhaAprovacaoSelecionada ?? solucoesAprovacao[0]?.leadSolucaoId ?? ""}
-                  onChange={onLinhaAprovacaoChange}
-                  placeholder="Selecione a solução…"
-                  searchPlaceholder="Buscar solução…"
-                  searchable={solucaoPropostaOptions.length > 6}
-                  leadingIcon={FileText}
-                />
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={solucaoPropostaOptions}
+                    value={linhaAprovacaoSelecionada ?? solucoesAprovacao[0]?.leadSolucaoId ?? ""}
+                    onChange={onLinhaAprovacaoChange}
+                    placeholder="Selecione a solução…"
+                    searchPlaceholder="Buscar solução…"
+                    searchable={solucaoPropostaOptions.length > 6}
+                    leadingIcon={FileText}
+                  />
+                </div>
               </div>
             )}
           <div>
             <label htmlFor="lanc-tipo" className={formLabelClass}>
               Entrada ou saída *
             </label>
-            <SearchableSelect
-              options={tipoLancamentoOptions}
-              value={tipo}
-              onChange={(v) => handleTipoChange(v as Lancamento["tipo"])}
-              placeholder="Selecione…"
-              searchPlaceholder="Buscar…"
-              searchable={false}
-              leadingIcon={TrendingUp}
-            />
+            <div className="mt-1">
+              <SearchableSelect
+                options={tipoLancamentoOptions}
+                value={tipo}
+                onChange={(v) => handleTipoChange(v as Lancamento["tipo"])}
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar…"
+                searchable={false}
+                leadingIcon={tipoLeadingIcon}
+              />
+            </div>
           </div>
 
           {tipo === "entrada" ? (
             <div>
               <label className={formLabelClass}>Cliente (recebimento)</label>
-              <SearchableSelect
-                options={clienteSelectOptions}
-                value={clienteId}
-                onChange={setClienteId}
-                placeholder="Selecionar cliente…"
-                searchPlaceholder="Buscar por CNPJ ou nome…"
-                emptyLabel="Nenhum cliente encontrado na base."
-                leadingIcon={Building2}
-              />
+              <div className="mt-1">
+                <SearchableSelect
+                  options={clienteSelectOptions}
+                  value={clienteId}
+                  onChange={setClienteId}
+                  placeholder="Selecionar cliente…"
+                  searchPlaceholder="Buscar por CNPJ ou nome…"
+                  emptyLabel="Nenhum cliente encontrado na base."
+                  leadingIcon={Building2}
+                />
+              </div>
             </div>
           ) : (
             <div>
               <label className={formLabelClass}>Fornecedor (RH)</label>
-              <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              <p className={formHelperTextClass}>
                 Cadastro da aba <strong>RH → Fornecedores</strong>.
               </p>
-              <SearchableSelect
-                options={fornecedorSelectOptions}
-                value={fornecedorKey}
-                onChange={setFornecedorKey}
-                placeholder="Selecionar fornecedor…"
-                searchPlaceholder="Buscar por CNPJ ou nome…"
-                emptyLabel="Nenhum fornecedor encontrado."
-                leadingIcon={UserRound}
-              />
+              <div className="mt-1">
+                <SearchableSelect
+                  options={fornecedorSelectOptions}
+                  value={fornecedorKey}
+                  onChange={setFornecedorKey}
+                  placeholder="Selecionar fornecedor…"
+                  searchPlaceholder="Buscar por CNPJ ou nome…"
+                  emptyLabel="Nenhum fornecedor encontrado."
+                  leadingIcon={UserRound}
+                />
+              </div>
             </div>
           )}
 
@@ -504,7 +701,7 @@ export function LancamentoForm({
             <label htmlFor="lanc-desc" className={formLabelClass}>
               Descrição *
             </label>
-            <div className="relative">
+            <div className="relative mt-1">
               <Text className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 id="lanc-desc"
@@ -521,7 +718,7 @@ export function LancamentoForm({
               <label htmlFor="lanc-valor" className={formLabelClass}>
                 Valor (R$) *
               </label>
-              <div className="relative">
+              <div className="relative mt-1">
                 <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   id="lanc-valor"
@@ -534,7 +731,7 @@ export function LancamentoForm({
                 />
               </div>
               {isCreate && tipoRecorrencia === "parcelado" && (
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <p className={clsx(formHelperTextClass, "mt-2")}>
                   Informe o valor total do acordo: o sistema divide igualmente entre as parcelas (cada linha na grade mostra o valor da parcela e o indicador Parcela k/N).
                 </p>
               )}
@@ -543,15 +740,17 @@ export function LancamentoForm({
               <label htmlFor="lanc-venc" className={formLabelClass}>
                 Vencimento *
               </label>
-              <DateField
-                id="lanc-venc"
-                value={vencimento}
-                onChange={setVencimento}
-                placeholder="Selecione a data"
-              />
+              <div className="mt-1">
+                <DateField
+                  id="lanc-venc"
+                  value={vencimento}
+                  onChange={setVencimento}
+                  placeholder="Selecione a data"
+                />
+              </div>
               <div
                 className={clsx(
-                  "mt-3 rounded-lg border px-3 py-2 text-sm",
+                  "mt-3 rounded-xl border px-3 py-2 text-sm",
                   prazoVenc.variant === "neutral" &&
                     "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-300",
                   prazoVenc.variant === "soon" &&
@@ -570,12 +769,12 @@ export function LancamentoForm({
 
           {isCreate && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Recorrência
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:mt-3 sm:flex-row sm:items-end">
+              <p className={formSectionHeadingClass}>Recorrência</p>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</span>
+                  <span className="shrink-0 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Tipo
+                  </span>
                   <SearchableSelect
                     fullWidth={false}
                     options={tipoRecorrenciaOptions}
@@ -608,9 +807,7 @@ export function LancamentoForm({
 
           {!isCreate && initial.leadIdOrigem && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/60">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Origem
-              </p>
+              <p className={formSectionHeadingClass}>Origem</p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
                 <Link
                   href={`/comercial?leadId=${encodeURIComponent(initial.leadIdOrigem)}`}
@@ -644,27 +841,31 @@ export function LancamentoForm({
                 <label htmlFor="lanc-conta" className={formLabelClass}>
                   Conta
                 </label>
-                <SearchableSelect
-                  options={contaSelectOptions}
-                  value={contaId}
-                  onChange={setContaId}
-                  placeholder="— Selecione —"
-                  searchPlaceholder="Buscar conta…"
-                  leadingIcon={Landmark}
-                />
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={contaSelectOptions}
+                    value={contaId}
+                    onChange={setContaId}
+                    placeholder="— Selecione —"
+                    searchPlaceholder="Buscar conta…"
+                    leadingIcon={contaLeadingIcon}
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="lanc-cat" className={formLabelClass}>
                   Categoria
                 </label>
-                <SearchableSelect
-                  options={categoriaSelectOptions}
-                  value={categoriaId}
-                  onChange={setCategoriaId}
-                  placeholder="— Selecione —"
-                  searchPlaceholder="Buscar categoria…"
-                  leadingIcon={Tags}
-                />
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={categoriaSelectOptions}
+                    value={categoriaId}
+                    onChange={setCategoriaId}
+                    placeholder="— Selecione —"
+                    searchPlaceholder="Buscar categoria…"
+                    leadingIcon={categoriaLeadingIcon}
+                  />
+                </div>
               </div>
           </div>
 
@@ -673,28 +874,32 @@ export function LancamentoForm({
                 <label htmlFor="lanc-status" className={formLabelClass}>
                   Situação *
                 </label>
-                <SearchableSelect
-                  options={statusSelectOptions}
-                  value={status}
-                  onChange={(v) => handleStatusChange(v as Lancamento["status"])}
-                  placeholder="Situação"
-                  searchPlaceholder="Buscar…"
-                  searchable={false}
-                  leadingIcon={Clock}
-                />
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={statusSelectOptions}
+                    value={status}
+                    onChange={(v) => handleStatusChange(v as Lancamento["status"])}
+                    placeholder="Situação"
+                    searchPlaceholder="Buscar…"
+                    searchable={false}
+                    leadingIcon={statusLeadingIcon}
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="lanc-data-pg" className={formLabelClass}>
                   Data do pagamento / recebimento
                 </label>
-                <DateField
-                  id="lanc-data-pg"
-                  value={dataPagamento}
-                  onChange={setDataPagamento}
-                  placeholder="Selecione a data"
-                  disabled={status !== "pago"}
-                />
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-1">
+                  <DateField
+                    id="lanc-data-pg"
+                    value={dataPagamento}
+                    onChange={setDataPagamento}
+                    placeholder="Selecione a data"
+                    disabled={status !== "pago"}
+                  />
+                </div>
+                <p className={formHelperTextClass}>
                   Disponível quando o status for &quot;Pago&quot;.
                 </p>
               </div>
@@ -705,15 +910,17 @@ export function LancamentoForm({
                 <label htmlFor="lanc-meio" className={formLabelClass}>
                   Meio de pagamento
                 </label>
-                <SearchableSelect
-                  options={meioSelectOptions}
-                  value={meioPagamentoId}
-                  onChange={setMeioPagamentoId}
-                  placeholder="— Selecione —"
-                  searchable={false}
-                  leadingIcon={Wallet}
-                />
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={meioSelectOptions}
+                    value={meioPagamentoId}
+                    onChange={setMeioPagamentoId}
+                    placeholder="— Selecione —"
+                    searchable={false}
+                    leadingIcon={meioLeadingIcon}
+                  />
+                </div>
+                <p className={formHelperTextClass}>
                   Cadastre novos meios em Configurações do Financeiro (ícone de engrenagem no topo).
                 </p>
               </div>
@@ -721,8 +928,13 @@ export function LancamentoForm({
                 <label htmlFor="lanc-cond" className={formLabelClass}>
                   Condições de pagamento
                 </label>
-                <div className="relative">
-                  <Text className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <div className="relative mt-1">
+                  <Text
+                    className={clsx(
+                      "pointer-events-none absolute left-3 h-4 w-4 text-slate-400",
+                      formTextareaLeadingIconTopClass
+                    )}
+                  />
                   <textarea
                     id="lanc-cond"
                     value={condicoesPagamento}
@@ -738,7 +950,7 @@ export function LancamentoForm({
       )}
       </div>
 
-      <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 px-4 py-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
+      <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
         <button
           type="button"
           onClick={onCancel}
@@ -750,7 +962,7 @@ export function LancamentoForm({
           type="submit"
           className={formModalSubmitButtonClass}
         >
-          {isCreate ? "Criar lançamento(s)" : "Salvar alterações"}
+          Salvar
         </button>
       </div>
     </form>

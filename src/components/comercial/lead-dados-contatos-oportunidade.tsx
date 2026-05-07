@@ -1,13 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Contact, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Contact,
+  Plus,
+  Trash2,
+  User,
+  Briefcase,
+  Building2,
+  Phone,
+  Mail,
+} from "lucide-react";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { SearchableMultiSelect } from "@/components/ui/searchable-select";
 import type { Lead, ContatoOportunidade, PapelContatoOportunidade } from "@/lib/comercial/types";
 import type { Contato } from "@/lib/clientes/types";
 import { PAPEIS_CONTATO_OPORTUNIDADE } from "@/lib/comercial/constants";
-import { comercialInputCompactClass, comercialLabelClass } from "./field-styles";
+import { comercialInputClass, comercialLabelClass } from "./field-styles";
 
 function formatPhoneInput(v: string): string {
   const digits = v.replace(/\D/g, "").slice(0, 11);
@@ -127,67 +138,67 @@ export function LeadDadosContatosOportunidade({
 
   return (
     <>
-    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-      <h4 className="mb-3 text-sm font-semibold text-slate-800">Contatos da Oportunidade</h4>
+      <div className="space-y-4">
+        <p className={comercialLabelClass}>Contatos da oportunidade</p>
 
-      {contatosClienteDisponiveis.length > 0 && (
-        <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Contatos já cadastrados no Cliente
-          </p>
-          <SearchableMultiSelect
-            options={contatosClienteDisponiveis.map((c) => ({
-              value: c.id,
-              label: c.nome,
-              subtitle: [c.email, c.telefone].filter(Boolean).join(" · ") || "Sem e-mail/telefone",
-              icon: Contact,
-            }))}
-            values={contatos
-              .map((c) => c.id)
-              .filter((id) => contatosClienteDisponiveis.some((x) => x.id === id))}
-            onChange={(ids) => {
-              const currentById = new Map(contatos.map((x) => [x.id, x] as const));
-              const selectedFromCliente = ids.map((id) => {
-                const fromCurrent = currentById.get(id);
-                if (fromCurrent) return fromCurrent;
-                const fromCliente = contatosClienteDisponiveis.find((x) => x.id === id);
-                return fromCliente ? mapClienteContatoToOportunidade(fromCliente) : null;
-              }).filter(Boolean) as ContatoOportunidade[];
-              const manualOnly = contatos.filter((x) => !contatosClienteDisponiveis.some((c) => c.id === x.id));
-              const next = [...manualOnly, ...selectedFromCliente];
-              onApplyLocal({ contatosOportunidade: next });
-              onPersistToServer({ contatosOportunidade: next });
-            }}
-            placeholder="Selecionar contatos..."
-            searchPlaceholder="Buscar contato..."
-            selectedLabel="Selecionados"
-            showSelectedBadges={false}
-            leadingIcon={Contact}
-          />
-        </div>
-      )}
+        {contatosClienteDisponiveis.length > 0 && (
+          <div className="space-y-1">
+            <label className={comercialLabelClass}>Contatos já cadastrados no cliente</label>
+            <SearchableMultiSelect
+              options={contatosClienteDisponiveis.map((c) => ({
+                value: c.id,
+                label: c.nome,
+                subtitle: [c.email, c.telefone].filter(Boolean).join(" · ") || "Sem e-mail/telefone",
+                icon: Contact,
+              }))}
+              values={contatos
+                .map((c) => c.id)
+                .filter((id) => contatosClienteDisponiveis.some((x) => x.id === id))}
+              onChange={(ids) => {
+                const currentById = new Map(contatos.map((x) => [x.id, x] as const));
+                const selectedFromCliente = ids
+                  .map((id) => {
+                    const fromCurrent = currentById.get(id);
+                    if (fromCurrent) return fromCurrent;
+                    const fromCliente = contatosClienteDisponiveis.find((x) => x.id === id);
+                    return fromCliente ? mapClienteContatoToOportunidade(fromCliente) : null;
+                  })
+                  .filter(Boolean) as ContatoOportunidade[];
+                const manualOnly = contatos.filter((x) => !contatosClienteDisponiveis.some((c) => c.id === x.id));
+                const next = [...manualOnly, ...selectedFromCliente];
+                onApplyLocal({ contatosOportunidade: next });
+                onPersistToServer({ contatosOportunidade: next });
+              }}
+              placeholder="Selecionar contatos..."
+              searchPlaceholder="Buscar contato..."
+              selectedLabel="Selecionados"
+              showSelectedBadges={false}
+              leadingIcon={Contact}
+            />
+          </div>
+        )}
 
-      {precisaContato && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Pelo menos um contato deve ser cadastrado para avançar de etapa.
-        </div>
-      )}
+        {precisaContato && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+            Pelo menos um contato deve ser cadastrado para avançar de etapa.
+          </div>
+        )}
 
-      <button
-        type="button"
-        onClick={addContato}
-        className="mb-3 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-      >
-        <Plus className="h-4 w-4" /> Adicionar Contato
-      </button>
+        <button
+          type="button"
+          onClick={addContato}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <Plus className="h-4 w-4" /> Adicionar Contato
+        </button>
 
-      <ul className="space-y-3">
+        <ul className="space-y-4">
         {contatos.map((c) => {
           const isExpanded = expandedId === c.id;
           return (
             <li
               key={c.id}
-              className="rounded-lg border border-slate-200 bg-white shadow-sm"
+              className="border-t border-slate-200 pt-3 dark:border-slate-700"
             >
               <div
                 onClick={() => setExpandedId(isExpanded ? null : c.id)}
@@ -199,7 +210,7 @@ export function LeadDadosContatosOportunidade({
                 }}
                 role="button"
                 tabIndex={0}
-                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                className="flex w-full items-center justify-between py-1 text-left"
               >
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-slate-800">
@@ -224,61 +235,76 @@ export function LeadDadosContatosOportunidade({
                 </button>
               </div>
               {isExpanded && (
-                <div className="border-t border-slate-100 p-3 space-y-3">
+                <div className="space-y-3 pt-2">
                   <div>
                     <label className={comercialLabelClass}>Nome</label>
-                    <input
-                      type="text"
-                      value={c.nome}
-                      onChange={(e) => updateContato(c.id, { nome: e.target.value })}
-                      placeholder="Nome completo"
-                      className={comercialInputCompactClass}
-                    />
+                    <div className="relative">
+                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={c.nome}
+                        onChange={(e) => updateContato(c.id, { nome: e.target.value })}
+                        placeholder="Nome completo"
+                        className={`${comercialInputClass} pl-9`}
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
                       <label className={comercialLabelClass}>Cargo</label>
-                      <input
-                        type="text"
-                        value={c.cargo ?? ""}
-                        onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
-                        placeholder="Ex: Diretor"
-                        className={comercialInputCompactClass}
-                      />
+                      <div className="relative">
+                        <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={c.cargo ?? ""}
+                          onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
+                          placeholder="Ex: Diretor"
+                          className={`${comercialInputClass} pl-9`}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className={comercialLabelClass}>Setor</label>
-                      <input
-                        type="text"
-                        value={c.setor ?? ""}
-                        onChange={(e) => updateContato(c.id, { setor: e.target.value })}
-                        placeholder="Ex: Comercial"
-                        className={comercialInputCompactClass}
-                      />
+                      <div className="relative">
+                        <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={c.setor ?? ""}
+                          onChange={(e) => updateContato(c.id, { setor: e.target.value })}
+                          placeholder="Ex: Comercial"
+                          className={`${comercialInputClass} pl-9`}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
                       <label className={comercialLabelClass}>Telefone</label>
-                      <input
-                        type="text"
-                        value={c.telefone}
-                        onChange={(e) =>
-                          updateContato(c.id, { telefone: formatPhoneInput(e.target.value) })
-                        }
-                        placeholder="(00) 00000-0000"
-                        className={comercialInputCompactClass}
-                      />
+                      <div className="relative">
+                        <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={c.telefone}
+                          onChange={(e) =>
+                            updateContato(c.id, { telefone: formatPhoneInput(e.target.value) })
+                          }
+                          placeholder="(00) 00000-0000"
+                          className={`${comercialInputClass} pl-9`}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className={comercialLabelClass}>E-mail</label>
-                      <input
-                        type="email"
-                        value={c.email}
-                        onChange={(e) => updateContato(c.id, { email: e.target.value })}
-                        placeholder="email@empresa.com"
-                        className={comercialInputCompactClass}
-                      />
+                      <div className="relative">
+                        <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="email"
+                          value={c.email}
+                          onChange={(e) => updateContato(c.id, { email: e.target.value })}
+                          placeholder="email@empresa.com"
+                          className={`${comercialInputClass} pl-9`}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -310,28 +336,28 @@ export function LeadDadosContatosOportunidade({
             </li>
           );
         })}
-      </ul>
-    </div>
-    <AlertDialog
-      open={!!contatoIdParaRemover}
-      onClose={() => setContatoIdParaRemover(null)}
-      onConfirm={() => {
-        if (contatoIdParaRemover) removeContato(contatoIdParaRemover);
-      }}
-      title="Remover contato da oportunidade?"
-      description={
-        contatoIdParaRemover ? (
-          <>
-            <strong className="text-slate-900 dark:text-slate-100">Esta ação é irreversível:</strong> o contato{" "}
-            <strong className="text-slate-900 dark:text-slate-100">{nomeContatoRemocao}</strong> será removido desta
-            oportunidade no servidor.
-          </>
-        ) : null
-      }
-      cancelLabel="Cancelar"
-      confirmLabel="Sim, remover permanentemente"
-      destructive
-    />
+        </ul>
+      </div>
+      <AlertDialog
+        open={!!contatoIdParaRemover}
+        onClose={() => setContatoIdParaRemover(null)}
+        onConfirm={() => {
+          if (contatoIdParaRemover) removeContato(contatoIdParaRemover);
+        }}
+        title="Remover contato da oportunidade?"
+        description={
+          contatoIdParaRemover ? (
+            <>
+              <strong className="text-slate-900 dark:text-slate-100">Esta ação é irreversível:</strong> o contato{" "}
+              <strong className="text-slate-900 dark:text-slate-100">{nomeContatoRemocao}</strong> será removido desta
+              oportunidade no servidor.
+            </>
+          ) : null
+        }
+        cancelLabel="Cancelar"
+        confirmLabel="Sim, remover permanentemente"
+        destructive
+      />
     </>
   );
 }

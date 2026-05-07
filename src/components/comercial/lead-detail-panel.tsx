@@ -43,10 +43,13 @@ export function LeadDetailPanel({
       onClose={onClose}
       title={lead.name}
       maxWidth="sm:max-w-3xl"
+      mobileContentPaddingClassName="px-0"
+      desktopContentPaddingClassName="px-0"
     >
       <LeadDetailTabs
         lead={lead}
         stages={stages}
+        onClose={onClose}
         onUpdateLead={onUpdateLead}
         onMudarEtapa={onMudarEtapa}
         onSolicitarLiberacaoFinanceiro={onSolicitarLiberacaoFinanceiro}
