@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { mapPerfil } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { DB_PERMISSION_MODULES } from "@/lib/configuracoes/permission-utils";
+import { savePerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
 
 export async function POST(req: Request) {
   const body = await parseJsonSafe<{ perfil?: PerfilAcessoFront }>(req);
@@ -15,19 +17,22 @@ export async function POST(req: Request) {
       nome: p.nome,
       descricao: p.descricao ?? null,
       permissoes: {
-        create: Object.entries(p.permissoes).map(([modulo, permitido]) => ({
+        create: Object.entries(p.permissoes)
+          .filter(([modulo]) => DB_PERMISSION_MODULES.includes(modulo as (typeof DB_PERMISSION_MODULES)[number]))
+          .map(([modulo, permitido]) => ({
           modulo: modulo as never,
           permitido: Boolean(permitido),
-        })),
+          })),
       },
     },
     include: { permissoes: true },
   });
+  await savePerfilPermissoesExtras(prisma, created.id, p.permissoes);
   await writeAuditLog(prisma, {
     acao: "Perfil criado",
     modulo: "configuracoes",
     detalhes: `Perfil ${created.nome}`,
   });
-  return ok({ perfil: mapPerfil(created) }, 201);
+  return ok({ perfil: mapPerfil(created, p.permissoes) }, 201);
 }
 

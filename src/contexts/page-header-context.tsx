@@ -37,6 +37,7 @@ const DEFAULT_TITLES: Record<string, string> = {
   "/comercial": "Funil de Vendas",
   "/financeiro": "Financeiro",
   "/financeiro/extrato": "Extrato Financeiro",
+  "/financeiro/comissoes": "Financeiro · Comissões",
   "/clientes": "Gestão de Clientes",
   "/contratos": "Contratos",
   "/solucoes": "Soluções e Playbooks",

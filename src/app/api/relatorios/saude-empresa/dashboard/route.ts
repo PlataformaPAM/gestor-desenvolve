@@ -35,7 +35,7 @@ export async function GET() {
         select: { clienteId: true, tipo: true, status: true, valor: true, vencimento: true },
       }),
       prisma.lead.findMany({
-        where: { createdAt: { gte: start, lte: end } },
+        where: { createdAt: { gte: start, lte: end }, registroLead: "oportunidade" },
         select: { stageId: true, valorTotal: true, value: true },
       }),
     ]);

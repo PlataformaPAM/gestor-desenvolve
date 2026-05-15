@@ -1,10 +1,11 @@
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
 import { prisma } from "@/lib/prisma";
+import { PORTAL_CLIENTE_PERFIL_MODULOS } from "@/lib/portal/cliente-perfil-modulos";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { resolvePortalContext } from "@/lib/server/portal-access";
 
 const PREFIX = "PORTAL_CLIENTE";
-const ALLOWED_MODULES: ModuloPermissao[] = ["helpdesk", "configuracoes"];
+const ALLOWED_MODULES = PORTAL_CLIENTE_PERFIL_MODULOS;
 
 function encodeName(clienteId: string, nome: string): string {
   return `${PREFIX}:${clienteId}:${nome.trim()}`;
@@ -22,10 +23,17 @@ function defaultPermissoes() {
     financeiro: false,
     tarefas: false,
     clientes: false,
+    contratos: false,
     helpdesk: true,
     posVenda: false,
+    solucoes: false,
     rh: false,
     configuracoes: false,
+    relatorios: false,
+    configuracoes_construtor_documentos: false,
+    configuracoes_logs: false,
+    configuracoes_perfis: false,
+    configuracoes_usuarios: false,
   } as Record<ModuloPermissao, boolean>;
 }
 
@@ -72,7 +80,7 @@ export async function POST(req: Request) {
       nome: nomePersistido,
       descricao: perfil.descricao ?? null,
       permissoes: {
-        create: ALLOWED_MODULES.map((modulo) => ({ modulo, permitido: permissoes[modulo] })),
+        create: ALLOWED_MODULES.map((modulo) => ({ modulo: modulo as never, permitido: permissoes[modulo] })),
       },
     },
     include: { permissoes: true },

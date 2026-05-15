@@ -21,11 +21,31 @@ import {
   TrendingDown,
   Wallet,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   ArrowDownLeft,
   ArrowUpRight,
   GitCompareArrows,
   Telescope,
   SlidersHorizontal,
+  CheckCircle2,
+  BadgePercent,
+  XCircle,
+  Unlock,
+  ShieldOff,
+  RotateCcw,
+  ScrollText,
+  RefreshCw,
+  Search,
+  Calendar,
+  CalendarCheck2,
+  ListFilter,
+  Users,
+  UserRound,
+  Building2,
+  Landmark,
+  Tag,
+  Clock,
 } from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { LancamentosTable } from "@/components/financeiro/lancamentos-table";
@@ -36,6 +56,7 @@ import { AlertDialog } from "@/components/ui/alert-dialog";
 import { ClientePerfil360 } from "@/components/clientes/cliente-perfil-360";
 import { usePageHeader } from "@/contexts/page-header-context";
 import type {
+  ConsultorComissaoSlim,
   FinanceiroCategoria,
   FinanceiroConta,
   FinanceiroMeioPagamento,
@@ -48,19 +69,27 @@ import { calcularCaixaAtual, calcularPrevisaoPeriodo } from "@/lib/financeiro/ca
 import { useAuth } from "@/contexts/auth-context";
 import type { AprovacaoPendente, UnlockRequest } from "@/app/api/financeiro/_shared";
 import { recorrenciaComercialParaFinanceiro } from "@/lib/comercial/recorrencia-financeiro";
+import { LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES } from "@/lib/financeiro/constants";
 import {
+  dedupeLancamentosPorId,
   descricaoParaExibicao,
   linhaLancamentoComAlertaVisual,
   normalizeTextoAlertaMatch,
   parseValorReaisDeTexto,
+  statusFinanceiroEfetivo,
 } from "@/lib/financeiro/lancamento-utils";
 import {
+  appendFixoMensalLinhas,
   buildPayloadsForRecurrenceScope,
+  getGroupMembers,
+  getRecurrenceRootId,
   hasLancamentoEdicaoDiff,
   isRecorrenciaPagamento,
 } from "@/lib/financeiro/recurrence-save";
-import { subscribeAlertsUpdated } from "@/lib/alerts/live-sync";
+import { emitAlertsUpdated, subscribeAlertsUpdated } from "@/lib/alerts/live-sync";
 import { RecurrenceScopeDialog } from "@/components/financeiro/recurrence-scope-dialog";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { SearchableOption } from "@/components/ui/searchable-select";
 
 type TabId = "entradas" | "saidas" | "fluxo";
 type PeriodoId = "mes_atual" | "mes_passado" | "personalizado";
@@ -145,6 +174,7 @@ export default function FinanceiroPage() {
   const [contas, setContas] = useState<FinanceiroConta[]>([]);
   const [categorias, setCategorias] = useState<FinanceiroCategoria[]>([]);
   const [meiosPagamento, setMeiosPagamento] = useState<FinanceiroMeioPagamento[]>([]);
+  const [consultoresComissaoRh, setConsultoresComissaoRh] = useState<ConsultorComissaoSlim[]>([]);
   const [drawerConfigOpen, setDrawerConfigOpen] = useState(false);
   const [drawerNovoOpen, setDrawerNovoOpen] = useState(false);
   const [drawerEditarOpen, setDrawerEditarOpen] = useState(false);
@@ -184,7 +214,11 @@ export default function FinanceiroPage() {
       ariaLabel: "Configurações do Financeiro — contas, categorias e meios de pagamento",
       onClick: () => setDrawerConfigOpen(true),
     });
-    setPrimaryAction({ label: "Novo Lançamento", onClick: () => setDrawerNovoOpen(true) });
+    setPrimaryAction({
+      label: "Novo Lançamento",
+      onClick: () => setDrawerNovoOpen(true),
+      showPlusIcon: true,
+    });
     return () => {
       setSecondaryAction(null);
       setPrimaryAction(null);
@@ -201,8 +235,9 @@ export default function FinanceiroPage() {
       meiosPagamento?: FinanceiroMeioPagamento[];
       aprovacoesPendentes?: AprovacaoPendente[];
       unlockRequests?: UnlockRequest[];
+      consultoresComissaoRh?: ConsultorComissaoSlim[];
     }) => {
-      setLancamentos(data.lancamentos ?? []);
+      setLancamentos(dedupeLancamentosPorId(data.lancamentos ?? []));
       setClientes(data.clientes ?? []);
       setFornecedoresRh(data.fornecedoresRh ?? []);
       setContas(data.contas ?? []);
@@ -210,6 +245,7 @@ export default function FinanceiroPage() {
       setMeiosPagamento(data.meiosPagamento ?? []);
       setAprovacoesPendentes(data.aprovacoesPendentes ?? []);
       setUnlockRequests(data.unlockRequests ?? []);
+      setConsultoresComissaoRh(data.consultoresComissaoRh ?? []);
     },
     []
   );
@@ -230,6 +266,7 @@ export default function FinanceiroPage() {
             meiosPagamento?: FinanceiroMeioPagamento[];
             aprovacoesPendentes?: AprovacaoPendente[];
             unlockRequests?: UnlockRequest[];
+            consultoresComissaoRh?: ConsultorComissaoSlim[];
           };
         }>(res);
         if (!active) return;
@@ -262,7 +299,7 @@ export default function FinanceiroPage() {
       tipoRec === "parcelado"
         ? Math.max(2, sel?.parcelas ?? 12)
         : tipoRec === "fixo_mensal"
-          ? 12
+          ? LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES
           : undefined;
     return {
       ...DEFAULT_NEW_LANCAMENTO,
@@ -299,6 +336,7 @@ export default function FinanceiroPage() {
           meiosPagamento?: FinanceiroMeioPagamento[];
           aprovacoesPendentes?: AprovacaoPendente[];
           unlockRequests?: UnlockRequest[];
+          consultoresComissaoRh?: ConsultorComissaoSlim[];
         };
       }>(res);
       aplicarPayloadBootstrap(json?.data ?? {});
@@ -324,6 +362,7 @@ export default function FinanceiroPage() {
           meiosPagamento?: FinanceiroMeioPagamento[];
           aprovacoesPendentes?: AprovacaoPendente[];
           unlockRequests?: UnlockRequest[];
+          consultoresComissaoRh?: ConsultorComissaoSlim[];
         };
       }>(res);
       aplicarPayloadBootstrap(json?.data ?? {});
@@ -378,6 +417,7 @@ export default function FinanceiroPage() {
       setAprovacoesPendentes((prev) => prev.filter((x) => x.leadId !== leadId));
       setRecusaModalLeadId((curr) => (curr === leadId ? null : curr));
       showToast("Aprovação recusada e devolvida ao Comercial.", "success");
+      emitAlertsUpdated();
     })();
   };
 
@@ -385,6 +425,92 @@ export default function FinanceiroPage() {
     () => getMonthRange(periodo, customYear, customMonth),
     [periodo, customYear, customMonth]
   );
+
+  const mesFocoLabel = useMemo(() => {
+    const { start: s } = getMonthRange(periodo, customYear, customMonth);
+    const raw = s.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+    const cleaned = raw.replace(/\.$/, "");
+    return cleaned.length ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : cleaned;
+  }, [periodo, customYear, customMonth]);
+
+  const goMonthDelta = useCallback(
+    (delta: number) => {
+      const { start: anchor } = getMonthRange(periodo, customYear, customMonth);
+      const d = new Date(anchor.getFullYear(), anchor.getMonth() + delta, 1);
+      setPeriodo("personalizado");
+      setCustomYear(d.getFullYear());
+      setCustomMonth(d.getMonth());
+    },
+    [periodo, customYear, customMonth]
+  );
+
+  const goMesAtualCalendario = useCallback(() => {
+    const n = new Date();
+    setPeriodo("mes_atual");
+    setCustomYear(n.getFullYear());
+    setCustomMonth(n.getMonth());
+  }, []);
+
+  const financeiroStatusFilterOptions = useMemo<SearchableOption[]>(
+    () => [
+      { value: "todos", label: "Status", icon: ListFilter, iconClassName: "text-[#6D28D9]" },
+      { value: "pendente", label: "Pendente", icon: Clock, iconClassName: "text-amber-600 dark:text-amber-400" },
+      {
+        value: "atrasado",
+        label: "Atrasado",
+        icon: AlertTriangle,
+        iconClassName: "text-orange-600 dark:text-orange-400",
+      },
+      { value: "pago", label: "Pago", icon: CheckCircle2, iconClassName: "text-emerald-600 dark:text-emerald-400" },
+    ],
+    []
+  );
+
+  const financeiroParteFilterOptions = useMemo<SearchableOption[]>(
+    () => [
+      { value: "todos", label: "Todos", icon: Users, iconClassName: "text-slate-500 dark:text-slate-400" },
+      { value: "cliente", label: "Cliente", icon: UserRound, iconClassName: "text-sky-600 dark:text-sky-400" },
+      {
+        value: "fornecedor",
+        label: "Fornecedor",
+        icon: Building2,
+        iconClassName: "text-violet-600 dark:text-violet-400",
+      },
+    ],
+    []
+  );
+
+  const financeiroContaFilterOptions = useMemo<SearchableOption[]>(() => {
+    const base: SearchableOption[] = [
+      { value: "todos", label: "Todas as contas", icon: Landmark, iconClassName: "text-[#6D28D9]" },
+    ];
+    const rows = contas
+      .filter((c) => c.ativo)
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((c) => ({
+        value: c.id,
+        label: c.nome,
+        icon: Wallet,
+        iconClassName: "text-slate-600 dark:text-slate-300",
+      }));
+    return [...base, ...rows];
+  }, [contas]);
+
+  const financeiroCategoriaFilterOptions = useMemo<SearchableOption[]>(() => {
+    const base: SearchableOption[] = [
+      { value: "todos", label: "Todas as categorias", icon: Tag, iconClassName: "text-[#6D28D9]" },
+    ];
+    const rows = categorias
+      .filter((c) => c.ativo)
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((c) => ({
+        value: c.id,
+        label: c.nome,
+        icon: Tag,
+        iconClassName: "text-slate-600 dark:text-slate-300",
+      }));
+    return [...base, ...rows];
+  }, [categorias]);
 
   const lancamentosNoPeriodo = useMemo(() => {
     return lancamentos.filter((l) => isInRange(l.vencimento, start, end));
@@ -415,7 +541,7 @@ export default function FinanceiroPage() {
     return lancamentosParaTabela.filter((l) => {
       if (filtroParte === "cliente" && l.tipo !== "entrada") return false;
       if (filtroParte === "fornecedor" && l.tipo !== "saida") return false;
-      if (filtroStatus !== "todos" && l.status !== filtroStatus) return false;
+      if (filtroStatus !== "todos" && statusFinanceiroEfetivo(l) !== filtroStatus) return false;
       if (filtroConta !== "todos" && (l.contaId ?? "") !== filtroConta) return false;
       if (filtroCategoria !== "todos" && (l.categoriaId ?? "") !== filtroCategoria) return false;
       if (!busca) return true;
@@ -446,13 +572,13 @@ export default function FinanceiroPage() {
   ]);
 
   const contagemAlertaPorTab = useMemo(() => {
-    const ok = (l: Lancamento) => linhaLancamentoComAlertaVisual(l, pendingByLancamentoId);
+    const ok = (l: Lancamento) => linhaLancamentoComAlertaVisual(l, pendingByLancamentoId, lancamentos);
     return {
       fluxo: lancamentosFiltrados.filter(ok).length,
       entradas: lancamentosFiltrados.filter((l) => l.tipo === "entrada" && ok(l)).length,
       saidas: lancamentosFiltrados.filter((l) => l.tipo === "saida" && ok(l)).length,
     } satisfies Record<TabId, number>;
-  }, [lancamentosFiltrados, pendingByLancamentoId]);
+  }, [lancamentosFiltrados, pendingByLancamentoId, lancamentos]);
 
   const lancamentosPorTab = useMemo(() => {
     const base =
@@ -633,6 +759,7 @@ export default function FinanceiroPage() {
             : "Lançamento atualizado com sucesso.",
           "success"
         );
+        emitAlertsUpdated();
       } catch {
         await refetchBootstrapSilencioso();
         showToast("Não foi possível salvar as alterações.", "error");
@@ -655,6 +782,46 @@ export default function FinanceiroPage() {
       void salvarEdicaoLancamentosLista([edited]);
     },
     [lancamentoEmEdicao, salvarEdicaoLancamentosLista]
+  );
+
+  const recorrenciaGrupoEdicao = useMemo(() => {
+    if (!lancamentoEmEdicao || lancamentoEmEdicao.tipoRecorrencia !== "fixo_mensal") return undefined;
+    const rootId = getRecurrenceRootId(lancamentoEmEdicao);
+    return getGroupMembers(rootId, lancamentos);
+  }, [lancamentoEmEdicao, lancamentos]);
+
+  const prorrogarFixoMensal = useCallback(
+    async (meses: number): Promise<boolean> => {
+      if (!lancamentoEmEdicao) {
+        showToast("Não foi possível prorrogar a recorrência.", "error");
+        return false;
+      }
+      const root = getRecurrenceRootId(lancamentoEmEdicao);
+      const novos = appendFixoMensalLinhas(root, meses, lancamentos);
+      if (novos.length === 0) {
+        showToast("Informe pelo menos 1 mês para prorrogar.", "error");
+        return false;
+      }
+      try {
+        const res = await fetch("/api/financeiro/lancamentos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lancamentos: novos }),
+        });
+        const json = await parseJsonSafe<{ success?: boolean }>(res);
+        if (!res.ok || !json?.success) {
+          showToast("Não foi possível prorrogar a recorrência.", "error");
+          return false;
+        }
+        await refetchBootstrapSilencioso();
+        showToast(`${novos.length} competência(ns) adicionada(s) à recorrência fixa mensal.`, "success");
+        return true;
+      } catch {
+        showToast("Não foi possível prorrogar a recorrência.", "error");
+        return false;
+      }
+    },
+    [lancamentoEmEdicao, lancamentos, refetchBootstrapSilencioso, showToast]
   );
 
   useEffect(() => {
@@ -747,6 +914,7 @@ export default function FinanceiroPage() {
         : "Lançamento marcado como pendente.",
       "success"
     );
+    emitAlertsUpdated();
   };
 
   const TABS: { id: TabId; label: string; icon: ComponentType<{ className?: string }> }[] = [
@@ -798,15 +966,17 @@ export default function FinanceiroPage() {
                     <button
                       type="button"
                       onClick={() => aceitarLeadComercial(p.leadId)}
-                      className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                      className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
                     >
+                      <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
                       Aprovar
                     </button>
                     <button
                       type="button"
                       onClick={() => setRecusaModalLeadId(p.leadId)}
-                      className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                      className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                     >
+                      <XCircle className="h-4 w-4 shrink-0" aria-hidden />
                       Recusar
                     </button>
                   </div>
@@ -872,8 +1042,9 @@ export default function FinanceiroPage() {
                         showToast("Edição do lead liberada com sucesso.", "success");
                       })();
                     }}
-                    className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                    className="inline-flex items-center gap-2 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
                   >
+                    <Unlock className="h-4 w-4 shrink-0" aria-hidden />
                     Liberar edição
                   </button>
                   <input
@@ -903,8 +1074,9 @@ export default function FinanceiroPage() {
                         showToast("Solicitação de liberação negada.", "success");
                       })();
                     }}
-                    className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                    className="inline-flex items-center gap-2 rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                   >
+                    <ShieldOff className="h-4 w-4 shrink-0" aria-hidden />
                     Negar liberação
                   </button>
                 </div>
@@ -975,118 +1147,157 @@ export default function FinanceiroPage() {
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
-          <input
-            value={filtroBusca}
-            onChange={(e) => setFiltroBusca(e.target.value)}
-            placeholder="Buscar…"
-            className="min-w-0 w-full max-w-full flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 sm:max-w-[min(22ch,36vw)] md:max-w-[min(26ch,32vw)]"
-          />
-          <select
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value as "todos" | Lancamento["status"])}
-            className="min-w-0 shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 w-[7.25rem] sm:w-[8.5rem]"
-          >
-            <option value="todos">Status</option>
-            <option value="pendente">Pendente</option>
-            <option value="atrasado">Atrasado</option>
-            <option value="pago">Pago</option>
-          </select>
-          <select
-            value={filtroCategoria}
-            onChange={(e) => setFiltroCategoria(e.target.value)}
-            className="min-w-0 shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 w-[min(11rem,42vw)] sm:w-[12rem]"
-          >
-            <option value="todos">Categorias</option>
-            {categorias
-              .filter((c) => c.ativo)
-              .sort((a, b) => a.ordem - b.ordem)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => setShowAdvancedFilters((v) => !v)}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            aria-expanded={showAdvancedFilters}
-            aria-label="Abrir filtros avançados"
-          >
-            <SlidersHorizontal className="h-4 w-4 shrink-0" />
-            <span className="whitespace-nowrap">{showAdvancedFilters ? "Menos" : "Mais"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={limparFiltros}
-            className="shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            Limpar
-          </button>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-3">
+          {/* Buscar */}
+          <div className="relative z-0 min-h-[42px] min-w-0 w-full">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6D28D9] dark:text-violet-400"
+              aria-hidden
+            />
+            <input
+              value={filtroBusca}
+              onChange={(e) => setFiltroBusca(e.target.value)}
+              placeholder="Buscar…"
+              className="min-h-[42px] w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
+          </div>
+
+          {/* Navegação mês + demais filtros (coluna própria; nunca sobrepõe a busca) */}
+          <div className="flex w-full min-w-0 flex-wrap items-stretch gap-2 justify-start lg:w-max lg:max-w-full lg:flex-nowrap lg:justify-end">
+            {/* período / ano */}
+            <div className="flex min-h-[42px] min-w-0 shrink-0 items-center gap-0.5 rounded-xl border border-slate-200 bg-white px-0.5 py-0.5 shadow-sm dark:border-slate-600 dark:bg-slate-800">
+              <Calendar className="ml-1 hidden h-4 w-4 shrink-0 text-[#6D28D9] dark:text-violet-400 sm:block" aria-hidden />
+              <button
+                type="button"
+                onClick={() => goMonthDelta(-1)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-[#6D28D9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9]/25 dark:text-slate-300 dark:hover:bg-violet-950/50 dark:hover:text-violet-300"
+                aria-label="Mês anterior"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+              <span
+                className="min-w-[6.5rem] select-none px-1 text-center text-xs font-semibold tabular-nums text-slate-800 dark:text-slate-100 sm:min-w-[7.25rem] sm:text-sm"
+                title={getMonthRange(periodo, customYear, customMonth).start.toLocaleDateString("pt-BR", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              >
+                {mesFocoLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => goMonthDelta(1)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-[#6D28D9] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9]/25 dark:text-slate-300 dark:hover:bg-violet-950/50 dark:hover:text-violet-300"
+                aria-label="Próximo mês"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={goMesAtualCalendario}
+              disabled={periodo === "mes_atual"}
+              className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition-colors hover:border-[#6D28D9]/40 hover:bg-violet-50/90 hover:text-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:cursor-default disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-violet-950/40 dark:hover:text-violet-200 sm:text-sm"
+            >
+              <CalendarCheck2 className="h-4 w-4 shrink-0 text-[#6D28D9] dark:text-violet-400" aria-hidden />
+              Mês atual
+            </button>
+
+            <div className="w-full min-w-0 sm:min-w-[10.5rem] sm:max-w-[15rem] lg:min-w-[11rem]">
+              <SearchableSelect
+                options={financeiroStatusFilterOptions}
+                value={filtroStatus}
+                onChange={(v) => setFiltroStatus(v as "todos" | Lancamento["status"])}
+                placeholder="Status"
+                searchable={false}
+                searchPlaceholder="Buscar status…"
+                emptyLabel="Nenhum status."
+                leadingIcon={ListFilter}
+                leadingIconClassName="text-[#6D28D9] dark:text-violet-400"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters((v) => !v)}
+              className={clsx(
+                "inline-flex min-h-[42px] shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20",
+                showAdvancedFilters
+                  ? "border-[#6D28D9]/50 bg-violet-50 text-[#6D28D9] dark:border-violet-500/50 dark:bg-violet-950/45 dark:text-violet-200"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-[#6D28D9]/35 hover:bg-violet-50/80 hover:text-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-violet-500/35 dark:hover:bg-violet-950/35 dark:hover:text-violet-200"
+              )}
+              aria-expanded={showAdvancedFilters}
+              aria-label="Mais filtros"
+            >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="whitespace-nowrap">{showAdvancedFilters ? "Menos filtros" : "Mais filtros"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={limparFiltros}
+              className="inline-flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              <RotateCcw className="h-4 w-4 shrink-0 text-[#6D28D9] dark:text-violet-400" aria-hidden />
+              Limpar
+            </button>
+          </div>
         </div>
 
         {showAdvancedFilters && (
-          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
-            <select
-              value={filtroParte}
-              onChange={(e) => setFiltroParte(e.target.value as "todos" | "cliente" | "fornecedor")}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value="todos">Cliente/Fornecedor</option>
-              <option value="cliente">Cliente</option>
-              <option value="fornecedor">Fornecedor</option>
-            </select>
-            <select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value as PeriodoId)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value="mes_atual">Período</option>
-              <option value="mes_passado">Mês passado</option>
-              <option value="personalizado">Personalizado</option>
-            </select>
-            <select
-              value={filtroConta}
-              onChange={(e) => setFiltroConta(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value="todos">Conta</option>
-              {contas
-                .filter((c) => c.ativo)
-                .sort((a, b) => a.ordem - b.ordem)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-            </select>
-            {periodo === "personalizado" ? (
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={customMonth}
-                  onChange={(e) => setCustomMonth(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                >
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {new Date(2000, i).toLocaleString("pt-BR", { month: "long" })}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={customYear}
-                  onChange={(e) => setCustomYear(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                >
-                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div />
-            )}
+          <div className="mt-3 grid w-full min-w-0 grid-cols-1 gap-3 border-t border-slate-200 pt-3 dark:border-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <Users className="h-3.5 w-3.5 text-[#6D28D9] dark:text-violet-400" aria-hidden />
+                Cliente / Fornecedor
+              </span>
+              <SearchableSelect
+                options={financeiroParteFilterOptions}
+                value={filtroParte}
+                onChange={(v) => setFiltroParte(v as "todos" | "cliente" | "fornecedor")}
+                placeholder="Todos"
+                searchable={false}
+                searchPlaceholder="Buscar…"
+                emptyLabel="Nenhuma opção."
+                leadingIcon={Users}
+                leadingIconClassName="text-[#6D28D9] dark:text-violet-400"
+              />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <Landmark className="h-3.5 w-3.5 text-[#6D28D9] dark:text-violet-400" aria-hidden />
+                Conta
+              </span>
+              <SearchableSelect
+                options={financeiroContaFilterOptions}
+                value={filtroConta}
+                onChange={(v) => setFiltroConta(v)}
+                placeholder="Todas as contas"
+                searchable
+                searchPlaceholder="Buscar conta…"
+                emptyLabel="Nenhuma conta encontrada."
+                leadingIcon={Landmark}
+                leadingIconClassName="text-[#6D28D9] dark:text-violet-400"
+              />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <Tag className="h-3.5 w-3.5 text-[#6D28D9] dark:text-violet-400" aria-hidden />
+                Categorias
+              </span>
+              <SearchableSelect
+                options={financeiroCategoriaFilterOptions}
+                value={filtroCategoria}
+                onChange={(v) => setFiltroCategoria(v)}
+                placeholder="Todas as categorias"
+                searchable
+                searchPlaceholder="Buscar categoria…"
+                emptyLabel="Nenhuma categoria encontrada."
+                leadingIcon={Tag}
+                leadingIconClassName="text-[#6D28D9] dark:text-violet-400"
+              />
+            </div>
           </div>
         )}
 
@@ -1095,7 +1306,7 @@ export default function FinanceiroPage() {
           <div
             role="tablist"
             aria-label="Abas de lançamentos"
-            className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50/50 dark:border-slate-600 dark:bg-slate-800/60"
+            className="inline-flex overflow-hidden rounded-lg border border-slate-300 bg-slate-50/50 dark:border-slate-600 dark:bg-slate-800/60"
           >
             {TABS.map((t) => {
               const Icon = t.icon;
@@ -1136,16 +1347,25 @@ export default function FinanceiroPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/financeiro/extrato"
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
             >
+              <ScrollText className="h-4 w-4 shrink-0" aria-hidden />
               Ver Extrato
+            </Link>
+            <Link
+              href="/financeiro/comissoes"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <BadgePercent className="h-4 w-4 shrink-0" aria-hidden />
+              Comissões
             </Link>
             <button
               type="button"
               onClick={() => void recarregarBootstrapManual()}
               disabled={refreshing}
-              className="rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
+              <RefreshCw className={clsx("h-4 w-4 shrink-0", refreshing && "animate-spin")} aria-hidden />
               {refreshing ? "Atualizando..." : "Atualizar agora"}
             </button>
           </div>
@@ -1168,6 +1388,7 @@ export default function FinanceiroPage() {
           disabledActionIds={pendingLancamentoAction}
           showTipo={tab === "fluxo"}
           pendingByLancamentoId={pendingByLancamentoId}
+          todosLancamentosParaAlerta={lancamentos}
         />
       </div>
 
@@ -1217,40 +1438,12 @@ export default function FinanceiroPage() {
           setAprovacaoLinhaSolucaoId(null);
         }}
         title={aprovacaoParaLancar ? `Novo Lançamento — ${aprovacaoParaLancar.leadNome}` : "Novo Lançamento"}
+        scrollBody={false}
         mobileContentPaddingClassName="px-0"
         desktopContentPaddingClassName="px-0"
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {aprovacaoParaLancar && aprovacaoParaLancar.solucoes.length > 0 && (
-            <div className="shrink-0 px-4 pb-3 pt-0 text-sm lg:px-6">
-              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-500/30 dark:bg-amber-950/35">
-              <p className="font-medium text-amber-900 dark:text-amber-200">Soluções da proposta</p>
-              <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90">
-                Registre o lançamento (único, mensal ou parcelado) para cada item. A aprovação só conclui quando todos
-                tiverem vínculo no caixa.
-              </p>
-              <ul className="mt-2 space-y-1">
-                {aprovacaoParaLancar.solucoes.map((s) => {
-                  const ok = lancamentos.some(
-                    (l) => l.leadIdOrigem === aprovacaoParaLancar.leadId && l.leadSolucaoId === s.leadSolucaoId
-                  );
-                  return (
-                    <li
-                      key={s.leadSolucaoId}
-                      className="flex items-center justify-between gap-2 text-slate-800 dark:text-slate-200"
-                    >
-                      <span className="min-w-0 truncate">{s.nome}</span>
-                      <span className={ok ? "shrink-0 text-emerald-600 dark:text-emerald-400" : "shrink-0 text-slate-500"}>
-                        {ok ? "Vinculado" : "Pendente"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-              </div>
-            </div>
-          )}
-          <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <LancamentoForm
             key={`novo-${aprovacaoParaLancar?.leadId ?? "livre"}-${aprovacaoLinhaSolucaoId ?? "auto"}-${aprovacaoFormEpoch}`}
             mode="create"
@@ -1264,6 +1457,17 @@ export default function FinanceiroPage() {
             solucoesAprovacao={
               aprovacaoParaLancar && aprovacaoParaLancar.solucoes.length > 1
                 ? aprovacaoParaLancar.solucoes.map((s) => ({ leadSolucaoId: s.leadSolucaoId, nome: s.nome }))
+                : undefined
+            }
+            propostaSolucoesResumo={
+              aprovacaoParaLancar && aprovacaoParaLancar.solucoes.length > 0
+                ? aprovacaoParaLancar.solucoes.map((s) => ({
+                    leadSolucaoId: s.leadSolucaoId,
+                    nome: s.nome,
+                    vinculado: lancamentos.some(
+                      (l) => l.leadIdOrigem === aprovacaoParaLancar.leadId && l.leadSolucaoId === s.leadSolucaoId
+                    ),
+                  }))
                 : undefined
             }
             linhaAprovacaoSelecionada={aprovacaoLinhaSolucaoId ?? undefined}
@@ -1289,7 +1493,7 @@ export default function FinanceiroPage() {
                 const salvos = json.data?.lancamentos?.length ? json.data.lancamentos : novos;
                 if (aprovacaoParaLancar) {
                   const leadIdApr = aprovacaoParaLancar.leadId;
-                  const merged = [...lancamentos, ...salvos];
+                  const merged = dedupeLancamentosPorId([...lancamentos, ...salvos]);
                   const vinc = new Set(
                     merged
                       .filter((l) => l.leadIdOrigem === leadIdApr && l.leadSolucaoId)
@@ -1302,7 +1506,6 @@ export default function FinanceiroPage() {
                       : lines.every((ln) => vinc.has(ln.leadSolucaoId));
 
                   if (!allCovered) {
-                    setLancamentos((prev) => [...prev, ...salvos]);
                     const nextLine = lines.find((ln) => !vinc.has(ln.leadSolucaoId));
                     setAprovacaoLinhaSolucaoId(nextLine?.leadSolucaoId ?? null);
                     setAprovacaoFormEpoch((e) => e + 1);
@@ -1328,7 +1531,6 @@ export default function FinanceiroPage() {
                     data?: { posVendaTarefasCriadas?: number };
                   };
                   const posVendaCriadas = approvedJson?.data?.posVendaTarefasCriadas ?? 0;
-                  setLancamentos((prev) => [...prev, ...salvos]);
                   setDrawerNovoOpen(false);
                   setAprovacaoParaLancar(null);
                   setAprovacaoLinhaSolucaoId(null);
@@ -1339,13 +1541,15 @@ export default function FinanceiroPage() {
                     "success"
                   );
                   await refetchBootstrapSilencioso();
+                  emitAlertsUpdated();
                   return;
                 }
-                setLancamentos((prev) => [...prev, ...salvos]);
                 setDrawerNovoOpen(false);
                 setAprovacaoParaLancar(null);
                 setAprovacaoLinhaSolucaoId(null);
                 showToast("Lançamento criado com sucesso.", "success");
+                await refetchBootstrapSilencioso();
+                emitAlertsUpdated();
               })();
             }}
             onCancel={() => {
@@ -1353,6 +1557,7 @@ export default function FinanceiroPage() {
               setAprovacaoParaLancar(null);
               setAprovacaoLinhaSolucaoId(null);
             }}
+            consultoresComissaoRh={consultoresComissaoRh}
           />
           </div>
         </div>
@@ -1364,7 +1569,7 @@ export default function FinanceiroPage() {
           setDrawerEditarOpen(false);
           setLancamentoEmEdicao(null);
         }}
-        title={lancamentoEmEdicao ? `Editar Lançamento — ${lancamentoEmEdicao.descricao}` : "Editar Lançamento"}
+        title={lancamentoEmEdicao ? lancamentoEmEdicao.descricao : "Lançamento"}
         mobileContentPaddingClassName="px-0"
         desktopContentPaddingClassName="px-0"
       >
@@ -1389,6 +1594,10 @@ export default function FinanceiroPage() {
                 void iniciarSalvarEdicao(itens[0]);
               }}
               origemContratoId={origemContratoIdEdit}
+              recorrenciaGrupo={recorrenciaGrupoEdicao}
+              onProrrogarFixoMensal={
+                lancamentoEmEdicao?.tipoRecorrencia === "fixo_mensal" ? prorrogarFixoMensal : undefined
+              }
             />
           )}
         </div>

@@ -88,7 +88,7 @@ export function NovoChamadoForm({ clientes = [], onSave, onCancel }: NovoChamado
       {/* Cliente */}
       <div data-helpdesk-cliente className="space-y-1">
         <label htmlFor="novo-cliente" className={labelClass}>
-          Cliente *
+          Cliente <span className="text-red-600 dark:text-red-400">*</span>
         </label>
         <div className="relative">
           <input
@@ -134,7 +134,7 @@ export function NovoChamadoForm({ clientes = [], onSave, onCancel }: NovoChamado
       {/* Assunto */}
       <div className="space-y-1">
         <label htmlFor="novo-assunto" className={labelClass}>
-          Assunto *
+          Assunto <span className="text-red-600 dark:text-red-400">*</span>
         </label>
         <input
           id="novo-assunto"
@@ -151,7 +151,7 @@ export function NovoChamadoForm({ clientes = [], onSave, onCancel }: NovoChamado
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
           <label htmlFor="novo-prioridade" className={labelClass}>
-            Prioridade *
+            Prioridade <span className="text-red-600 dark:text-red-400">*</span>
           </label>
           <select
             id="novo-prioridade"
@@ -170,7 +170,7 @@ export function NovoChamadoForm({ clientes = [], onSave, onCancel }: NovoChamado
         </div>
         <div className="space-y-1">
           <label htmlFor="novo-categoria" className={labelClass}>
-            Categoria *
+            Categoria <span className="text-red-600 dark:text-red-400">*</span>
           </label>
           <select
             id="novo-categoria"
@@ -192,7 +192,7 @@ export function NovoChamadoForm({ clientes = [], onSave, onCancel }: NovoChamado
       {/* Descrição */}
       <div className="space-y-1">
         <label htmlFor="novo-descricao" className={labelClass}>
-          Descrição *
+          Descrição <span className="text-red-600 dark:text-red-400">*</span>
         </label>
         <textarea
           id="novo-descricao"

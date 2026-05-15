@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, MapPin, Mail, Phone, Building2, ChevronRight } from "lucide-react";
+import { Trash2, MapPin, Mail, Phone, Building2, ChevronRight, Pencil } from "lucide-react";
 import type { Cliente, Contato } from "@/lib/clientes/types";
 import { STATUS_LABELS } from "@/lib/clientes/constants";
 
@@ -198,7 +198,10 @@ export function ClientesTable({
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
-                    <ChevronRight className="ml-1 inline-block h-4 w-4 text-slate-400" />
+                    <span className="ml-1 inline-flex items-center text-slate-400" title="Abrir detalhes" aria-hidden>
+                      <Pencil className="h-4 w-4" />
+                    </span>
+                    <ChevronRight className="inline-block h-4 w-4 text-slate-400" />
                   </td>
                 </tr>
               );
@@ -278,7 +281,10 @@ export function ClientesTable({
                   {cidadeUf}
                 </div>
                 <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                  <ChevronRight className="h-4 w-4 self-center text-slate-400" />
+                  <span className="inline-flex self-center text-slate-400" aria-hidden title="Abrir detalhes">
+                    <Pencil className="h-4 w-4" />
+                  </span>
+                  <ChevronRight className="h-4 w-4 self-center text-slate-400" aria-hidden />
                   {onExcluir && (
                     <button
                       type="button"
@@ -286,7 +292,7 @@ export function ClientesTable({
                         e.stopPropagation();
                         onExcluir(cliente);
                       }}
-                      className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 inline-flex items-center justify-center"
+                      className="inline-flex items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                       aria-label="Excluir"
                     >
                       <Trash2 className="h-4 w-4" />

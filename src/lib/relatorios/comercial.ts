@@ -72,7 +72,7 @@ export async function buildComercialSnapshot(params: ComercialBuildParams): Prom
   if (!modelo) throw new Error("Modelo de documento não encontrado.");
 
   const leadsBase = await prisma.lead.findMany({
-    where: { createdAt: { gte: inicio, lte: fim } },
+    where: { createdAt: { gte: inicio, lte: fim }, registroLead: "oportunidade" },
     orderBy: [{ createdAt: "asc" }],
   });
   const leads = leadsBase.filter((l) => {

@@ -12,6 +12,7 @@ const STAGE_ORDER: PipelineStageId[] = [
 ];
 
 export function columnsFromLeads(leads: Lead[]): ColumnsState {
+  const list = Array.isArray(leads) ? leads : [];
   const columns: ColumnsState = {
     prospecao: [],
     qualificacao: [],
@@ -20,7 +21,8 @@ export function columnsFromLeads(leads: Lead[]): ColumnsState {
     fechado: [],
     perdido: [],
   };
-  leads.forEach((lead) => {
+  list.forEach((lead) => {
+    if (!lead || typeof lead !== "object" || !lead.stageId) return;
     if (columns[lead.stageId]) {
       columns[lead.stageId].push(lead);
     }

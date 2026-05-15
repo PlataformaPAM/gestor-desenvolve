@@ -1,5 +1,6 @@
 export type TipoTarefaRégua =
   | "boas_vindas"
+  | "agenda_reuniao"
   | "checkup_30"
   | "checkup_90"
   | "renovacao_contrato"

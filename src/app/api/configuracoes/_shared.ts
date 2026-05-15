@@ -6,17 +6,7 @@ import type {
   UsuarioSistema,
   VinculacaoPessoa,
 } from "@/lib/configuracoes/types";
-
-const ALL_MODULES: ModuloPermissao[] = [
-  "comercial",
-  "financeiro",
-  "tarefas",
-  "clientes",
-  "helpdesk",
-  "posVenda",
-  "rh",
-  "configuracoes",
-];
+import { DB_PERMISSION_MODULES, withDerivedConfiguracoes } from "@/lib/configuracoes/permission-utils";
 
 function mapVinculacaoLegacy(u: Usuario): VinculacaoPessoa | undefined {
   if (!u.vinculacaoTipo || !u.vinculacaoPessoaId) return undefined;
@@ -46,12 +36,18 @@ export function mapUsuario(u: Usuario & { vinculos?: UsuarioVinculo[] }): Usuari
   };
 }
 
-export function mapPerfil(p: PerfilAcesso & { permissoes: PerfilPermissao[] }): PerfilAcessoFront {
-  const permissoes = Object.fromEntries(ALL_MODULES.map((m) => [m, false])) as Record<ModuloPermissao, boolean>;
+export function mapPerfil(
+  p: PerfilAcesso & { permissoes: PerfilPermissao[] },
+  extras?: Partial<Record<ModuloPermissao, boolean>>
+): PerfilAcessoFront {
+  const permissoesBase = Object.fromEntries(
+    DB_PERMISSION_MODULES.map((m) => [m, false])
+  ) as Partial<Record<ModuloPermissao, boolean>>;
   for (const pp of p.permissoes) {
     const modulo = pp.modulo as ModuloPermissao;
-    permissoes[modulo] = pp.permitido;
+    permissoesBase[modulo] = pp.permitido;
   }
+  const permissoes = withDerivedConfiguracoes({ ...permissoesBase, ...(extras ?? {}) });
   return {
     id: p.id,
     nome: p.nome,

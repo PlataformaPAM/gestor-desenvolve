@@ -3,7 +3,7 @@
 import type { RefObject } from "react";
 import { useRef, useState } from "react";
 import clsx from "clsx";
-import { Eye, Paperclip, X, User, Users, Building2, Tags, FileText } from "lucide-react";
+import { Eye, Paperclip, X, Save, User, Users, Building2, Tags, FileText } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import type { Cliente } from "@/lib/clientes/types";
 import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
@@ -22,7 +22,7 @@ import {
   formLabelClass,
   formModalCancelButtonClass,
   formModalSubmitButtonClass,
-  formSectionLabelClass,
+  formTextareaClass,
 } from "@/components/ui/field-patterns";
 
 /** Destaque suave para campo obrigatório não preenchido após tentativa de salvar */
@@ -121,6 +121,11 @@ export function NovaTarefaForm({
         icon: Building2,
       })),
   ];
+  const clienteIdsForSelect = (() => {
+    const base = [...clienteIds];
+    if (clientes.length > 0 && base.length === clientes.length) return ["__TODOS__", ...base];
+    return base;
+  })();
   const colaboradorOptions: SearchableOption[] = usuarios
     .filter((u) => u.id !== responsavelId)
     .map((u) => ({
@@ -236,7 +241,7 @@ export function NovaTarefaForm({
             onChange={(e) => setDescricao(e.target.value)}
             rows={3}
             placeholder="Detalhes da tarefa..."
-            className={`${formInputClass} min-h-[80px] resize-y pl-10`}
+            className={`${formTextareaClass} min-h-[80px] resize-y pl-10`}
           />
         </div>
       </div>
@@ -330,8 +335,15 @@ export function NovaTarefaForm({
         </label>
         <SearchableMultiSelect
           options={clienteOptions}
-          values={clienteIds}
-          onChange={setClienteIds}
+          values={clienteIdsForSelect}
+          onChange={(values) => {
+            const hasAll = values.includes("__TODOS__");
+            if (hasAll) {
+              setClienteIds(clientes.map((c) => c.id));
+              return;
+            }
+            setClienteIds(values.filter((id) => id !== "__TODOS__"));
+          }}
           placeholder="Selecionar clientes..."
           searchPlaceholder="Buscar cliente..."
           selectedLabel="Selecionados"
@@ -339,12 +351,16 @@ export function NovaTarefaForm({
         />
       </div>
 
-      <div className="space-y-1">
-        <span className={formSectionLabelClass}>Anexos</span>
+      <div>
+        <label htmlFor="nova-tarefa-anexos-input" className={formLabelClass}>
+          Anexos
+        </label>
         <input
+          id="nova-tarefa-anexos-input"
           ref={fileInputRef}
           type="file"
-          className="hidden"
+          className="sr-only"
+          tabIndex={-1}
           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
           multiple
           onChange={(e) => {
@@ -362,14 +378,13 @@ export function NovaTarefaForm({
             e.target.value = "";
           }}
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className={formAttachmentDropzoneClass}
+        <label
+          htmlFor="nova-tarefa-anexos-input"
+          className={`${formAttachmentDropzoneClass} mt-1 cursor-pointer`}
         >
-          <Paperclip className="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
+          <Paperclip className="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
           <span>Arraste documentos ou clique para anexar</span>
-        </button>
+        </label>
         {arquivos.length > 0 && (
           <ul className="mt-2 space-y-2">
             {arquivos.map((f, idx) => (
@@ -403,16 +418,19 @@ export function NovaTarefaForm({
 
       </div>
 
-      <div className="-mx-2 shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:-mx-3 lg:px-6">
+      <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
-          Cancelar
+          <span className="inline-flex items-center gap-2">
+            <X className="h-4 w-4 shrink-0" aria-hidden />
+            Cancelar
+          </span>
         </button>
-        <button
-          type="submit"
-          className={formModalSubmitButtonClass}
-        >
-          Criar tarefa
+        <button type="submit" className={formModalSubmitButtonClass}>
+          <span className="inline-flex items-center gap-2">
+            <Save className="h-4 w-4 shrink-0" aria-hidden />
+            Salvar
+          </span>
         </button>
         </div>
       </div>

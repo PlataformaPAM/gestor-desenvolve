@@ -2,6 +2,8 @@ import { fail, ok } from "@/lib/server/api-response";
 import { COOKIE_NAME, decodeSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
+import { loadPerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
+import { withAdminOverride } from "@/lib/configuracoes/permission-utils";
 
 export async function GET(req: Request) {
   const cookieHeader = req.headers.get("cookie") || "";
@@ -18,9 +20,17 @@ export async function GET(req: Request) {
       where: { id: session.perfilId },
       include: { permissoes: true },
     });
-    permissoes = Object.fromEntries(
+    const permissoesBase = Object.fromEntries(
       (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
     ) as Partial<Record<ModuloPermissao, boolean>>;
+    const extrasByPerfil = await loadPerfilPermissoesExtras(prisma, [session.perfilId]);
+    permissoes = withAdminOverride(
+      {
+        ...permissoesBase,
+        ...(extrasByPerfil[session.perfilId] ?? {}),
+      },
+      perfil?.nome ?? ""
+    );
     perfilNome = (perfil?.nome ?? "").toLowerCase();
   } catch (error) {
     console.error("[auth/session] falha ao carregar perfil/permissões:", error);
@@ -84,6 +94,7 @@ export async function GET(req: Request) {
       perfilNome.includes("administrador") ||
       session.isAdminCliente === true
     );
+  const isSystemAdmin = perfilNome.includes("admin") || perfilNome.includes("administrador");
   return ok({
     perfilId: session.perfilId,
     userId,
@@ -94,6 +105,7 @@ export async function GET(req: Request) {
     clienteIds,
     isPortalCliente,
     isAdminCliente,
+    isSystemAdmin,
     permissoes,
   });
 }

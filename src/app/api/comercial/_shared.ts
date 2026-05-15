@@ -1,4 +1,9 @@
-import type { Cliente as PrismaCliente, Lead as PrismaLead, SolucaoCatalogo } from "@prisma/client";
+import type {
+  Cliente as PrismaCliente,
+  Lead as PrismaLead,
+  PrismaClient,
+  SolucaoCatalogo,
+} from "@prisma/client";
 import type { Cliente, Contato } from "@/lib/clientes/types";
 import type { Lead, LeadRecorrenciaPagamento } from "@/lib/comercial/types";
 import { mapSolucao } from "@/app/api/solucoes/_shared";
@@ -18,6 +23,60 @@ export function resolveLeadInteractionUserId(
   if (fromPayload) return fromPayload;
   const fromSession = typeof sessionUserId === "string" ? sessionUserId.trim() : "";
   return fromSession || null;
+}
+
+/** Só retorna id se existir em `Usuario` (evita FK ao criar/editar lead com sessão órfã ou payload legado). */
+export async function resolveUsuarioIdForPrismaFk(
+  prisma: Pick<PrismaClient, "usuario">,
+  candidate: string | null | undefined
+): Promise<string | undefined> {
+  const t = typeof candidate === "string" ? candidate.trim() : "";
+  if (!t) return undefined;
+  const row = await prisma.usuario.findUnique({ where: { id: t }, select: { id: true } });
+  return row?.id;
+}
+
+/**
+ * Garante que o enum Postgres `LeadPriority` inclua `urgente`.
+ * Evita P2007 quando o código/Prisma já esperam `urgente`, mas o banco ficou sem a migração correspondente.
+ */
+export async function ensureLeadPriorityEnumIncludesUrgente(
+  db: Pick<PrismaClient, "$executeRawUnsafe">
+): Promise<void> {
+  try {
+    await db.$executeRawUnsafe(`
+DO $enum$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_enum e
+    INNER JOIN pg_catalog.pg_type t ON e.enumtypid = t.oid
+    INNER JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+    WHERE n.nspname = current_schema()
+      AND t.typname = 'LeadPriority'
+      AND e.enumlabel = 'urgente'
+  ) THEN
+    ALTER TYPE "LeadPriority" ADD VALUE 'urgente';
+  END IF;
+END
+$enum$;
+`);
+  } catch (err) {
+    console.warn("[comercial] ensureLeadPriorityEnumIncludesUrgente:", err);
+  }
+}
+
+export async function filterUsuarioIdsExisting(
+  prisma: Pick<PrismaClient, "usuario">,
+  ids: string[]
+): Promise<Set<string>> {
+  const unique = [...new Set(ids.map((x) => x.trim()).filter(Boolean))];
+  if (!unique.length) return new Set();
+  const rows = await prisma.usuario.findMany({
+    where: { id: { in: unique } },
+    select: { id: true },
+  });
+  return new Set(rows.map((r) => r.id));
 }
 
 export function mapClienteFromDb(
@@ -184,6 +243,7 @@ export function mapLeadFromDb(
     priority: lead.priority as Lead["priority"],
     enteredStageAt: lead.enteredStageAt.toISOString(),
     origem: lead.origem as Lead["origem"],
+    registroLead: lead.registroLead as Lead["registroLead"],
     clienteId: lead.clienteId,
     solucoes: lead.solucoes.map((s) => {
       const mappedCatalog = s.solucaoCatalogo ? mapSolucao(s.solucaoCatalogo) : null;
@@ -218,7 +278,9 @@ export function mapLeadFromDb(
     contratoArquivos: { minuta, assinatura },
     contratoAnexosCliente,
     propostaGeradaEm: lead.propostaGeradaEm?.toISOString(),
-    previsaoFechamento: lead.previsaoFechamento?.toISOString().slice(0, 10),
+    previsaoFechamento: lead.previsaoFechamento
+      ? lead.previsaoFechamento.toISOString().slice(0, 10)
+      : undefined,
     cpf: lead.cpf ?? undefined,
     company: lead.company ?? undefined,
     contact: lead.contact ?? undefined,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Paperclip, Trash2 } from "lucide-react";
 import type { Lead } from "@/lib/comercial/types";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import { useAuth } from "@/contexts/auth-context";
@@ -124,7 +124,8 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
       </div>
 
       <div className="space-y-2">
-        <h3 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+        <h3 className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <Paperclip className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
           Anexar arquivos do Cliente
         </h3>
         <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">

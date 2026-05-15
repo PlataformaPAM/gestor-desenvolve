@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useId } from "react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
@@ -20,6 +20,8 @@ import {
   CheckCircle2,
   AlertCircle,
   CircleSlash2,
+  Save,
+  X,
 } from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { AlertDialog } from "@/components/ui/alert-dialog";
@@ -35,6 +37,7 @@ import type { Cliente, Contato, ClienteEndereco, ClienteStatus, PapelContatoClie
 import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
 import { fetchViaCep } from "@/lib/clientes/viacep";
 import { PAPEIS_CONTATO_CLIENTE, STATUS_LABELS } from "@/lib/clientes/constants";
+import { formatBrazilianPhoneInput } from "@/lib/comercial/phone-input";
 
 const defaultEndereco: ClienteEndereco = {
   logradouro: "",
@@ -59,12 +62,6 @@ function maskCep(v: string): string {
   const d = v.replace(/\D/g, "").slice(0, 8);
   if (d.length <= 5) return d;
   return `${d.slice(0, 5)}-${d.slice(5)}`;
-}
-
-function formatPhone(v: string): string {
-  const d = v.replace(/\D/g, "").slice(0, 11);
-  if (d.length <= 2) return d.replace(/(\d{0,2})/, "($1");
-  return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2").slice(0, 15);
 }
 
 type TabId = "empresa" | "contatos";
@@ -143,14 +140,15 @@ export function ClienteFormSheet({
       setCnpjRaw(initialCliente.cpfCnpj);
       setNome(initialCliente.nome || initialCliente.empresa || "");
       setEmail(initialCliente.email ?? "");
-      setTelefone(initialCliente.telefone ?? "");
+      setTelefone(formatBrazilianPhoneInput(initialCliente.telefone ?? ""));
       setUrlSiteOficial(initialCliente.urlSiteOficial ?? "");
-      setEndereco(initialCliente.endereco ? { ...defaultEndereco, ...initialCliente.endereco } : defaultEndereco);
+      setEndereco(initialCliente.endereco ? { ...defaultEndereco, ...initialCliente.endereco } : { ...defaultEndereco });
       setStatus(initialCliente.status);
       const contatosInit = initialCliente.contatos?.length
         ? initialCliente.contatos.map((c) => ({
             ...c,
             papeis: c.papeis ?? [],
+            telefone: formatBrazilianPhoneInput(c.telefone ?? ""),
           }))
         : [];
       setContatos(contatosInit.length ? contatosInit : [emptyContato()]);
@@ -160,11 +158,15 @@ export function ClienteFormSheet({
       setEmail("");
       setTelefone("");
       setUrlSiteOficial("");
-      setEndereco(defaultEndereco);
+      setEndereco({ ...defaultEndereco });
       setContatos([emptyContato()]);
       setStatus("ativo");
     }
     setErroCnpj("");
+    setLoadingCnpj(false);
+    setLoadingCep(false);
+    setFlashCnpj(false);
+    setFlashCep(false);
     setActiveTab("empresa");
   }, [open, initialCliente]);
 
@@ -177,7 +179,7 @@ export function ClienteFormSheet({
       if (res) {
         setNome(res.nomeFantasia || res.empresa || "");
         setEndereco((prev) => ({ ...defaultEndereco, ...prev, ...res.endereco }));
-        if (res.telefone) setTelefone(res.telefone);
+        if (res.telefone) setTelefone(formatBrazilianPhoneInput(res.telefone));
         if (res.email) setEmail(res.email);
         setFlashCnpj(true);
         setTimeout(() => setFlashCnpj(false), 2000);
@@ -292,23 +294,53 @@ export function ClienteFormSheet({
     { id: "contatos", label: "Contatos", icon: Users },
   ];
   const statusOptions: SearchableOption[] = [
-    { value: "ativo", label: STATUS_LABELS.ativo, icon: CheckCircle2 },
-    { value: "inativo", label: STATUS_LABELS.inativo, icon: CircleSlash2 },
-    { value: "inadimplente", label: STATUS_LABELS.inadimplente, icon: AlertCircle },
+    {
+      value: "ativo",
+      label: STATUS_LABELS.ativo,
+      icon: ({ className }) => <CheckCircle2 className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />,
+    },
+    {
+      value: "inativo",
+      label: STATUS_LABELS.inativo,
+      icon: ({ className }) => <CircleSlash2 className={clsx(className, "!text-slate-500 dark:!text-slate-400")} />,
+    },
+    {
+      value: "inadimplente",
+      label: STATUS_LABELS.inadimplente,
+      icon: ({ className }) => <AlertCircle className={clsx(className, "!text-red-600 dark:!text-red-400")} />,
+    },
   ];
+
+  const statusLeadingIcon = useMemo(() => {
+    if (status === "ativo") {
+      return ({ className }: { className?: string }) => (
+        <CheckCircle2 className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+      );
+    }
+    if (status === "inadimplente") {
+      return ({ className }: { className?: string }) => (
+        <AlertCircle className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+      );
+    }
+    return ({ className }: { className?: string }) => (
+      <CircleSlash2 className={clsx(className, "!text-slate-500 dark:!text-slate-400")} />
+    );
+  }, [status]);
 
   return (
     <>
     <DrawerSheet
       open={open}
       onClose={onClose}
-      title={isEdit ? "Editar Cliente" : "Novo Cliente"}
+      title={isEdit ? (initialCliente?.empresa || initialCliente?.nome || "Cliente") : "Novo Cliente"}
       maxWidth="sm:max-w-3xl"
+      mobileContentPaddingClassName="px-0"
+      desktopContentPaddingClassName="px-0"
     >
-      <form onSubmit={handleSubmit} className="flex h-full flex-col">
+      <form onSubmit={handleSubmit} autoComplete="off" className="flex h-full min-h-0 flex-col">
         <div
           role="tablist"
-          className="flex border-b border-slate-200 bg-slate-50/50"
+          className="flex shrink-0 border-b border-slate-300 bg-slate-50/50 dark:border-slate-600 dark:bg-slate-800/50"
         >
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -322,7 +354,7 @@ export function ClienteFormSheet({
                 onClick={() => setActiveTab(tab.id)}
                 className={clsx(
                   "relative flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
-                  isActive ? "text-[#6D28D9]" : "text-slate-500 hover:text-slate-700"
+                  isActive ? "text-[#6D28D9] dark:text-violet-300" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 {isActive && (
@@ -339,11 +371,11 @@ export function ClienteFormSheet({
           })}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
           {activeTab === "empresa" && (
             <div className="space-y-6">
               <div>
-                <label className={formLabelClass}>CNPJ *</label>
+                <label className={formLabelClass}>CNPJ <span className="text-red-600 dark:text-red-400">*</span></label>
                 <div className="relative">
                   <Building2 className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <AutoFillInput
@@ -370,7 +402,7 @@ export function ClienteFormSheet({
               </div>
 
               <div>
-                <label className={formLabelClass}>Nome (Fantasia ou Razão Social) *</label>
+                <label className={formLabelClass}>Nome (Fantasia ou Razão Social) <span className="text-red-600 dark:text-red-400">*</span></label>
                 <div className="relative">
                   <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <AutoFillInput
@@ -391,13 +423,13 @@ export function ClienteFormSheet({
                   value={status}
                   onChange={(v) => setStatus(v as ClienteStatus)}
                   searchable={false}
-                  leadingIcon={CheckCircle2}
+                  leadingIcon={statusLeadingIcon}
                 />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={formLabelClass}>E-mail *</label>
+                  <label className={formLabelClass}>E-mail <span className="text-red-600 dark:text-red-400">*</span></label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
@@ -411,13 +443,13 @@ export function ClienteFormSheet({
                   </div>
                 </div>
                 <div>
-                  <label className={formLabelClass}>Telefone *</label>
+                  <label className={formLabelClass}>Telefone <span className="text-red-600 dark:text-red-400">*</span></label>
                   <div className="relative">
                     <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       value={telefone}
-                      onChange={(e) => setTelefone(formatPhone(e.target.value))}
+                      onChange={(e) => setTelefone(formatBrazilianPhoneInput(e.target.value))}
                       placeholder="(00) 00000-0000"
                       className={`${formInputClass} pl-9`}
                       required
@@ -444,7 +476,7 @@ export function ClienteFormSheet({
                 <h4 className="mb-3 text-sm font-semibold text-slate-800">Endereço</h4>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="sm:col-span-2">
-                    <label className={formLabelClass}>CEP *</label>
+                    <label className={formLabelClass}>CEP <span className="text-red-600 dark:text-red-400">*</span></label>
                     <div className="relative">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <AutoFillInput
@@ -465,7 +497,7 @@ export function ClienteFormSheet({
                     </div>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className={formLabelClass}>Rua *</label>
+                    <label className={formLabelClass}>Rua <span className="text-red-600 dark:text-red-400">*</span></label>
                     <div className="relative">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <AutoFillInput
@@ -478,7 +510,7 @@ export function ClienteFormSheet({
                     </div>
                   </div>
                   <div>
-                    <label className={formLabelClass}>N° *</label>
+                    <label className={formLabelClass}>N° <span className="text-red-600 dark:text-red-400">*</span></label>
                     <div className="relative">
                       <Hash className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                       <input
@@ -502,7 +534,7 @@ export function ClienteFormSheet({
                     </div>
                   </div>
                   <div>
-                    <label className={formLabelClass}>Bairro *</label>
+                    <label className={formLabelClass}>Bairro <span className="text-red-600 dark:text-red-400">*</span></label>
                     <div className="relative">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <AutoFillInput
@@ -515,7 +547,7 @@ export function ClienteFormSheet({
                     </div>
                   </div>
                   <div>
-                    <label className={formLabelClass}>Cidade *</label>
+                    <label className={formLabelClass}>Cidade <span className="text-red-600 dark:text-red-400">*</span></label>
                     <div className="relative">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <AutoFillInput
@@ -528,7 +560,7 @@ export function ClienteFormSheet({
                     </div>
                   </div>
                   <div>
-                    <label className={formLabelClass}>UF *</label>
+                    <label className={formLabelClass}>UF <span className="text-red-600 dark:text-red-400">*</span></label>
                     <div className="relative">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <AutoFillInput
@@ -548,111 +580,131 @@ export function ClienteFormSheet({
 
           {activeTab === "contatos" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-slate-800">Contatos vinculados</h4>
-                <button
-                  type="button"
-                  onClick={addContato}
-                  className={`${formModalSubmitButtonClass} inline-flex items-center gap-2`}
-                >
-                  <Plus className="h-4 w-4" /> Adicionar Contato
-                </button>
-              </div>
+              <p className={formLabelClass}>Contatos vinculados</p>
 
-              <ul className="space-y-4">
+              <button
+                type="button"
+                onClick={addContato}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <Plus className="h-4 w-4" aria-hidden />
+                Adicionar Contato
+              </button>
+
+              <ul className="space-y-0">
                 {contatos.map((c) => (
-                  <li key={c.id} className="rounded-xl border border-slate-200 bg-slate-50/30 p-4 dark:border-slate-700 dark:bg-slate-800/30">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700">
+                  <li
+                    key={c.id}
+                    className="border-t border-slate-200 pt-3 dark:border-slate-700"
+                  >
+                    <div className="flex w-full items-center justify-between py-1 text-left">
+                      <span className="font-medium text-slate-800 dark:text-slate-100">
                         {c.nome.trim() || "Novo contato"}
                       </span>
                       <button
                         type="button"
                         onClick={() => setContatoIdParaRemover(c.id)}
-                        className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
                         aria-label="Remover contato"
                       >
-                        <Trash2 className="h-5 w-5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-3 pt-2">
                       <div>
-                        <label className={formLabelClass}>Nome completo</label>
+                        <label className={formLabelClass}>Nome</label>
                         <div className="relative">
                           <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                           <input
+                            type="text"
                             value={c.nome}
                             onChange={(e) => updateContato(c.id, { nome: e.target.value })}
+                            placeholder="Nome completo"
                             className={`${formInputClass} pl-9`}
                           />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                          <label className={formLabelClass}>Cargo</label>
+                          <div className="relative">
+                            <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={c.cargo ?? ""}
+                              onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
+                              placeholder="Ex: Diretor"
+                              className={`${formInputClass} pl-9`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className={formLabelClass}>Setor</label>
+                          <div className="relative">
+                            <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={c.setor ?? ""}
+                              onChange={(e) => updateContato(c.id, { setor: e.target.value })}
+                              placeholder="Ex: Comercial"
+                              className={`${formInputClass} pl-9`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                          <label className={formLabelClass}>Telefone</label>
+                          <div className="relative">
+                            <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={c.telefone}
+                              onChange={(e) =>
+                                updateContato(c.id, { telefone: formatBrazilianPhoneInput(e.target.value) })
+                              }
+                              placeholder="(00) 00000-0000"
+                              className={`${formInputClass} pl-9`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className={formLabelClass}>E-mail</label>
+                          <div className="relative">
+                            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="email"
+                              value={c.email}
+                              onChange={(e) => updateContato(c.id, { email: e.target.value })}
+                              placeholder="email@empresa.com"
+                              className={`${formInputClass} pl-9`}
+                            />
+                          </div>
                         </div>
                       </div>
                       <div>
-                        <label className={formLabelClass}>E-mail</label>
-                        <div className="relative">
-                          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="email"
-                            value={c.email}
-                            onChange={(e) => updateContato(c.id, { email: e.target.value })}
-                            className={`${formInputClass} pl-9`}
-                          />
+                        <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                          Papel do Contato (pode marcar mais de um)
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {PAPEIS_CONTATO_CLIENTE.map((opt) => {
+                            const checked = (c.papeis ?? []).includes(opt.value);
+                            return (
+                              <label
+                                key={opt.value}
+                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => togglePapel(c.id, opt.value)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600"
+                                />
+                                {opt.label}
+                              </label>
+                            );
+                          })}
                         </div>
-                      </div>
-                      <div>
-                        <label className={formLabelClass}>Telefone</label>
-                        <div className="relative">
-                          <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            value={c.telefone}
-                            onChange={(e) => updateContato(c.id, { telefone: formatPhone(e.target.value) })}
-                            className={`${formInputClass} pl-9`}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={formLabelClass}>Setor</label>
-                        <div className="relative">
-                          <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            value={c.setor ?? ""}
-                            onChange={(e) => updateContato(c.id, { setor: e.target.value })}
-                            className={`${formInputClass} pl-9`}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={formLabelClass}>Cargo</label>
-                        <div className="relative">
-                          <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            value={c.cargo ?? ""}
-                            onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
-                            className={`${formInputClass} pl-9`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <label className="mb-1.5 block text-xs font-medium text-slate-600">Papel (pode marcar mais de um)</label>
-                      <div className="flex flex-wrap gap-2">
-                        {PAPEIS_CONTATO_CLIENTE.map((opt) => {
-                          const checked = (c.papeis ?? []).includes(opt.value);
-                          return (
-                            <label
-                              key={opt.value}
-                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => togglePapel(c.id, opt.value)}
-                                className="h-3.5 w-3.5 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
-                              />
-                              {opt.label}
-                            </label>
-                          );
-                        })}
                       </div>
                     </div>
                   </li>
@@ -662,20 +714,26 @@ export function ClienteFormSheet({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:px-6 lg:py-3">
+        <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
             <button
               type="button"
               onClick={onClose}
               className={formModalCancelButtonClass}
             >
-              Cancelar
+              <span className="inline-flex items-center gap-2">
+                <X className="h-4 w-4 shrink-0" aria-hidden />
+                Cancelar
+              </span>
             </button>
             <button
               type="submit"
               className={formModalSubmitButtonClass}
             >
-              Salvar
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4 shrink-0" aria-hidden />
+                Salvar
+              </span>
             </button>
           </div>
         </div>

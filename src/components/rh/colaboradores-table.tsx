@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import type { ColaboradorParceiro } from "@/lib/rh/types";
 import { STATUS_LABELS, iniciais } from "@/lib/rh/constants";
 import { formatDocumentoColunaEquipe } from "@/lib/rh/format-documento";
+import { displayCargoRh } from "@/lib/rh/pre-cadastro-consultor";
 import clsx from "clsx";
 
 const STATUS_BADGE: Record<ColaboradorParceiro["status"], string> = {
@@ -21,12 +22,15 @@ type ColaboradoresTableProps = {
   lista: ColaboradorParceiro[];
   /** Na aba Equipe, CPF/CNPJ é exibido com máscara. */
   variant?: "equipe" | "default";
+  /** Aba Consultores: exibe badge em linhas de pré-cadastro. */
+  showPreCadastroBadge?: boolean;
   onSelecionar: (c: ColaboradorParceiro) => void;
 };
 
 export function ColaboradoresTable({
   lista,
   variant = "default",
+  showPreCadastroBadge = false,
   onSelecionar,
 }: ColaboradoresTableProps) {
   const docCell = (c: ColaboradorParceiro) =>
@@ -51,7 +55,7 @@ export function ColaboradoresTable({
                   Status
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-10 dark:text-slate-400">
-                  Ações
+                  <span className="sr-only">Abrir detalhes</span>
                 </th>
               </tr>
             </thead>
@@ -68,12 +72,17 @@ export function ColaboradoresTable({
                         {iniciais(c.nome)}
                       </div>
                       <span className="font-medium text-slate-900 dark:text-slate-100">{c.nome}</span>
+                      {showPreCadastroBadge && c.tipo === "vendedor_externo" && c.cadastroEfetivado === false ? (
+                        <span className="ml-2 inline-flex shrink-0 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900 dark:border-amber-600/50 dark:bg-amber-950/60 dark:text-amber-100">
+                          Pré-cadastro
+                        </span>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-sm text-slate-600 dark:text-slate-400">
                     {docCell(c)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{c.cargoOuFuncao}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{displayCargoRh(c)}</td>
                   <td className="px-4 py-3">
                     <span
                       className={clsx(
@@ -85,9 +94,7 @@ export function ColaboradoresTable({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                    </div>
+                    <ChevronRight className="ml-auto h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden />
                   </td>
                 </tr>
               ))}
@@ -123,8 +130,15 @@ export function ColaboradoresTable({
                   {iniciais(c.nome)}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-900 dark:text-slate-100">{c.nome}</p>
-                  <p className="truncate text-sm text-slate-500 dark:text-slate-400">{c.cargoOuFuncao}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-slate-900 dark:text-slate-100">
+                    <span className="truncate">{c.nome}</span>
+                    {showPreCadastroBadge && c.tipo === "vendedor_externo" && c.cadastroEfetivado === false ? (
+                      <span className="inline-flex shrink-0 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900 dark:border-amber-600/50 dark:bg-amber-950/60 dark:text-amber-100">
+                        Pré-cadastro
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="truncate text-sm text-slate-500 dark:text-slate-400">{displayCargoRh(c)}</p>
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -138,8 +152,8 @@ export function ColaboradoresTable({
                 </span>
               </div>
             </div>
-              <div className="mt-2 flex justify-end">
-                <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <div className="mt-2 flex justify-end text-slate-400 dark:text-slate-500">
+                <ChevronRight className="h-4 w-4" aria-hidden />
               </div>
           </div>
         ))}

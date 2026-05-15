@@ -3,12 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import type { ComponentType } from "react";
+import clsx from "clsx";
 
 export type SearchableOption = {
   value: string;
   label: string;
   subtitle?: string;
+  /** Sobrescreve a cor padrão do subtítulo (`text-slate-500`). */
+  subtitleClassName?: string;
   icon?: ComponentType<{ className?: string }>;
+  /** Classes Tailwind para cor do ícone (ex.: `text-violet-600`). Se omitido, usa cinza padrão. */
+  iconClassName?: string;
 };
 
 type SearchableSelectProps = {
@@ -23,6 +28,10 @@ type SearchableSelectProps = {
   leadingIcon?: ComponentType<{ className?: string }>;
   /** Default true. When false, trigger fits content (for label-inline layouts). */
   fullWidth?: boolean;
+  /** Quando há `leadingIcon` e nenhuma opção selecionada (ou sem `iconClassName`), classes do ícone do gatilho. */
+  leadingIconClassName?: string;
+  /** `id` do botão gatilho (ex.: para `label htmlFor`). */
+  triggerButtonId?: string;
 };
 
 export function SearchableSelect({
@@ -36,6 +45,8 @@ export function SearchableSelect({
   searchable = true,
   leadingIcon: LeadingIcon,
   fullWidth = true,
+  leadingIconClassName,
+  triggerButtonId,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -58,6 +69,10 @@ export function SearchableSelect({
     return options.filter((o) => `${o.label} ${o.subtitle ?? ""}`.toLowerCase().includes(q));
   }, [options, query, searchable]);
   const SelectedIcon = selected?.icon ?? LeadingIcon;
+  const triggerIconClassName =
+    selected?.iconClassName ??
+    (!selected && LeadingIcon ? leadingIconClassName : undefined) ??
+    "text-slate-400";
 
   const rootCls = fullWidth ? "relative" : "relative inline-block w-fit max-w-full";
   const btnCls = fullWidth
@@ -67,16 +82,31 @@ export function SearchableSelect({
   return (
     <div ref={rootRef} className={rootCls}>
       <button
+        id={triggerButtonId}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((s) => !s)}
         className={btnCls}
       >
-        <span className="flex min-w-0 items-center gap-2">
-          {SelectedIcon ? <SelectedIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
-          <span className={selected ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
-            {selected ? selected.label : placeholder}
+        <span className="flex min-w-0 flex-1 flex-col items-stretch gap-0.5 text-left">
+          <span className="flex min-w-0 items-center gap-2">
+            {SelectedIcon ? (
+              <SelectedIcon className={clsx("h-4 w-4 shrink-0", triggerIconClassName)} />
+            ) : null}
+            <span className={selected ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
+              {selected ? selected.label : placeholder}
+            </span>
           </span>
+          {selected?.subtitle ? (
+            <span
+              className={clsx(
+                "truncate pl-6 text-xs leading-tight",
+                selected.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
+              )}
+            >
+              {selected.subtitle}
+            </span>
+          ) : null}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
@@ -117,11 +147,22 @@ export function SearchableSelect({
                   >
                     <span className="min-w-0">
                       <span className="flex items-center gap-2">
-                        {OptionIcon ? <OptionIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+                        {OptionIcon ? (
+                          <OptionIcon
+                            className={clsx("h-4 w-4 shrink-0", opt.iconClassName ?? "text-slate-400")}
+                          />
+                        ) : null}
                         <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
                       </span>
                       {opt.subtitle ? (
-                        <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{opt.subtitle}</span>
+                        <span
+                          className={clsx(
+                            "block truncate text-xs",
+                            opt.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
+                          )}
+                        >
+                          {opt.subtitle}
+                        </span>
                       ) : null}
                     </span>
                     {isSelected ? <Check className="h-4 w-4 text-[#6D28D9]" /> : null}
@@ -231,11 +272,22 @@ export function SearchableMultiSelect({
                   >
                     <span className="min-w-0">
                       <span className="flex items-center gap-2">
-                        {OptionIcon ? <OptionIcon className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+                        {OptionIcon ? (
+                          <OptionIcon
+                            className={clsx("h-4 w-4 shrink-0", opt.iconClassName ?? "text-slate-400")}
+                          />
+                        ) : null}
                         <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
                       </span>
                       {opt.subtitle ? (
-                        <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{opt.subtitle}</span>
+                        <span
+                          className={clsx(
+                            "block truncate text-xs",
+                            opt.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
+                          )}
+                        >
+                          {opt.subtitle}
+                        </span>
                       ) : null}
                     </span>
                     {isSelected ? <Check className="h-4 w-4 text-[#6D28D9]" /> : null}

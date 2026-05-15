@@ -8,6 +8,7 @@ import {
   setContratoCodigoPersonalizado,
 } from "@/lib/contratos/codigo-personalizado";
 import type { ContratoStatus } from "@prisma/client";
+import { markContratoAlertsResolvedIfApplicable } from "@/lib/server/alerts-resolve";
 
 function formatContratoCode(year: number, seq: number): string {
   return `CTT-${year}-${String(seq).padStart(4, "0")}`;
@@ -312,6 +313,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     acao: b.aditivo?.titulo ? "Aditivo de contrato registrado" : "Contrato atualizado",
     modulo: "contratos",
     detalhes: id,
+  });
+
+  await markContratoAlertsResolvedIfApplicable(prisma, {
+    id: saved.id,
+    leadId: saved.leadId,
+    status: saved.status,
+    dataFim: saved.dataFim,
   });
 
   const codigo = await resolveContratoCodeByCreatedAt(saved.id, saved.createdAt);

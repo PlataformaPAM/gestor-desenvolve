@@ -82,7 +82,7 @@ export function LeadDetailTabs({
       <div
         role="tablist"
         aria-label="Abas do lead"
-        className="flex flex-wrap border-b border-slate-200 bg-slate-50/50"
+        className="flex flex-wrap border-b border-slate-300 bg-slate-50/50"
       >
         {visibleTabs.map((tab) => {
           const Icon = tab.icon;

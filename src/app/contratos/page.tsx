@@ -1,11 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { ChevronRight, FileText, RefreshCw, Search } from "lucide-react";
+import {
+  Building2,
+  ChevronRight,
+  FileText,
+  Pencil,
+  RefreshCw,
+  Save,
+  Search,
+  Text,
+  Wallet,
+  X,
+} from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
+import { ContratoDetalheView } from "@/app/contratos/[id]/page";
+import { DateField } from "@/components/ui/date-field";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { usePageHeader } from "@/contexts/page-header-context";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
 import { CONTRATO_STATUS_LABEL } from "@/lib/contratos/constants";
 import {
   badgeUrgenciaContrato,
@@ -50,6 +70,20 @@ function normalize(s: string): string {
     .trim();
 }
 
+function digitsOnly(v: string): string {
+  return v.replace(/\D/g, "");
+}
+
+function formatCurrencyInput(v: string): string {
+  const cents = Number.parseInt(digitsOnly(v) || "0", 10);
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
+function parseCurrencyInput(v: string): number {
+  const cents = Number.parseInt(digitsOnly(v) || "0", 10);
+  return cents / 100;
+}
+
 function statusBadgeClass(status: string): string {
   if (status === "ativo")
     return "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300";
@@ -61,7 +95,6 @@ function statusBadgeClass(status: string): string {
 type ClienteOpt = { id: string; nome: string; empresa: string };
 
 export default function ContratosPage() {
-  const router = useRouter();
   const { setPrimaryAction, setSecondaryAction } = usePageHeader();
   const [contratos, setContratos] = useState<ContratoRow[]>([]);
   const [clientesOpts, setClientesOpts] = useState<ClienteOpt[]>([]);
@@ -71,6 +104,9 @@ export default function ContratosPage() {
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
+  const [detalheOpen, setDetalheOpen] = useState(false);
+  const [contratoSelecionadoId, setContratoSelecionadoId] = useState<string | null>(null);
+  const [contratoSelecionadoTitulo, setContratoSelecionadoTitulo] = useState<string>("");
   const [novoClienteId, setNovoClienteId] = useState("");
   const [novoTitulo, setNovoTitulo] = useState("");
   const [novoValor, setNovoValor] = useState("");
@@ -125,16 +161,14 @@ export default function ContratosPage() {
     setPrimaryAction({
       label: "Novo contrato",
       onClick: () => setNovoOpen(true),
+      showPlusIcon: true,
     });
-    setSecondaryAction({
-      ariaLabel: "Abrir módulo Comercial",
-      onClick: () => router.push("/comercial"),
-    });
+    setSecondaryAction(null);
     return () => {
       setPrimaryAction(null);
       setSecondaryAction(null);
     };
-  }, [setPrimaryAction, setSecondaryAction, router]);
+  }, [setPrimaryAction, setSecondaryAction]);
 
   useEffect(() => {
     if (!novoOpen) return;
@@ -186,6 +220,18 @@ export default function ContratosPage() {
   }, [contratos]);
 
   const isEmpty = filtrados.length === 0;
+  const clientesSelectOptions: SearchableOption[] = useMemo(
+    () => [
+      { value: "", label: "Selecione…", icon: Building2 },
+      ...clientesOpts.map((c) => ({
+        value: c.id,
+        label: c.empresa || c.nome,
+        subtitle: c.nome && c.empresa !== c.nome ? c.nome : undefined,
+        icon: Building2,
+      })),
+    ],
+    [clientesOpts]
+  );
 
   return (
     <section className="w-full min-w-0 space-y-6">
@@ -295,11 +341,17 @@ export default function ContratosPage() {
                       key={c.id}
                       role="link"
                       tabIndex={0}
-                      onClick={() => router.push(`/contratos/${c.id}`)}
+                      onClick={() => {
+                        setContratoSelecionadoId(c.id);
+                        setContratoSelecionadoTitulo(tituloContratoExibicao(c));
+                        setDetalheOpen(true);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          router.push(`/contratos/${c.id}`);
+                          setContratoSelecionadoId(c.id);
+                          setContratoSelecionadoTitulo(tituloContratoExibicao(c));
+                          setDetalheOpen(true);
                         }
                       }}
                       className="relative cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
@@ -360,7 +412,10 @@ export default function ContratosPage() {
                             aria-hidden
                           />
                         )}
-                        <ChevronRight className="ml-auto inline-block h-4 w-4 text-slate-400" aria-hidden />
+                        <span className="ml-auto inline-flex items-center gap-1 text-slate-400" aria-hidden>
+                          <Pencil className="h-4 w-4" />
+                          <ChevronRight className="h-4 w-4" />
+                        </span>
                       </td>
                     </tr>
                   );
@@ -393,11 +448,17 @@ export default function ContratosPage() {
               key={c.id}
               role="link"
               tabIndex={0}
-              onClick={() => router.push(`/contratos/${c.id}`)}
+              onClick={() => {
+                setContratoSelecionadoId(c.id);
+                setContratoSelecionadoTitulo(tituloContratoExibicao(c));
+                setDetalheOpen(true);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  router.push(`/contratos/${c.id}`);
+                  setContratoSelecionadoId(c.id);
+                  setContratoSelecionadoTitulo(tituloContratoExibicao(c));
+                  setDetalheOpen(true);
                 }
               }}
               className="relative flex cursor-pointer flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-all hover:bg-slate-50/50 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/50"
@@ -458,7 +519,8 @@ export default function ContratosPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-end border-t border-slate-100 pt-2 dark:border-slate-700">
+              <div className="flex items-center justify-end gap-1 border-t border-slate-100 pt-2 dark:border-slate-700">
+                <Pencil className="h-4 w-4 text-slate-400" aria-hidden />
                 <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
               </div>
             </div>
@@ -483,125 +545,148 @@ export default function ContratosPage() {
           setNovoOpen(false);
           setNovoErr(null);
         }}
-        title="Novo contrato (cadastro direto)"
+        title="Novo contrato"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="flex flex-col gap-4 pb-6">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Contratos sem lead geram alertas para o Financeiro e, se marcado, para o Pós-venda.
-          </p>
-          {novoErr && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
-              {novoErr}
-            </p>
-          )}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-contrato-cliente">
-              Cliente
-            </label>
-            <select
-              id="novo-contrato-cliente"
-              value={novoClienteId}
-              onChange={(e) => setNovoClienteId(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Contratos sem lead geram alertas para o Financeiro e, se marcado, para o Pós-venda.
+              </p>
+              {novoErr && (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                  {novoErr}
+                </p>
+              )}
+              <div>
+                <label className={formLabelClass} htmlFor="novo-contrato-cliente">
+                  Cliente
+                </label>
+                <div className="mt-1">
+                  <SearchableSelect
+                    options={clientesSelectOptions}
+                    value={novoClienteId}
+                    onChange={setNovoClienteId}
+                    placeholder="Selecione…"
+                    searchPlaceholder="Buscar cliente…"
+                    leadingIcon={Building2}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={formLabelClass} htmlFor="novo-contrato-titulo">
+                  Título (opcional)
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="novo-contrato-titulo"
+                    value={novoTitulo}
+                    onChange={(e) => setNovoTitulo(e.target.value)}
+                    className={formInputClass}
+                    placeholder="Ex.: Prestação de serviços 2026"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={formLabelClass} htmlFor="novo-contrato-valor">
+                    Valor total
+                  </label>
+                  <div className="relative mt-1">
+                    <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="novo-contrato-valor"
+                      inputMode="numeric"
+                      value={novoValor}
+                      onChange={(e) => setNovoValor(formatCurrencyInput(e.target.value))}
+                      className={`${formInputClass} pl-9`}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <span className={formLabelClass}>Pós-venda</span>
+                  <div className="mt-1">
+                    <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={novoPosVenda}
+                        onChange={(e) => setNovoPosVenda(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
+                      />
+                      Gerar alerta e fluxo de Pós-venda
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={formLabelClass} htmlFor="novo-inicio">
+                    Início
+                  </label>
+                  <div className="mt-1">
+                    <DateField id="novo-inicio" value={novoInicio} onChange={setNovoInicio} placeholder="Selecione a data" />
+                  </div>
+                </div>
+                <div>
+                  <label className={formLabelClass} htmlFor="novo-fim">
+                    Fim
+                  </label>
+                  <div className="mt-1">
+                    <DateField id="novo-fim" value={novoFim} onChange={setNovoFim} placeholder="Selecione a data" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className={formLabelClass} htmlFor="novo-cond">
+                  Condições gerais
+                </label>
+                <div className="relative mt-1">
+                  <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <textarea
+                    id="novo-cond"
+                    value={novoCondicoes}
+                    onChange={(e) => setNovoCondicoes(e.target.value)}
+                    rows={3}
+                    placeholder="Termos gerais, SLA, forma de pagamento…"
+                    className={`${formTextareaClass} pl-9`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={formLabelClass} htmlFor="novo-obs">
+                  Observações
+                </label>
+                <div className="relative mt-1">
+                  <Text className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <textarea
+                    id="novo-obs"
+                    value={novoObs}
+                    onChange={(e) => setNovoObs(e.target.value)}
+                    rows={3}
+                    placeholder="Observações internas ou observações para o cliente…"
+                    className={`${formTextareaClass} pl-9`}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
+            <button
+              type="button"
+              onClick={() => {
+                setNovoOpen(false);
+                setNovoErr(null);
+              }}
+              className={formModalCancelButtonClass}
             >
-              <option value="">Selecione…</option>
-              {clientesOpts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.empresa || c.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-contrato-titulo">
-              Título (opcional)
-            </label>
-            <input
-              id="novo-contrato-titulo"
-              value={novoTitulo}
-              onChange={(e) => setNovoTitulo(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="Ex.: Prestação de serviços 2026"
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-contrato-valor">
-                Valor total
-              </label>
-              <input
-                id="novo-contrato-valor"
-                inputMode="decimal"
-                value={novoValor}
-                onChange={(e) => setNovoValor(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                placeholder="0,00"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pós-venda</span>
-              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={novoPosVenda}
-                  onChange={(e) => setNovoPosVenda(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
-                />
-                Gerar alerta e fluxo de Pós-venda
-              </label>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-inicio">
-                Início
-              </label>
-              <input
-                id="novo-inicio"
-                type="date"
-                value={novoInicio}
-                onChange={(e) => setNovoInicio(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-fim">
-                Fim
-              </label>
-              <input
-                id="novo-fim"
-                type="date"
-                value={novoFim}
-                onChange={(e) => setNovoFim(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-obs">
-              Observações
-            </label>
-            <textarea
-              id="novo-obs"
-              value={novoObs}
-              onChange={(e) => setNovoObs(e.target.value)}
-              rows={2}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="novo-cond">
-              Condições gerais
-            </label>
-            <textarea
-              id="novo-cond"
-              value={novoCondicoes}
-              onChange={(e) => setNovoCondicoes(e.target.value)}
-              rows={3}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 pt-2">
+              <span className="inline-flex items-center gap-2">
+                <X className="h-4 w-4 shrink-0" aria-hidden />
+                Cancelar
+              </span>
+            </button>
             <button
               type="button"
               disabled={novoSaving}
@@ -611,8 +696,7 @@ export default function ContratosPage() {
                   setNovoErr("Selecione o cliente.");
                   return;
                 }
-                const raw = novoValor.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-                const valorTotal = raw === "" ? 0 : Number(raw);
+                const valorTotal = parseCurrencyInput(novoValor);
                 if (Number.isNaN(valorTotal)) {
                   setNovoErr("Valor inválido.");
                   return;
@@ -650,28 +734,45 @@ export default function ContratosPage() {
                   setNovoCondicoes("");
                   await recarregarLista();
                   const nid = json?.data?.id;
-                  if (nid) router.push(`/contratos/${encodeURIComponent(nid)}`);
+                  if (nid) {
+                    setContratoSelecionadoId(nid);
+                    setContratoSelecionadoTitulo(novoTitulo.trim() || "Contrato");
+                    setDetalheOpen(true);
+                  }
                 } catch {
                   setNovoErr("Erro de rede.");
                 } finally {
                   setNovoSaving(false);
                 }
               })()}
-              className="rounded-xl bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#5B21B6] disabled:opacity-50"
+              className={formModalSubmitButtonClass}
             >
-              {novoSaving ? "Salvando…" : "Criar contrato"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setNovoOpen(false);
-                setNovoErr(null);
-              }}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200"
-            >
-              Cancelar
+              <span className="inline-flex items-center gap-2">
+                <Save className={clsx("h-4 w-4 shrink-0", novoSaving && "animate-pulse")} aria-hidden />
+                {novoSaving ? "Salvando…" : "Salvar"}
+              </span>
             </button>
           </div>
+        </div>
+      </DrawerSheet>
+
+      <DrawerSheet
+        open={detalheOpen}
+        onClose={() => {
+          setDetalheOpen(false);
+          setContratoSelecionadoId(null);
+          setContratoSelecionadoTitulo("");
+          void recarregarLista();
+        }}
+        title={contratoSelecionadoTitulo || "Contrato"}
+        maxWidth="sm:max-w-3xl"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {contratoSelecionadoId ? (
+            <ContratoDetalheView id={contratoSelecionadoId} embedded />
+          ) : null}
         </div>
       </DrawerSheet>
     </section>

@@ -1,4 +1,5 @@
 import type { Lancamento } from "./types";
+import { LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES } from "./constants";
 
 export type RecurrenceScope = "single" | "future" | "all";
 
@@ -51,7 +52,7 @@ export function hasLancamentoEdicaoDiff(initial: Lancamento, edited: Lancamento)
 /**
  * Mescla o formulário editado em cada linha do grupo.
  * - Campos descritivos / cadastro: replicam do editado.
- * - Valor: em linhas já pagas não altera o valor (exceto na linha que o usuário está editando).
+ * - Valor: em linhas já pagas mantém o valor original (linhas pagas não entram em escopos futuro/todos).
  * - Status / dataPagamento: só na linha editada; demais mantêm o estado atual.
  * - vencimento, id, idPai, parcelaNumero, lead*: preservados por linha.
  */
@@ -77,7 +78,7 @@ export function mergeRecurrenceBulkRow(
   };
 
   let valor = target.valor;
-  if (isPrimary || target.status !== "pago") {
+  if (target.status !== "pago") {
     valor = edited.valor;
   }
 
@@ -111,5 +112,53 @@ export function buildPayloadsForRecurrenceScope(
     scope === "future"
       ? group.filter((t) => t.vencimento >= initial.vencimento)
       : group;
+  subset = subset.filter((t) => t.id === initial.id || t.status !== "pago");
   return subset.map((t) => mergeRecurrenceBulkRow(t, edited, initial.id));
+}
+
+function newLancamentoUuid(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `ext-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+/** Cria linhas adicionais de fixo mensal após a última do grupo (mesmo valor e vínculos do template). */
+export function appendFixoMensalLinhas(rootId: string, extraMeses: number, all: Lancamento[]): Lancamento[] {
+  const nExtra = Math.max(0, Math.floor(extraMeses));
+  if (nExtra < 1) return [];
+  const group = getGroupMembers(rootId, all);
+  const gfm = group.filter((x) => x.tipoRecorrencia === "fixo_mensal");
+  if (gfm.length === 0) return [];
+  const template = gfm[gfm.length - 1];
+  const lastVenc = new Date(template.vencimento);
+  const parcelasMeta = template.parcelas ?? gfm.length + nExtra;
+  const out: Lancamento[] = [];
+  for (let i = 1; i <= nExtra; i += 1) {
+    const d = new Date(lastVenc);
+    d.setMonth(d.getMonth() + i);
+    const venc = d.toISOString().slice(0, 10);
+    out.push({
+      id: newLancamentoUuid(),
+      tipo: template.tipo,
+      descricao: template.descricao,
+      vencimento: venc,
+      valor: template.valor,
+      status: "pendente",
+      tipoRecorrencia: "fixo_mensal",
+      parcelas: parcelasMeta || LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES,
+      idPai: rootId,
+      clienteId: template.clienteId,
+      fornecedor: template.fornecedor,
+      leadIdOrigem: template.leadIdOrigem,
+      leadSolucaoId: template.leadSolucaoId,
+      formaPagamento: template.formaPagamento,
+      condicoesPagamento: template.condicoesPagamento,
+      prazoDias: template.prazoDias,
+      contaId: template.contaId,
+      categoriaId: template.categoriaId,
+      meioPagamentoId: template.meioPagamentoId,
+    });
+  }
+  return out;
 }

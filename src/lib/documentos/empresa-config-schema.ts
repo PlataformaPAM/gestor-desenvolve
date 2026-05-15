@@ -11,6 +11,13 @@ export type EmpresaDocumentoConfig = {
   telefone: string;
   email: string;
   site: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
   endereco: string;
   logoUrl: string;
   cabecalhoPadraoHtml: string;
@@ -55,6 +62,13 @@ export function emptyEmpresaDocumentoConfig(): EmpresaDocumentoConfig {
     telefone: "",
     email: "",
     site: "",
+    cep: "",
+    logradouro: "",
+    numero: "",
+    complemento: "",
+    bairro: "",
+    cidade: "",
+    uf: "",
     endereco: "",
     logoUrl: "",
     cabecalhoPadraoHtml: "",
@@ -101,6 +115,13 @@ export function normalizeEmpresaDocumentoConfig(raw: unknown): EmpresaDocumentoC
     telefone: String(o.telefone ?? "").trim(),
     email: String(o.email ?? "").trim(),
     site: String(o.site ?? "").trim(),
+    cep: String(o.cep ?? "").trim(),
+    logradouro: String(o.logradouro ?? "").trim(),
+    numero: String(o.numero ?? "").trim(),
+    complemento: String(o.complemento ?? "").trim(),
+    bairro: String(o.bairro ?? "").trim(),
+    cidade: String(o.cidade ?? "").trim(),
+    uf: String(o.uf ?? "").trim(),
     endereco: String(o.endereco ?? "").trim(),
     logoUrl: String(o.logoUrl ?? "").trim(),
     cabecalhoPadraoHtml: String(o.cabecalhoPadraoHtml ?? ""),

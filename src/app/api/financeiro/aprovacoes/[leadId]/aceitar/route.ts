@@ -3,6 +3,12 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { seedPosVendaAfterFinanceiroApproval } from "@/lib/server/pos-venda-from-fechamento";
 import { emitManyAlerts } from "@/lib/server/alerts";
+import { markAlertsReadForLeadFinanceiroApproved } from "@/lib/server/alerts-resolve";
+import {
+  consultoresUnicosResolvidos,
+  resolveEquipeVendaParaComissao,
+  validarParticipacoesNoEscopo,
+} from "@/lib/server/comissoes-ownership-resolve";
 
 type Payload = {
   userName?: string;
@@ -54,6 +60,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ leadId: string
     }
   } else if (lancamentosLead.length === 0) {
     return fail("BAD_REQUEST", "Crie o lançamento no caixa antes de concluir a aprovação.", 400);
+  }
+
+  const equipeResolvida = await resolveEquipeVendaParaComissao(prisma, leadId);
+  const consultorIdsExigidos = consultoresUnicosResolvidos(equipeResolvida).map((c) => c.id);
+  const escoposComissao: (string | null)[] =
+    linhasSolucao.length > 0 ? linhasSolucao.map((s) => s.id) : [null];
+  for (const leadSolucaoId of escoposComissao) {
+    const v = await validarParticipacoesNoEscopo(prisma, {
+      leadId,
+      leadSolucaoId,
+      consultorIdsExigidos,
+    });
+    if (!v.ok) return fail("BAD_REQUEST", v.message, 400);
   }
 
   const lancamentoRecente = await prisma.lancamento.findFirst({
@@ -141,6 +160,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ leadId: string
       },
     ]);
   });
+
+  await markAlertsReadForLeadFinanceiroApproved(prisma, leadId);
 
   await writeAuditLog(prisma, {
     acao: "Aprovação financeira concluída",

@@ -141,6 +141,7 @@ export async function backfillContratosFaltantes(): Promise<BackfillResult> {
   const leads = await prisma.lead.findMany({
     where: {
       stageId: "fechado",
+      registroLead: "oportunidade",
       clienteId: { not: null },
       contrato: { is: null },
     },

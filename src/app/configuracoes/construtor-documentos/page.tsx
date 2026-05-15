@@ -7,16 +7,28 @@ import {
   DocumentoRichEditor,
   type DocumentoRichEditorHandle,
 } from "@/components/configuracoes/documento-rich-editor";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { htmlOuParagrafoSimples, htmlTemTextoVisivel } from "@/lib/documentos/html-text";
 import {
   VARIAVEIS_DOCUMENTO_MODULOS,
+  type ModuloVariaveisDocumento,
   preencherTemplateDocumento,
   valoresPreviewExemplo,
 } from "@/lib/documentos/template-vars";
 import { ConfiguracoesTopNav } from "@/components/configuracoes/configuracoes-top-nav";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
+import { DadosEmpresaFormSection } from "@/components/configuracoes/dados-empresa-form";
+import {
+  formInputClass,
+  formInputLeadingIconPaddingClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formSectionLabelClass,
+} from "@/components/ui/field-patterns";
+import { AlignLeft, ClipboardList, FileSpreadsheet, FileText, Layers3, ReceiptText, Save, ScrollText, Type, X } from "lucide-react";
 
 type TipoDocumento =
   | "proposta_comercial"
@@ -92,6 +104,29 @@ const TIPO_LABEL: Record<TipoDocumento, string> = {
   relatorio: "Relatório",
 };
 
+const TIPO_OPTIONS: SearchableOption[] = [
+  {
+    value: "proposta_comercial",
+    label: TIPO_LABEL.proposta_comercial,
+    icon: ({ className }) => <FileText className={`${className ?? ""} !text-violet-600 dark:!text-violet-400`} />,
+  },
+  {
+    value: "oficio",
+    label: TIPO_LABEL.oficio,
+    icon: ({ className }) => <ScrollText className={`${className ?? ""} !text-sky-600 dark:!text-sky-400`} />,
+  },
+  {
+    value: "prestacao_contas",
+    label: TIPO_LABEL.prestacao_contas,
+    icon: ({ className }) => <ReceiptText className={`${className ?? ""} !text-amber-600 dark:!text-amber-400`} />,
+  },
+  {
+    value: "relatorio",
+    label: TIPO_LABEL.relatorio,
+    icon: ({ className }) => <FileSpreadsheet className={`${className ?? ""} !text-emerald-600 dark:!text-emerald-400`} />,
+  },
+];
+
 function emptyModelo(): ModeloDocumento {
   return {
     id: "",
@@ -132,19 +167,128 @@ function absolutizeAssetUrl(raw: string): string {
   return `${window.location.origin}${value.startsWith("/") ? value : `/${value}`}`;
 }
 
+/** Corrige rótulos com encoding quebrado vindos do catálogo legado (sem alterar tokens). */
+function sanitizeVariavelLabel(label: string): string {
+  return label
+    .replace(/\u00e2\u20ac\u201d/g, "—")
+    .replace(/â€"/g, "—")
+    .replace(/Â·/g, "·");
+}
+
+/**
+ * Tokens preenchidos ao exportar relatórios Comercial / Financeiro (lançamentos).
+ * Mantidos aqui para documentação na UI sem alterar outros arquivos do sistema.
+ */
+const MODULOS_VARIAVEIS_RELATORIOS_EXTRA: ModuloVariaveisDocumento[] = [
+  {
+    id: "relatorios_contexto",
+    titulo: "Relatórios · Contexto",
+    variaveis: [
+      {
+        token: "{{relatorio_tipo}}",
+        label: "Nome do tipo de relatório (conforme escolha ao gerar o PDF)",
+      },
+    ],
+  },
+  {
+    id: "relatorios_tabela_comercial",
+    titulo: "Relatórios · Comercial (lista de leads)",
+    variaveis: [
+      { token: "{{resumo_total_leads}}", label: "Quantidade de leads no período" },
+      { token: "{{resumo_valor_aberto}}", label: "Soma dos valores em aberto (não fechado/perdido)" },
+      { token: "{{resumo_valor_ganhos}}", label: "Soma dos valores ganhos (fechado)" },
+      { token: "{{resumo_valor_perdidos}}", label: "Soma dos valores perdidos" },
+      { token: "{{resumo_taxa_conversao}}", label: "Taxa de conversão (ganhos vs. ganhos+perdidos)" },
+      { token: "{{tabela_leads_html}}", label: "Tabela HTML com os leads do período" },
+    ],
+  },
+  {
+    id: "relatorios_tabela_financeiro",
+    titulo: "Relatórios · Financeiro (lançamentos)",
+    variaveis: [
+      { token: "{{resumo_total_lancamentos}}", label: "Quantidade de lançamentos no período" },
+      { token: "{{resumo_total_entradas}}", label: "Total de entradas" },
+      { token: "{{resumo_total_saidas}}", label: "Total de saídas" },
+      { token: "{{resumo_saldo_periodo}}", label: "Saldo do período (entradas − saídas)" },
+      { token: "{{resumo_total_atrasado}}", label: "Total em atraso (conforme filtros do relatório)" },
+      { token: "{{tabela_lancamentos_html}}", label: "Tabela HTML com lançamentos" },
+    ],
+  },
+];
+
+const TITULO_MODULO_VARIAVEL_OVERRIDES: Partial<Record<string, string>> = {
+  comercial: "Oportunidade (lead / CRM)",
+  contato: "Papéis de contato na oportunidade",
+  financeiro: "Financeiro da proposta",
+  usuario_data: "Autoria e data",
+  relatorios_prestacao_contas: "Relatórios · Prestação de contas",
+  relatorios_operacional: "Relatórios · Operacional (desempenho)",
+  relatorios_financeiro: "Relatórios · Financeiro (indicadores)",
+  relatorios_comercial: "Relatórios · Comercial (indicadores)",
+};
+
+const ORDEM_MODULOS_COLUNA_VARIAVEIS = [
+  "empresa",
+  "cliente",
+  "usuario_data",
+  "comercial",
+  "solucoes",
+  "contato",
+  "financeiro",
+  "rh",
+  "relatorios_contexto",
+  "relatorios_prestacao_contas",
+  "relatorios_operacional",
+  "relatorios_financeiro",
+  "relatorios_tabela_financeiro",
+  "relatorios_comercial",
+  "relatorios_tabela_comercial",
+] as const;
+
+function construirCatalogoVariaveisColuna(): ModuloVariaveisDocumento[] {
+  const map = new Map<string, ModuloVariaveisDocumento>();
+
+  for (const m of VARIAVEIS_DOCUMENTO_MODULOS) {
+    const titulo = TITULO_MODULO_VARIAVEL_OVERRIDES[m.id] ?? m.titulo;
+    map.set(m.id, {
+      ...m,
+      titulo,
+      variaveis: m.variaveis.map((v) => ({
+        ...v,
+        label: sanitizeVariavelLabel(v.label),
+      })),
+    });
+  }
+  for (const m of MODULOS_VARIAVEIS_RELATORIOS_EXTRA) {
+    map.set(m.id, m);
+  }
+
+  const ordered: ModuloVariaveisDocumento[] = [];
+  const ordemPrevista = new Set<string>([...ORDEM_MODULOS_COLUNA_VARIAVEIS]);
+  for (const id of ORDEM_MODULOS_COLUNA_VARIAVEIS) {
+    const mod = map.get(id);
+    if (mod) ordered.push(mod);
+  }
+  for (const [id, mod] of map) {
+    if (!ordemPrevista.has(id)) ordered.push(mod);
+  }
+  return ordered;
+}
+
 export default function ConstrutorDocumentosPage() {
   const { setPrimaryAction } = usePageHeader();
   const [modelos, setModelos] = useState<ModeloDocumento[]>([]);
   const [busca, setBusca] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerDadosEmpresaOpen, setDrawerDadosEmpresaOpen] = useState(false);
   const [modeloAtual, setModeloAtual] = useState<ModeloDocumento>(emptyModelo());
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [acaoId, setAcaoId] = useState<string | null>(null);
   const [editorNonce, setEditorNonce] = useState(0);
-  const [abaVariaveis, setAbaVariaveis] = useState<string>(VARIAVEIS_DOCUMENTO_MODULOS[0]?.id ?? "empresa");
   const [buscaVariavel, setBuscaVariavel] = useState("");
+  const [abaVariaveis, setAbaVariaveis] = useState<string>("empresa");
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaDocumentoConfig>({
     layoutModo: "none",
     razaoSocial: "",
@@ -189,6 +333,8 @@ export default function ConstrutorDocumentosPage() {
       setToast({ visible: true, message, variant, duration });
     });
   }, []);
+
+  const catalogoVariaveisColuna = useMemo(() => construirCatalogoVariaveisColuna(), []);
 
   const inserirVariavel = useCallback((token: string) => {
     const alvo = campoVariavelAlvoRef.current;
@@ -295,6 +441,7 @@ export default function ConstrutorDocumentosPage() {
   useEffect(() => {
     setPrimaryAction({
       label: "Novo Modelo",
+      showPlusIcon: true,
       onClick: () => {
         setEditorNonce((n) => n + 1);
         setModeloAtual(emptyModelo());
@@ -422,6 +569,25 @@ export default function ConstrutorDocumentosPage() {
     () => timbres.find((t) => t.id === (modeloAtual.timbreId ?? "").trim()) ?? null,
     [timbres, modeloAtual.timbreId]
   );
+  const timbreOptions = useMemo<SearchableOption[]>(
+    () => [
+      {
+        value: "",
+        label: "(Nenhum / usa padrão global)",
+        icon: ({ className }) => <ClipboardList className={`${className ?? ""} !text-slate-500 dark:!text-slate-400`} />,
+      },
+      ...timbres
+        .filter((t) => t.ativo !== false)
+        .map((t) => ({
+          value: t.id,
+          label: t.nome,
+          icon: ({ className }: { className?: string }) => (
+            <ClipboardList className={`${className ?? ""} !text-violet-600 dark:!text-violet-400`} />
+          ),
+        })),
+    ],
+    [timbres]
+  );
   const previewValues = useMemo(() => valoresPreviewExemplo(new Date(), empresaConfig), [empresaConfig]);
   const abrirPreviewCompletoEmNovaAba = useCallback(() => {
     void (async () => {
@@ -512,7 +678,7 @@ export default function ConstrutorDocumentosPage() {
   const termoVariavel = buscaVariavel.trim().toLowerCase();
   const modulosComVariaveisFiltradas = useMemo(
     () =>
-      VARIAVEIS_DOCUMENTO_MODULOS.map((mod) => ({
+      catalogoVariaveisColuna.map((mod) => ({
         ...mod,
         variaveis: !termoVariavel
           ? mod.variaveis
@@ -520,16 +686,23 @@ export default function ConstrutorDocumentosPage() {
               `${v.token} ${v.label}`.toLowerCase().includes(termoVariavel)
             ),
       })).filter((mod) => mod.variaveis.length > 0),
-    [termoVariavel]
+    [catalogoVariaveisColuna, termoVariavel]
   );
+
   const moduloAtivoFiltrado =
-    modulosComVariaveisFiltradas.find((x) => x.id === abaVariaveis) ??
+    modulosComVariaveisFiltradas.find((m) => m.id === abaVariaveis) ??
     modulosComVariaveisFiltradas[0] ??
     null;
 
+  useEffect(() => {
+    if (modulosComVariaveisFiltradas.length === 0) return;
+    const existe = modulosComVariaveisFiltradas.some((m) => m.id === abaVariaveis);
+    if (!existe) setAbaVariaveis(modulosComVariaveisFiltradas[0].id);
+  }, [modulosComVariaveisFiltradas, abaVariaveis]);
+
   return (
     <section className="w-full min-w-0 space-y-4">
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
+      <div className="sticky top-0 z-10 flex w-full min-w-0 flex-wrap items-center gap-3 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-3 shadow-sm backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto sm:max-w-lg sm:flex-row sm:items-center">
           <div className="relative min-w-0 w-full sm:w-[520px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -538,11 +711,11 @@ export default function ConstrutorDocumentosPage() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar modelos..."
-              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className={`${formInputClass} h-10 min-w-0 pl-9`}
             />
           </div>
         </div>
-        <ConfiguracoesTopNav atalhosDocumentos />
+        <ConfiguracoesTopNav atalhosDocumentos onOpenDadosEmpresaModal={() => setDrawerDadosEmpresaOpen(true)} />
       </div>
 
       {erroLista ? (
@@ -636,257 +809,268 @@ export default function ConstrutorDocumentosPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title={modeloAtual.id ? "Editar modelo de documento" : "Novo modelo de documento"}
-        maxWidth="sm:max-w-5xl"
+        fullViewport
+        maxWidth="sm:max-w-3xl"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 p-1 pr-2">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Nome do modelo</label>
-              <input
-                type="text"
-                value={modeloAtual.nome}
-                onChange={(e) => setModeloAtual((p) => ({ ...p, nome: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Tipo</label>
-              <select
-                value={modeloAtual.tipo}
-                onChange={(e) => setModeloAtual((p) => ({ ...p, tipo: e.target.value as TipoDocumento }))}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              >
-                {Object.entries(TIPO_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Papel timbrado deste modelo
-              </label>
-              <select
-                value={modeloAtual.timbreId ?? ""}
-                onChange={(e) => {
-                  const nextId = e.target.value;
-                  const timbre = timbres.find((t) => t.id === nextId);
-                  setModeloAtual((p) => ({ ...p, timbreId: nextId, timbreUrl: timbre?.url ?? "" }));
-                }}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              >
-                <option value="">(Nenhum / usa padrão global)</option>
-                {timbres.filter((t) => t.ativo !== false).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-600 dark:bg-slate-800/50">
-              {timbreSelecionado ? (
-                <img src={timbreSelecionado.url} alt={timbreSelecionado.nome} className="h-24 w-full rounded object-contain" />
-              ) : (
-                <div className="flex h-24 items-center justify-center text-xs text-slate-500 dark:text-slate-400">
-                  Prévia do timbrado
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Descrição</label>
-            <input
-              type="text"
-              value={modeloAtual.descricao}
-              onChange={(e) => setModeloAtual((p) => ({ ...p, descricao: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Assunto (texto simples)</label>
-            <input
-              ref={assuntoInputRef}
-              type="text"
-              value={modeloAtual.assunto}
-              onChange={(e) => setModeloAtual((p) => ({ ...p, assunto: e.target.value }))}
-              onFocus={() => {
-                campoVariavelAlvoRef.current = "assunto";
-              }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="Ex.: Proposta - {{cliente.nome}}"
-            />
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-800/40">
-            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Logo (URL pública)</p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Use o botão para inserir a imagem na posição do cursor no cabeçalho. Você também pode colocar imagens pela barra do editor (ícone de imagem).
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <input
-                type="url"
-                value={modeloAtual.logoUrl}
-                onChange={(e) => setModeloAtual((p) => ({ ...p, logoUrl: e.target.value }))}
-                placeholder="https://..."
-                className="min-w-[200px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <button
-                type="button"
-                onClick={inserirLogoNoCabecalho}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                Inserir logo no cabeçalho
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Cabeçalho (fixo - logo, endereço, contatos)
-            </label>
-            <DocumentoRichEditor
-              key={`cab-${editorResetKey}`}
-              ref={refCabecalho}
-              initialHtml={modeloAtual.cabecalhoHtml}
-              placeholder="Ex.: dados da empresa, telefone, e-mail institucional..."
-              minHeightClassName="min-h-[120px]"
-              onFocus={() => {
-                campoVariavelAlvoRef.current = "cabecalho";
-              }}
-              onChange={(html) => setModeloAtual((p) => ({ ...p, cabecalhoHtml: html }))}
-            />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[1fr_min(320px,100%)]">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Corpo do documento
-              </label>
-              <DocumentoRichEditor
-                key={`corpo-${editorResetKey}`}
-                ref={refCorpo}
-                initialHtml={modeloAtual.corpo}
-                placeholder="Texto principal da proposta, ofício, etc."
-                minHeightClassName="min-h-[260px]"
-                onFocus={() => {
-                  campoVariavelAlvoRef.current = "corpo";
-                }}
-                onChange={(html) => setModeloAtual((p) => ({ ...p, corpo: html }))}
-              />
-            </div>
-
-            <div className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/50">
-              <div className="border-b border-slate-200 p-2 dark:border-slate-600">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-stretch">
+            <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="space-y-4">
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="search"
-                    value={buscaVariavel}
-                    onChange={(e) => setBuscaVariavel(e.target.value)}
-                    placeholder="Buscar variável por nome ou token..."
-                    className="h-9 w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  <div className="flex flex-col gap-3 lg:pr-[232px]">
+                    <div className="space-y-1">
+                      <label className={formLabelClass}>Nome do modelo</label>
+                      <div className="relative">
+                        <Type className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={modeloAtual.nome}
+                          onChange={(e) => setModeloAtual((p) => ({ ...p, nome: e.target.value }))}
+                          className={`${formInputClass} pl-9`}
+                          placeholder="Ex.: Proposta Comercial 2026"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className={formLabelClass}>Tipo</label>
+                      <SearchableSelect
+                        options={TIPO_OPTIONS}
+                        value={modeloAtual.tipo}
+                        onChange={(value) => setModeloAtual((p) => ({ ...p, tipo: value as TipoDocumento }))}
+                        placeholder="Selecione o tipo"
+                        searchPlaceholder="Buscar tipo..."
+                        searchable={false}
+                        leadingIcon={Layers3}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className={formLabelClass}>Papel timbrado deste modelo</label>
+                      <SearchableSelect
+                        options={timbreOptions}
+                        value={modeloAtual.timbreId ?? ""}
+                        onChange={(value) => {
+                          const timbre = timbres.find((t) => t.id === value);
+                          setModeloAtual((p) => ({ ...p, timbreId: value, timbreUrl: timbre?.url ?? "" }));
+                        }}
+                        placeholder="Selecione o papel timbrado"
+                        searchPlaceholder="Buscar papel timbrado..."
+                        searchable={false}
+                        leadingIcon={ClipboardList}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-1 lg:absolute lg:inset-y-0 lg:right-0 lg:mt-0 lg:min-h-0 lg:w-[220px]">
+                    <label className={formLabelClass}>Papel timbrado</label>
+                    <div className="flex min-h-[7rem] flex-1 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-600 dark:bg-slate-800/50 lg:min-h-0">
+                      {timbreSelecionado ? (
+                        <img
+                          src={timbreSelecionado.url}
+                          alt={timbreSelecionado.nome}
+                          className="max-h-full max-w-full rounded object-contain"
+                        />
+                      ) : (
+                        <div className="flex min-h-[5rem] items-center justify-center text-xs text-slate-500 dark:text-slate-400 lg:min-h-0">
+                          Prévia do timbrado
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Descrição</label>
+                  <div className="relative">
+                    <AlignLeft className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={modeloAtual.descricao}
+                      onChange={(e) => setModeloAtual((p) => ({ ...p, descricao: e.target.value }))}
+                      className={`${formInputClass} pl-9`}
+                      placeholder="Ex.: Modelo usado para propostas de novos clientes"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Assunto (texto simples)</label>
+                  <div className="relative">
+                    <Type className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={assuntoInputRef}
+                      type="text"
+                      value={modeloAtual.assunto}
+                      onChange={(e) => setModeloAtual((p) => ({ ...p, assunto: e.target.value }))}
+                      onFocus={() => {
+                        campoVariavelAlvoRef.current = "assunto";
+                      }}
+                      className={`${formInputClass} pl-9`}
+                      placeholder="Ex.: Proposta - {{cliente.nome}}"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={formLabelClass}>Cabeçalho (fixo - logo, endereço, contatos)</label>
+                  <DocumentoRichEditor
+                    key={`cab-${editorResetKey}`}
+                    ref={refCabecalho}
+                    initialHtml={modeloAtual.cabecalhoHtml}
+                    placeholder="Ex.: dados da empresa, telefone, e-mail institucional..."
+                    minHeightClassName="min-h-[150px]"
+                    contentLeadingIcon={AlignLeft}
+                    onFocus={() => {
+                      campoVariavelAlvoRef.current = "cabecalho";
+                    }}
+                    onChange={(html) => setModeloAtual((p) => ({ ...p, cabecalhoHtml: html }))}
+                  />
+                </div>
+
+                <div>
+                  <label className={formLabelClass}>Corpo do documento</label>
+                  <DocumentoRichEditor
+                    key={`corpo-${editorResetKey}`}
+                    ref={refCorpo}
+                    initialHtml={modeloAtual.corpo}
+                    placeholder="Texto principal da proposta, ofício, etc."
+                    minHeightClassName="min-h-[150px]"
+                    contentLeadingIcon={AlignLeft}
+                    onFocus={() => {
+                      campoVariavelAlvoRef.current = "corpo";
+                    }}
+                    onChange={(html) => setModeloAtual((p) => ({ ...p, corpo: html }))}
+                  />
+                </div>
+
+                <div>
+                  <label className={formLabelClass}>Rodapé (fixo - avisos legais, CNPJ, contato)</label>
+                  <DocumentoRichEditor
+                    key={`rodape-${editorResetKey}`}
+                    ref={refRodape}
+                    initialHtml={modeloAtual.rodapeHtml}
+                    placeholder="Ex.: observações legais, linha de assinatura, dados cadastrais..."
+                    minHeightClassName="min-h-[150px]"
+                    contentLeadingIcon={AlignLeft}
+                    onFocus={() => {
+                      campoVariavelAlvoRef.current = "rodape";
+                    }}
+                    onChange={(html) => setModeloAtual((p) => ({ ...p, rodapeHtml: html }))}
                   />
                 </div>
               </div>
-              <div className="border-b border-slate-200 dark:border-slate-600">
-                <div className="flex max-h-[220px] flex-wrap gap-1 overflow-y-auto p-2">
-                  {modulosComVariaveisFiltradas.map((mod) => (
-                    <button
-                      key={mod.id}
-                      type="button"
-                      onClick={() => setAbaVariaveis(mod.id)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
-                        abaVariaveis === mod.id
-                          ? "bg-[#6D28D9] text-white"
-                          : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      {mod.titulo}
-                    </button>
-                  ))}
+            </div>
+
+            <aside className="flex min-h-0 flex-col overflow-hidden border-t border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-900/50 lg:h-full lg:min-h-0 lg:border-l lg:border-t-0">
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-3 py-4 sm:px-4 lg:px-5">
+                <div className="shrink-0 space-y-2">
+                  <p className={formSectionLabelClass}>Variáveis do documento</p>
+                  <p className="text-sm leading-snug text-slate-500 dark:text-slate-400">
+                    Utilize o campo de busca ou clique nos grupos para filtrar, com o cursor na posição do texto onde deseja,
+                    clique na variável para inserir.
+                  </p>
+                  <div className="relative mt-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={buscaVariavel}
+                      onChange={(e) => setBuscaVariavel(e.target.value)}
+                      placeholder="Buscar variável por nome ou token..."
+                      className={`${formInputClass} ${formInputLeadingIconPaddingClass}`}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="max-h-[320px] overflow-y-auto p-2">
-                <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  Clique na variável para inserir na posição do cursor no último campo em que você clicou (assunto,
-                  cabeçalho, corpo ou rodapé). Campos de texto rico: clique dentro do editor antes de escolher a
-                  variável.
-                </p>
-                {!moduloAtivoFiltrado ? (
-                  <p className="rounded-lg border border-dashed border-slate-300 bg-white px-2 py-3 text-center text-xs text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                {modulosComVariaveisFiltradas.length === 0 ? (
+                  <p className="text-center text-sm text-slate-500 dark:text-slate-400">
                     Nenhuma variável encontrada para esta busca.
                   </p>
                 ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {moduloAtivoFiltrado.variaveis.map((v) => (
-                      <button
-                        key={v.token}
-                        type="button"
-                        onClick={() => inserirVariavel(v.token)}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-xs text-slate-800 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <span className="font-mono text-[11px] text-violet-700 dark:text-violet-300">{v.token}</span>
-                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">{v.label}</span>
-                      </button>
-                    ))}
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <p className={`${formSectionLabelClass} mb-2`}>Grupos</p>
+                    <div className="grid w-full gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,7.5rem),1fr))]">
+                      {modulosComVariaveisFiltradas.map((mod) => (
+                        <button
+                          key={mod.id}
+                          type="button"
+                          onClick={() => setAbaVariaveis(mod.id)}
+                          className={`flex min-h-[2.25rem] w-full items-center justify-center rounded-lg px-2 py-1.5 text-center text-sm font-medium leading-snug transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                            abaVariaveis === mod.id
+                              ? "bg-[#6D28D9] text-white"
+                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <span className="line-clamp-3">{mod.titulo}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className={`${formSectionLabelClass} mb-2 mt-6`}>Variáveis</p>
+                    {!moduloAtivoFiltrado ? null : (
+                      <div className="flex flex-col gap-2">
+                        {moduloAtivoFiltrado.variaveis.map((v) => (
+                          <button
+                            key={v.token}
+                            type="button"
+                            onClick={() => inserirVariavel(v.token)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
+                          >
+                            <span className="inline text-sm text-slate-800 dark:text-slate-100">{v.label}</span>
+                            <span className="inline break-all font-mono text-xs text-violet-700 dark:text-violet-300">
+                              {" "}
+                              {v.token}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
+            </aside>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Rodapé (fixo - avisos legais, CNPJ, contato)
-            </label>
-            <DocumentoRichEditor
-              key={`rodape-${editorResetKey}`}
-              ref={refRodape}
-              initialHtml={modeloAtual.rodapeHtml}
-              placeholder="Ex.: observações legais, linha de assinatura, dados cadastrais..."
-              minHeightClassName="min-h-[120px]"
-              onFocus={() => {
-                campoVariavelAlvoRef.current = "rodape";
-              }}
-              onChange={(html) => setModeloAtual((p) => ({ ...p, rodapeHtml: html }))}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
             <button
               type="button"
               onClick={abrirPreviewCompletoEmNovaAba}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+              className={formModalCancelButtonClass}
             >
-              <Eye className="h-4 w-4" />
-              Visualizar documento completo
+              <span className="inline-flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Visualizar prévia do modelo de documento
+              </span>
             </button>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                Cancelar
+              <button type="button" onClick={() => setDrawerOpen(false)} className={formModalCancelButtonClass}>
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </span>
               </button>
-              <button
-                type="button"
-                disabled={salvando}
-                onClick={salvarModelo}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
-              >
-                <FilePlus2 className="h-4 w-4" />
-                {salvando ? "Salvando..." : "Salvar modelo"}
+              <button type="button" disabled={salvando} onClick={salvarModelo} className={formModalSubmitButtonClass}>
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4" />
+                  {salvando ? "Salvando..." : "Salvar"}
+                </span>
               </button>
             </div>
           </div>
         </div>
+      </DrawerSheet>
+
+      <DrawerSheet
+        open={drawerDadosEmpresaOpen}
+        onClose={() => setDrawerDadosEmpresaOpen(false)}
+        title="Dados da Empresa"
+        maxWidth="sm:max-w-3xl"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <DadosEmpresaFormSection
+          compact
+          withFixedFooter
+          onCancel={() => setDrawerDadosEmpresaOpen(false)}
+          onSaved={() => setDrawerDadosEmpresaOpen(false)}
+        />
       </DrawerSheet>
 
       <Toast

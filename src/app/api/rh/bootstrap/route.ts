@@ -1,9 +1,30 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapColaborador } from "../_shared";
 import { fail, ok } from "@/lib/server/api-response";
 
 /** Evita `SELECT *` em colunas que podem não existir no banco até migrar (ex.: contatosFornecedor). */
 const colaboradorRhSelectBase = {
+  id: true,
+  nome: true,
+  cargoOuFuncao: true,
+  tipoContrato: true,
+  status: true,
+  tipoPessoa: true,
+  cadastroEfetivado: true,
+  email: true,
+  telefone: true,
+  cpfCnpj: true,
+  totalVendasMes: true,
+  ultimoAcesso: true,
+  createdAt: true,
+  updatedAt: true,
+  dadosBancarios: true,
+  documentos: true,
+} as const;
+
+/** Mesmo conjunto de campos, sem `cadastroEfetivado` (BD antes da migration RH consultor). */
+const colaboradorRhSelectLegacy = {
   id: true,
   nome: true,
   cargoOuFuncao: true,
@@ -21,10 +42,39 @@ const colaboradorRhSelectBase = {
   documentos: true,
 } as const;
 
-async function loadColaboradoresRh() {
+function minimalScalarSelect(includeCadastroEfetivado: boolean) {
+  return {
+    id: true,
+    nome: true,
+    cargoOuFuncao: true,
+    tipoContrato: true,
+    status: true,
+    tipoPessoa: true,
+    ...(includeCadastroEfetivado ? { cadastroEfetivado: true as const } : {}),
+    email: true,
+    telefone: true,
+    cpfCnpj: true,
+    totalVendasMes: true,
+    ultimoAcesso: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022";
+}
+
+/**
+ * Carrega colaboradores; se a coluna `cadastroEfetivado` ainda não existir no banco,
+ * repete sem ela (mapColaborador assume efetivado = true).
+ */
+async function loadColaboradoresRhOnce(includeCadastroEfetivado: boolean) {
+  const base = includeCadastroEfetivado ? colaboradorRhSelectBase : colaboradorRhSelectLegacy;
+  const minimal = minimalScalarSelect(includeCadastroEfetivado);
   try {
     return await prisma.colaboradorRH.findMany({
-      select: { ...colaboradorRhSelectBase, contatosFornecedor: true },
+      select: { ...base, contatosFornecedor: true },
       orderBy: { nome: "asc" },
     });
   } catch (e) {
@@ -32,30 +82,31 @@ async function loadColaboradoresRh() {
   }
   try {
     return await prisma.colaboradorRH.findMany({
-      select: { ...colaboradorRhSelectBase },
+      select: { ...base },
       orderBy: { nome: "asc" },
     });
   } catch (e) {
     console.warn("[rh/bootstrap] select com relações falhou; lista mínima.", e);
   }
-  return await prisma.colaboradorRH.findMany({
-    select: {
-      id: true,
-      nome: true,
-      cargoOuFuncao: true,
-      tipoContrato: true,
-      status: true,
-      tipoPessoa: true,
-      email: true,
-      telefone: true,
-      cpfCnpj: true,
-      totalVendasMes: true,
-      ultimoAcesso: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+  return prisma.colaboradorRH.findMany({
+    select: { ...minimal },
     orderBy: { nome: "asc" },
   });
+}
+
+async function loadColaboradoresRh() {
+  try {
+    return await loadColaboradoresRhOnce(true);
+  } catch (e) {
+    if (isMissingColumnError(e)) {
+      console.warn(
+        "[rh/bootstrap] possível coluna inexistente (ex.: cadastroEfetivado); repetindo select legado.",
+        e
+      );
+      return loadColaboradoresRhOnce(false);
+    }
+    throw e;
+  }
 }
 
 export async function GET() {

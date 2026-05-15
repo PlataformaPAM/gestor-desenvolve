@@ -4,7 +4,31 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useId } from "react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import { FileText, History, Eye } from "lucide-react";
+import {
+  FileText,
+  History,
+  Eye,
+  Building2,
+  AlertTriangle,
+  Clock3,
+  ShieldAlert,
+  Circle,
+  CircleDot,
+  CircleHelp,
+  CheckCircle2,
+  MessageSquareReply,
+  CircleSlash2,
+  User,
+  Users,
+  Handshake,
+  Wallet,
+  Wrench,
+  Lightbulb,
+  MessageSquare,
+  Save,
+  X,
+  Plus,
+} from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import {
@@ -25,6 +49,13 @@ import type {
   TicketResponsavel,
   HistoricoEntrada,
 } from "@/lib/suporte/types";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
 
 export type TicketFormPayload = {
   clienteId: string;
@@ -60,9 +91,8 @@ type TicketFormSheetProps = {
 
 type TabId = "detalhes" | "interacoes";
 
-const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500";
-const labelClass = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300";
+const inputClass = formInputClass;
+const labelClass = formLabelClass;
 
 function openPlaceholderPreview(filename: string) {
   const w = window.open("", "_blank");
@@ -143,6 +173,7 @@ export function TicketFormSheet({
 
   // Histórico (timeline) — auditoria de ações e atualizações
   const [historico, setHistorico] = useState<HistoricoEntrada[]>([]);
+  const prevOpenRef = useRef(false);
   const prevStatusRef = useRef<TicketStatus | null>(null);
   const prevPrioridadeRef = useRef<TicketPrioridade | null>(null);
   const prevCategoriaRef = useRef<TicketCategoria | null>(null);
@@ -160,6 +191,7 @@ export function TicketFormSheet({
         value: c.id,
         label: (c.empresa || c.nome).trim(),
         subtitle: c.empresa && c.nome && c.nome !== c.empresa ? c.nome : undefined,
+        icon: Building2,
       })),
     [clientes]
   );
@@ -177,6 +209,7 @@ export function TicketFormSheet({
       listaResponsaveisPrincipal.map((r) => ({
         value: r.id,
         label: r.id === usuarioAtual.id ? `${r.nome} (você)` : r.nome,
+        icon: User,
       })),
     [listaResponsaveisPrincipal, usuarioAtual.id]
   );
@@ -184,7 +217,7 @@ export function TicketFormSheet({
     () =>
       equipe
         .filter((m) => m.id !== responsavelPrincipal.id)
-        .map((m) => ({ value: m.id, label: m.nome })),
+        .map((m) => ({ value: m.id, label: m.nome, icon: Users })),
     [equipe, responsavelPrincipal.id]
   );
   const colaboradorIds = useMemo(() => colaboradores.map((c) => c.id), [colaboradores]);
@@ -193,6 +226,18 @@ export function TicketFormSheet({
       (Object.entries(CATEGORIA_LABELS) as [TicketCategoria, string][]).map(([value, label]) => ({
         value,
         label,
+        icon:
+          value === "comercial"
+            ? ({ className }) => <Handshake className={clsx(className, "!text-violet-600 dark:!text-violet-400")} />
+            : value === "financeiro"
+              ? ({ className }) => <Wallet className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+              : value === "suporte_tecnico"
+                ? ({ className }) => <Wrench className={clsx(className, "!text-blue-600 dark:!text-blue-400")} />
+                : value === "duvida"
+                  ? ({ className }) => <CircleHelp className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />
+                  : value === "sugestao"
+                    ? ({ className }) => <Lightbulb className={clsx(className, "!text-fuchsia-600 dark:!text-fuchsia-400")} />
+                    : ({ className }) => <Building2 className={clsx(className, "!text-slate-500 dark:!text-slate-400")} />,
       })),
     []
   );
@@ -201,6 +246,14 @@ export function TicketFormSheet({
       (Object.entries(PRIORIDADE_LABELS) as [TicketPrioridade, string][]).map(([value, label]) => ({
         value,
         label,
+        icon:
+          value === "critica"
+            ? ({ className }) => <ShieldAlert className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+            : value === "alta"
+              ? ({ className }) => <AlertTriangle className={clsx(className, "!text-orange-600 dark:!text-orange-400")} />
+              : value === "media"
+                ? ({ className }) => <Clock3 className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />
+                : ({ className }) => <Circle className={clsx(className, "!text-slate-500 dark:!text-slate-400")} />,
       })),
     []
   );
@@ -209,6 +262,24 @@ export function TicketFormSheet({
       (Object.entries(STATUS_LABELS) as [TicketStatus, string][]).map(([value, label]) => ({
         value,
         label,
+        icon:
+          value === "novo"
+            ? ({ className }) => <CircleDot className={clsx(className, "!text-blue-600 dark:!text-blue-400")} />
+            : value === "em_andamento"
+              ? ({ className }) => <Clock3 className={clsx(className, "!text-sky-600 dark:!text-sky-400")} />
+              : value === "aguardando_cliente"
+                ? ({ className }) => <MessageSquareReply className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />
+                : value === "aguardando_equipe"
+                  ? ({ className }) => <Users className={clsx(className, "!text-violet-600 dark:!text-violet-400")} />
+                  : value === "pendente"
+                    ? ({ className }) => <AlertTriangle className={clsx(className, "!text-orange-600 dark:!text-orange-400")} />
+                    : value === "respondido"
+                      ? ({ className }) => <CheckCircle2 className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />
+                      : value === "finalizado"
+                        ? ({ className }) => <History className={clsx(className, "!text-teal-600 dark:!text-teal-400")} />
+            : value === "nao_solucionado"
+              ? ({ className }) => <CircleSlash2 className={clsx(className, "!text-red-600 dark:!text-red-400")} />
+                        : ({ className }) => <Circle className={clsx(className, "!text-slate-500 dark:!text-slate-400")} />,
       })),
     []
   );
@@ -219,8 +290,14 @@ export function TicketFormSheet({
   }, [prioridade]);
 
   useEffect(() => {
-    if (!open) return;
-    setActiveTab("detalhes");
+    if (!open) {
+      prevOpenRef.current = false;
+      return;
+    }
+    if (!prevOpenRef.current) {
+      setActiveTab("detalhes");
+      prevOpenRef.current = true;
+    }
     if (!initialTicket) {
       setClienteId(fixedCliente?.id ?? "");
       setClienteNome(fixedCliente?.nome ?? "");
@@ -480,7 +557,7 @@ export function TicketFormSheet({
 
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
     { id: "detalhes", label: "Detalhes", icon: FileText },
-    { id: "interacoes", label: "Histórico & Comentários", icon: History },
+    { id: "interacoes", label: "Interações", icon: MessageSquare },
   ];
 
   const sheetTitle = titleProp ?? (initialTicket ? initialTicket.id : "Novo Ticket");
@@ -491,10 +568,16 @@ export function TicketFormSheet({
       onClose={onClose}
       title={sheetTitle}
       maxWidth="sm:max-w-3xl"
+      mobileContentPaddingClassName="px-0"
+      desktopContentPaddingClassName="px-0"
     >
-      <form onSubmit={handleSubmit} className="flex h-full flex-col">
-        <div className="shrink-0 border-b border-slate-200 dark:border-slate-700">
-          <nav className="flex gap-1 p-2" aria-label="Abas do detalhe do ticket">
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          role="tablist"
+          aria-label="Abas do detalhe do ticket"
+          className="sticky top-0 z-30 flex w-full shrink-0 flex-wrap border-b border-slate-300 bg-slate-50/95 backdrop-blur-sm dark:border-slate-600 dark:bg-slate-800/95"
+        >
+          <nav className="flex w-full" aria-label="Abas do detalhe do ticket">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -506,12 +589,13 @@ export function TicketFormSheet({
                   aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id)}
                   className={clsx(
-                    "flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                    "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors sm:px-4",
                     isActive
-                      ? "bg-[#6D28D9]/10 text-[#6D28D9] dark:bg-violet-950/50 dark:text-violet-300"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                      ? "text-[#6D28D9] dark:text-violet-400"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                   )}
                 >
+                  {isActive ? <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]" /> : null}
                   <Icon className="h-4 w-4" />
                   {tab.label}
                 </button>
@@ -520,14 +604,14 @@ export function TicketFormSheet({
           </nav>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6">
           {activeTab === "detalhes" && (
             <div className="space-y-6">
               {/* Cliente */}
               {!hideClienteField && (
                 <div className="space-y-1">
                   <label className={labelClass}>
-                    Cliente *
+                    Cliente <span className="text-red-600 dark:text-red-400">*</span>
                   </label>
                   <SearchableSelect
                     options={clienteOptions}
@@ -535,36 +619,32 @@ export function TicketFormSheet({
                     onChange={handleSelectCliente}
                     placeholder="Buscar por nome ou empresa..."
                     searchPlaceholder="Buscar cliente..."
+                    leadingIcon={Building2}
                   />
                 </div>
               )}
 
-              {/* Classificação — Grid 3 colunas */}
-              <div>
-                <p className={labelClass}>Classificação</p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-600">
-                      Categoria
-                    </label>
+                    <label className={labelClass}>Categoria</label>
                     <SearchableSelect
                       options={categoriaOptions}
                       value={categoria}
                       onChange={(v) => setCategoria(v as TicketCategoria)}
                       placeholder="Selecione a categoria..."
                       searchable={false}
+                      leadingIcon={CircleDot}
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-600">
-                      Prioridade
-                    </label>
+                    <label className={labelClass}>Prioridade</label>
                     <SearchableSelect
                       options={prioridadeOptions}
                       value={prioridade}
                       onChange={(v) => setPrioridade(v as TicketPrioridade)}
                       placeholder="Selecione a prioridade..."
                       searchable={false}
+                      leadingIcon={Clock3}
                     />
                     {!hideSlaPreview && (
                       <p className="mt-1 text-xs text-slate-500">
@@ -573,9 +653,7 @@ export function TicketFormSheet({
                     )}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-600">
-                      Status
-                    </label>
+                    <label className={labelClass}>Status</label>
                     {readOnlyStatus ? (
                       <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                         {STATUS_LABELS[status]}
@@ -587,50 +665,49 @@ export function TicketFormSheet({
                         onChange={(v) => setStatus(v as TicketStatus)}
                         placeholder="Selecione o status..."
                         searchable={false}
+                        leadingIcon={Circle}
                       />
                     )}
                   </div>
-                </div>
               </div>
 
               {/* Assunto */}
               <div className="space-y-1">
                 <label htmlFor="ticket-assunto" className={labelClass}>
-                  Título *
+                  Título <span className="text-red-600 dark:text-red-400">*</span>
                 </label>
-                <input
-                  id="ticket-assunto"
-                  type="text"
-                  value={assunto}
-                  onChange={(e) => setAssunto(e.target.value)}
-                  placeholder="Resumo do ticket"
-                  className={inputClass}
-                  required
-                />
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="ticket-assunto"
+                    type="text"
+                    value={assunto}
+                    onChange={(e) => setAssunto(e.target.value)}
+                    placeholder="Resumo do ticket"
+                    className={`${inputClass} pl-9`}
+                    required
+                  />
+                </div>
               </div>
 
               {/* Descrição — Textarea */}
               <div className="space-y-1">
                 <label htmlFor="ticket-descricao" className={labelClass}>
-                  Descrição *
+                  Descrição <span className="text-red-600 dark:text-red-400">*</span>
                 </label>
-                <textarea
-                  id="ticket-descricao"
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                  placeholder="Detalhe o problema ou solicitação..."
-                  rows={5}
-                  className={`${inputClass} min-h-[120px] resize-y`}
-                  required
-                />
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <textarea
+                    id="ticket-descricao"
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    placeholder="Detalhe o problema ou solicitação..."
+                    rows={5}
+                    className={`${formTextareaClass} min-h-[120px] resize-y pl-9`}
+                    required
+                  />
+                </div>
               </div>
-
-              {/* Anexos — Dropzone */}
-              <MultiFileAttachment
-                existingFiles={[]}
-                newFiles={arquivos}
-                onNewFilesChange={setArquivos}
-              />
 
               {/* Responsável Principal + Colaboradores */}
               {!hideResponsavelSection && (
@@ -648,6 +725,7 @@ export function TicketFormSheet({
                       }}
                       placeholder="Selecione o responsável..."
                       searchPlaceholder="Buscar responsável..."
+                      leadingIcon={User}
                     />
                     <p className="text-xs text-slate-500">
                       Ao criar um novo ticket, o usuário logado é o padrão. Altere para transferir a responsabilidade.
@@ -665,10 +743,18 @@ export function TicketFormSheet({
                       placeholder="Selecionar colaboradores..."
                       searchPlaceholder="Buscar colaborador..."
                       selectedLabel="Selecionados"
+                      leadingIcon={Users}
                     />
                   </div>
                 </div>
               )}
+
+              {/* Anexos — Dropzone */}
+              <MultiFileAttachment
+                existingFiles={[]}
+                newFiles={arquivos}
+                onNewFilesChange={setArquivos}
+              />
             </div>
           )}
 
@@ -676,94 +762,99 @@ export function TicketFormSheet({
             <div className="space-y-6">
               {/* Nova interação — input rápido */}
               <div className="space-y-3">
-                <textarea
-                  value={novaAtualizacao}
-                  onChange={(e) => setNovaAtualizacao(e.target.value)}
-                  placeholder="Descreva a ação realizada, resposta ao cliente ou nota interna..."
-                  rows={3}
-                  className={`${inputClass} min-h-[80px] resize-y`}
-                />
+                <div className="relative">
+                  <MessageSquare className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <textarea
+                    value={novaAtualizacao}
+                    onChange={(e) => setNovaAtualizacao(e.target.value)}
+                    placeholder="Descreva a ação realizada, resposta ao cliente ou nota interna..."
+                    rows={3}
+                    className={`${formTextareaClass} min-h-[80px] resize-y pl-9`}
+                  />
+                </div>
                 <MultiFileAttachment
                   existingFiles={[]}
                   newFiles={arquivosAtualizacao}
                   onNewFilesChange={setArquivosAtualizacao}
                 />
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <label className="mr-auto flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={notificarCliente}
+                      onChange={(e) => setNotificarCliente(e.target.checked)}
+                      className="rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
+                    />
+                    Notificar cliente por e-mail
+                  </label>
                   <button
                     type="button"
                     onClick={handleAdicionarAtualizacao}
                     disabled={!novaAtualizacao.trim() && arquivosAtualizacao.length === 0}
-                    className="rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:pointer-events-none"
+                    className={`${formModalSubmitButtonClass} disabled:pointer-events-none disabled:opacity-50`}
                   >
-                    Adicionar Atualização
+                    <span className="inline-flex items-center gap-2">
+                      <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                      Adicionar
+                    </span>
                   </button>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={notificarCliente}
-                    onChange={(e) => setNotificarCliente(e.target.checked)}
-                    className="rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800"
-                  />
-                  Notificar cliente por e-mail
-                </label>
               </div>
 
               {/* Timeline do histórico */}
               <div className="border-t border-slate-200 pt-6 dark:border-slate-700">
                 <p className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">Linha do tempo</p>
-                <div className="relative border-l-2 border-slate-100 pl-6 dark:border-slate-700">
+                <ul className="relative space-y-0">
+                  <span className="absolute bottom-2 left-[11px] top-2 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
                   {historico.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma ação registrada ainda.</p>
+                    <li className="text-sm text-slate-500 dark:text-slate-400">Nenhuma ação registrada ainda.</li>
                   ) : (
-                    <ul className="space-y-6">
-                      {[...historico]
-                        .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
-                        .map((entrada) => (
-                        <li key={entrada.id} className="relative">
-                          <div className="absolute -left-[29px] top-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#6D28D9]/15 text-xs font-semibold text-[#6D28D9] shadow-sm dark:border-slate-900 dark:bg-violet-500/20 dark:text-violet-300">
-                            {entrada.autor ? iniciais(entrada.autor) : "S"}
-                          </div>
-                          <div>
-                            <p className="text-xs text-slate-400 dark:text-slate-500">
-                              {entrada.autor ?? "Sistema"}
-                              {" · "}
-                              {formatHistoricoData(entrada.data)}
-                            </p>
-                            <p className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-                              {entrada.acao}
-                            </p>
-                            {entrada.detalhe && (
-                              <div className="mt-1 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/80 dark:text-slate-300">
-                                {entrada.detalhe}
-                              </div>
-                            )}
-                            {entrada.anexos?.length ? (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {entrada.anexos.map((nome) => (
-                                  <button
-                                    key={nome}
-                                    type="button"
-                                    onClick={() => {
-                                      const f = arquivos.find((x) => x.name === nome);
-                                      if (f) openFilePreview(f);
-                                      else openPlaceholderPreview(nome);
-                                    }}
-                                    className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
-                                  >
-                                    <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{nome}</span>
-                                    <Eye className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
+                    [...historico]
+                      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                      .map((entrada) => (
+                      <li key={entrada.id} className="relative flex gap-3 pb-6 last:pb-0">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                          {entrada.autor ? iniciais(entrada.autor) : "S"}
+                        </span>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                            {entrada.autor ?? "Sistema"}
+                            {" · "}
+                            {formatHistoricoData(entrada.data)}
+                          </p>
+                          <p className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {entrada.acao}
+                          </p>
+                          {entrada.detalhe && (
+                            <div className="mt-1 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/80 dark:text-slate-300">
+                              {entrada.detalhe}
+                            </div>
+                          )}
+                          {entrada.anexos?.length ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {entrada.anexos.map((nome) => (
+                                <button
+                                  key={nome}
+                                  type="button"
+                                  onClick={() => {
+                                    const f = arquivos.find((x) => x.name === nome);
+                                    if (f) openFilePreview(f);
+                                    else openPlaceholderPreview(nome);
+                                  }}
+                                  className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+                                >
+                                  <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{nome}</span>
+                                  <Eye className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))
                   )}
-                </div>
+                </ul>
               </div>
             </div>
           )}
@@ -771,20 +862,26 @@ export function TicketFormSheet({
 
         {/* Ações — apenas na aba Detalhes */}
         {activeTab === "detalhes" && (
-          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 lg:px-6 lg:py-3">
+          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                className={formModalCancelButtonClass}
               >
-                Cancelar
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4 shrink-0" aria-hidden />
+                  Cancelar
+                </span>
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className={formModalSubmitButtonClass}
               >
-                Salvar Ticket
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4 shrink-0" aria-hidden />
+                  Salvar
+                </span>
               </button>
             </div>
           </div>

@@ -1,12 +1,34 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { UsuarioSistema, VinculacaoPessoa, PessoaParaVinculo } from "@/lib/configuracoes/types";
 import type { PerfilAcesso } from "@/lib/configuracoes/types";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { validatePasswordPolicy } from "@/lib/password-policy";
-import { Eye, EyeOff } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { SearchableOption } from "@/components/ui/searchable-select";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "@/components/ui/field-patterns";
+import { buildProfileColorMap } from "@/lib/configuracoes/profile-color-map";
+import {
+  Eye,
+  EyeOff,
+  IdCard,
+  Lock,
+  Mail,
+  Save,
+  Search,
+  ShieldCheck,
+  Trash2,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 
 export type UsuarioFormPayload = Omit<UsuarioSistema, "id" | "criadoEm" | "atualizadoEm"> & {
   id?: string;
@@ -40,6 +62,13 @@ function apenasDigitos(valor: string): string {
 
 function isCpf(documento: string): boolean {
   return apenasDigitos(documento).length === 11;
+}
+
+function labelTipoVinculoPessoa(pessoa: PessoaParaVinculo): string {
+  if (pessoa.tipo === "cliente") return "Cliente";
+  if (pessoa.rhTipo === "vendedor_externo") return "RH - Consultor";
+  if (pessoa.rhTipo === "fornecedor_parceiro") return "RH - Fornecedor";
+  return "RH - Equipe";
 }
 
 /** Filtro parcial: termo incluso no Nome ou no CPF/CNPJ, ignorando pontuação e case. */
@@ -88,6 +117,7 @@ export function NovoUsuarioForm({
   const [showSenhaConfirm, setShowSenhaConfirm] = useState(false);
   const [showNovaSenha, setShowNovaSenha] = useState(false);
   const [showNovaSenhaConfirm, setShowNovaSenhaConfirm] = useState(false);
+  const vinculoPickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (initialUsuario) {
@@ -124,6 +154,34 @@ export function NovoUsuarioForm({
         .filter(Boolean) as PessoaParaVinculo[],
     [pessoas, vinculos]
   );
+  const perfilColorById = useMemo(() => buildProfileColorMap(perfis), [perfis]);
+  const perfilOptions = useMemo<SearchableOption[]>(
+    () =>
+      perfis.map((p) => {
+        const color = perfilColorById.get(p.id);
+        const ColoredProfileIcon = ({ className }: { className?: string }) => (
+          <ShieldCheck
+            className={className ?? "h-4 w-4"}
+            style={{ color: color?.color }}
+            aria-hidden
+          />
+        );
+        return { value: p.id, label: p.nome, icon: ColoredProfileIcon };
+      }),
+    [perfis, perfilColorById]
+  );
+
+  useEffect(() => {
+    if (!buscaVinculo.trim()) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!vinculoPickerRef.current) return;
+      if (!vinculoPickerRef.current.contains(event.target as Node)) {
+        setBuscaVinculo("");
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [buscaVinculo]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,159 +247,157 @@ export function NovoUsuarioForm({
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-4 p-4">
-      <p className="text-xs text-slate-500 dark:text-slate-400">
-        Criação de contas é estritamente manual. O login (username) será sempre o CPF do usuário.
-      </p>
-      <div>
-        <label htmlFor="cfg-cpf" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          CPF (Login) *
-        </label>
-        <input
-          id="cfg-cpf"
-          type="text"
-          value={cpf}
-          onChange={(e) => setCpf(e.target.value)}
-          placeholder="000.000.000-00"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          required
-          readOnly={isEdit}
-        />
-        {isEdit && (
-          <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-            CPF não pode ser alterado na edição.
-          </span>
-        )}
-      </div>
-      <div>
-        <label htmlFor="cfg-email" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          E-mail *
-        </label>
-        <input
-          id="cfg-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          required
-        />
-      </div>
-      <div>
-        <label htmlFor="cfg-nome" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Nome para exibição
-        </label>
-        <input
-          id="cfg-nome"
-          type="text"
-          value={nomeExibicao}
-          onChange={(e) => setNomeExibicao(e.target.value)}
-          placeholder="Nome completo ou apelido"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-        />
-      </div>
-      <div>
-        <label htmlFor="cfg-perfil" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Perfil de acesso *
-        </label>
-        <select
-          id="cfg-perfil"
-          value={perfilId}
-          onChange={(e) => setPerfilId(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-        >
-          {perfis.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nome}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {!isEdit && (
-        <>
-          <div>
-            <label
-              htmlFor="cfg-senha"
-              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
-              Senha inicial *
-            </label>
-            <div className="relative">
-              <input
-                id="cfg-senha"
-                type={showSenhaInicial ? "text" : "password"}
-                autoComplete="new-password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                placeholder="Mín. 8 caracteres, maiúscula, minúscula e número"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowSenhaInicial((v) => !v)}
-                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                aria-label={showSenhaInicial ? "Ocultar senha" : "Mostrar senha"}
-              >
-                {showSenhaInicial ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label
-              htmlFor="cfg-senha-confirm"
-              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
-              Confirmar senha *
-            </label>
-            <div className="relative">
-              <input
-                id="cfg-senha-confirm"
-                type={showSenhaConfirm ? "text" : "password"}
-                autoComplete="new-password"
-                value={senhaConfirm}
-                onChange={(e) => setSenhaConfirm(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowSenhaConfirm((v) => !v)}
-                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                aria-label={showSenhaConfirm ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}
-              >
-                {showSenhaConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {isEdit && (
-        <>
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={ativo}
-              onCheckedChange={setAtivo}
-              aria-label="Usuário ativo"
+    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 lg:p-6">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Criação de contas é estritamente manual. O login (username) será sempre o CPF do usuário.
+        </p>
+        <div>
+          <label htmlFor="cfg-cpf" className={formLabelClass}>
+            CPF (Login) <span className="text-red-600 dark:text-red-400">*</span>
+          </label>
+          <div className="relative">
+            <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="cfg-cpf"
+              type="text"
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              placeholder="000.000.000-00"
+              className={`${formInputClass} pl-9`}
+              required
+              readOnly={isEdit}
             />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Usuário ativo
-            </span>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-800/50">
-            <p className="mb-2 text-xs font-medium text-slate-600 dark:text-slate-400">
-              Alterar senha (opcional)
-            </p>
+          {isEdit && (
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              CPF não pode ser alterado na edição.
+            </span>
+          )}
+        </div>
+        <div>
+          <label htmlFor="cfg-email" className={formLabelClass}>
+            E-mail <span className="text-red-600 dark:text-red-400">*</span>
+          </label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="cfg-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@empresa.com"
+              className={`${formInputClass} pl-9`}
+              required
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="cfg-nome" className={formLabelClass}>
+            Nome para exibição
+          </label>
+          <div className="relative">
+            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="cfg-nome"
+              type="text"
+              value={nomeExibicao}
+              onChange={(e) => setNomeExibicao(e.target.value)}
+              placeholder="Nome completo ou apelido"
+              className={`${formInputClass} pl-9`}
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="cfg-perfil" className={formLabelClass}>
+            Perfil de acesso <span className="text-red-600 dark:text-red-400">*</span>
+          </label>
+          <SearchableSelect
+            options={perfilOptions}
+            value={perfilId}
+            onChange={setPerfilId}
+            placeholder="Selecionar perfil..."
+            searchPlaceholder="Buscar perfil..."
+            leadingIcon={ShieldCheck}
+          />
+        </div>
+
+        {!isEdit && (
+          <>
+            <div>
+              <label htmlFor="cfg-senha" className={formLabelClass}>
+                Senha inicial <span className="text-red-600 dark:text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="cfg-senha"
+                  type={showSenhaInicial ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  placeholder="Mín. 8 caracteres, maiúscula, minúscula e número"
+                  className={`${formInputClass} pl-9 pr-11`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSenhaInicial((v) => !v)}
+                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  aria-label={showSenhaInicial ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showSenhaInicial ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              <label htmlFor="cfg-senha-confirm" className={formLabelClass}>
+                Confirmar senha <span className="text-red-600 dark:text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="cfg-senha-confirm"
+                  type={showSenhaConfirm ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={senhaConfirm}
+                  onChange={(e) => setSenhaConfirm(e.target.value)}
+                  placeholder="Repita a senha inicial"
+                  className={`${formInputClass} pl-9 pr-11`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSenhaConfirm((v) => !v)}
+                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  aria-label={showSenhaConfirm ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}
+                >
+                  {showSenhaConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {isEdit && (
+          <>
+            <div className="flex items-center gap-2">
+              <Switch checked={ativo} onCheckedChange={setAtivo} aria-label="Usuário ativo" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Usuário ativo
+              </span>
+            </div>
+            <p className={formLabelClass}>Alterar senha (opcional)</p>
             <div className="space-y-2">
               <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type={showNovaSenha ? "text" : "password"}
                   autoComplete="new-password"
                   value={novaSenha}
                   onChange={(e) => setNovaSenha(e.target.value)}
                   placeholder="Nova senha"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className={`${formInputClass} pl-9 pr-11`}
                 />
                 <button
                   type="button"
@@ -353,13 +409,14 @@ export function NovoUsuarioForm({
                 </button>
               </div>
               <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type={showNovaSenhaConfirm ? "text" : "password"}
                   autoComplete="new-password"
                   value={novaSenhaConfirm}
                   onChange={(e) => setNovaSenhaConfirm(e.target.value)}
                   placeholder="Confirmar nova senha"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-11 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className={`${formInputClass} pl-9 pr-11`}
                 />
                 <button
                   type="button"
@@ -371,23 +428,22 @@ export function NovoUsuarioForm({
                 </button>
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
 
-      {/* Busca vínculo RH / Cliente (autocomplete) */}
-      {!hideVinculoSection && (
-      <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Vincular a pessoa (RH ou Cliente)
-        </label>
-        <input
-          type="text"
-          value={buscaVinculo}
-          onChange={(e) => setBuscaVinculo(e.target.value)}
-          placeholder="Buscar por nome ou CPF/CNPJ (ex.: 456 encontra 123.456.789-00)"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-        />
+        {!hideVinculoSection && (
+          <div ref={vinculoPickerRef}>
+            <label className={formLabelClass}>Vincular a pessoa (RH ou Cliente)</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={buscaVinculo}
+                onChange={(e) => setBuscaVinculo(e.target.value)}
+                placeholder="Buscar por nome ou CPF/CNPJ (ex.: 456 encontra 123.456.789-00)"
+                className={`${formInputClass} pl-9`}
+              />
+            </div>
         {vinculos.length > 0 && (
           <div className="mt-2 space-y-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
             {pessoasSelecionadas.map((p) => (
@@ -395,7 +451,8 @@ export function NovoUsuarioForm({
                 key={`${p.tipo}-${p.id}`}
                 className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300"
               >
-                <span>
+                <span className="inline-flex items-center gap-2">
+                  {p.tipo === "rh" ? <User className="h-4 w-4 text-fuchsia-500" /> : <Users className="h-4 w-4 text-cyan-500" />}
                   Vínculo: {p.tipo === "rh" ? "RH" : "Cliente"} - {p.nome}
                 </span>
                 <button
@@ -403,7 +460,7 @@ export function NovoUsuarioForm({
                   onClick={() => setPendingRemoveVinculo(p)}
                   className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                 >
-                  Remover
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))}
@@ -431,7 +488,7 @@ export function NovoUsuarioForm({
                 >
                   <span className="font-medium text-slate-900 dark:text-slate-100">{p.nome}</span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {p.cpfCnpj} • {p.tipo === "rh" ? "RH" : "Cliente"}
+                    {p.cpfCnpj} • {labelTipoVinculoPessoa(p)}
                     {p.subtitulo ? ` — ${p.subtitulo}` : ""}
                   </span>
                 </button>
@@ -445,28 +502,28 @@ export function NovoUsuarioForm({
         {erroCpfVinculo && (
           <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{erroCpfVinculo}</p>
         )}
+          </div>
+        )}
+
+        {erroSenha && (
+          <p className="text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+            {erroSenha}
+          </p>
+        )}
       </div>
-      )}
 
-      {erroSenha && (
-        <p className="text-xs font-medium text-red-600 dark:text-red-400" role="alert">
-          {erroSenha}
-        </p>
-      )}
-
-      <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          Cancelar
+      <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
+        <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
+          <span className="inline-flex items-center gap-2">
+            <X className="h-4 w-4 shrink-0" aria-hidden />
+            Cancelar
+          </span>
         </button>
-        <button
-          type="submit"
-          className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-        >
-          {isEdit ? "Salvar alterações" : "Salvar usuário"}
+        <button type="submit" className={formModalSubmitButtonClass}>
+          <span className="inline-flex items-center gap-2">
+            <Save className="h-4 w-4 shrink-0" aria-hidden />
+            Salvar
+          </span>
         </button>
       </div>
     </form>

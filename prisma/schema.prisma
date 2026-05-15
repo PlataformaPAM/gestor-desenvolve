@@ -35,6 +35,12 @@ enum LeadOrigem {
   outro
 }
 
+/** Oportunidade no funil Comercial vs. venda materializada só pelo Financeiro (comissão e histórico). */
+enum LeadRegistro {
+  oportunidade
+  venda_direta_financeiro
+}
+
 enum LeadInteractionType {
   etapa
   contato
@@ -267,6 +273,8 @@ model Usuario {
   ticketsCriados         HelpdeskTicket[]     @relation("TicketCriadoPor")
   ticketsAtualizados     HelpdeskTicket[]     @relation("TicketAtualizadoPor")
   contratoAditivos       ContratoAditivo[]    @relation("AditivoRegistradoPor")
+  comissaoLotesCriados   ComissaoLotePagamento[] @relation("ComissaoLoteCriadoPor")
+  comissaoLotesAtualizados ComissaoLotePagamento[] @relation("ComissaoLoteAtualizadoPor")
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 }
@@ -475,10 +483,12 @@ model ClienteTicketResumo {
 model SolucaoCatalogo {
   id                 String                 @id @default(uuid())
   nome               String
+  categoria          String?
   descricao          String?
   valorBase          Float?
   ativa              Boolean                @default(true)
   leadSolucoes       LeadSolucao[]
+  regrasComissao     ComissaoRegra[]
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 }
@@ -492,6 +502,8 @@ model Lead {
   priority           LeadPriority
   enteredStageAt     DateTime
   origem             LeadOrigem
+  /** Leads do funil Comercial vs. registro criado pelo Financeiro para vendas diretas (comissão). */
+  registroLead       LeadRegistro           @default(oportunidade)
   clienteId          String?
   propostaGeradaEm   DateTime?
   previsaoFechamento DateTime?
@@ -514,12 +526,16 @@ model Lead {
   financeiroFluxo    LeadFinanceiroFluxo?
   lancamentosFinanceiro Lancamento[]
   contrato           Contrato?
+  comissaoParticipacoes ComissaoParticipacaoVenda[]
+  comissaoEventos    ComissaoEvento[]
   criadoPorId        String?
   atualizadoPorId    String?
   criadoPor          Usuario?               @relation("LeadCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   atualizadoPor      Usuario?               @relation("LeadAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
+
+  @@index([registroLead])
 }
 
 model Contrato {
@@ -591,6 +607,8 @@ model LeadSolucao {
   lead                   Lead                           @relation(fields: [leadId], references: [id], onDelete: Cascade)
   solucaoCatalogo        SolucaoCatalogo?               @relation(fields: [solucaoCatalogoId], references: [id], onDelete: SetNull)
   lancamentosVinculados  Lancamento[]
+  comissaoParticipacoes  ComissaoParticipacaoVenda[]
+  comissaoEventos        ComissaoEvento[]
   createdAt              DateTime                       @default(now())
   updatedAt              DateTime                       @updatedAt
 }
@@ -892,6 +910,8 @@ model ColaboradorRH {
   tipoContrato         TipoContrato
   status               StatusColaborador
   tipoPessoa           TipoPessoaRH
+  /** Consultores (vendedor_externo): false = pré-cadastro; não usar em vínculos/combobox fora do RH. */
+  cadastroEfetivado    Boolean                @default(true)
   email                String?
   telefone             String?
   cpfCnpj              String?
@@ -901,6 +921,9 @@ model ColaboradorRH {
   ultimoAcesso         DateTime?
   dadosBancarios       ColaboradorDadosBancarios?
   documentos           ColaboradorDocumento[]
+  regrasComissao       ComissaoRegra[]
+  participacoesComissao ComissaoParticipacaoVenda[]
+  eventosComissao      ComissaoEvento[]
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 }
@@ -998,7 +1021,125 @@ model Lancamento {
   categoria          FinanceiroCategoria?     @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   meioPagamento      FinanceiroMeioPagamento? @relation(fields: [meioPagamentoId], references: [id], onDelete: SetNull)
   criadoPor          Usuario?                 @relation("LancamentoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor      Usuario?                 @relation("LancamentoAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  atualizadoPor                Usuario?                 @relation("LancamentoAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  comissaoEventosOrigem        ComissaoEvento[]         @relation("ComissaoEventoOrigemRecebimento")
+  comissaoEventoPagamentoSaida ComissaoEvento?          @relation("ComissaoEventoPagamentoSaida")
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+}
+
+enum ComissaoBaseCalculo {
+  bruto
+  liquido
+}
+
+enum ComissaoStatus {
+  prevista
+  elegivel
+  aprovada
+  paga
+  cancelada_tecnica
+}
+
+model ComissaoRegra {
+  id                 String                 @id @default(uuid())
+  consultorId        String
+  solucaoCatalogoId  String?
+  categoriaSolucao   String?
+  baseCalculo        ComissaoBaseCalculo    @default(bruto)
+  percentualComissao Decimal                @db.Decimal(7, 4)
+  despesaFixa        Decimal?               @db.Decimal(14, 2)
+  vigenciaInicio     DateTime
+  vigenciaFim        DateTime?
+  ativo              Boolean                @default(true)
+  prioridade         Int                    @default(0)
+  observacoes        String?
+  consultor          ColaboradorRH          @relation(fields: [consultorId], references: [id], onDelete: Cascade)
+  solucaoCatalogo    SolucaoCatalogo?       @relation(fields: [solucaoCatalogoId], references: [id], onDelete: SetNull)
+  eventos            ComissaoEvento[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([consultorId, ativo, vigenciaInicio, vigenciaFim])
+  @@index([solucaoCatalogoId])
+  @@index([categoriaSolucao])
+}
+
+model ComissaoParticipacaoVenda {
+  id                     String                 @id @default(uuid())
+  leadId                 String
+  leadSolucaoId          String?
+  consultorId            String
+  percentualParticipacao Decimal                @db.Decimal(7, 4)
+  ativo                  Boolean                @default(true)
+  observacoes            String?
+  lead                   Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadSolucao            LeadSolucao?           @relation(fields: [leadSolucaoId], references: [id], onDelete: Cascade)
+  consultor              ColaboradorRH          @relation(fields: [consultorId], references: [id], onDelete: Cascade)
+  eventos                ComissaoEvento[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  @@unique([leadId, leadSolucaoId, consultorId], map: "comissao_participacao_un")
+  @@index([leadId, ativo])
+  @@index([leadSolucaoId, ativo])
+}
+
+model ComissaoLotePagamento {
+  id                 String                 @id @default(uuid())
+  competenciaAno     Int
+  competenciaMes     Int
+  observacao         String?
+  referenciaExterna  String?
+  pagoEm             DateTime?
+  criadoPorId        String?
+  atualizadoPorId    String?
+  criadoPor          Usuario?               @relation("ComissaoLoteCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor      Usuario?               @relation("ComissaoLoteAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  eventos            ComissaoEvento[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([competenciaAno, competenciaMes])
+}
+
+model ComissaoEvento {
+  id                     String                   @id @default(uuid())
+  status                 ComissaoStatus           @default(elegivel)
+  competenciaAno         Int
+  competenciaMes         Int
+  dataRecebimento        DateTime
+  origemLancamentoId     String
+  leadId                 String
+  leadSolucaoId          String?
+  consultorId            String
+  regraId                String?
+  participacaoId         String?
+  lotePagamentoId        String?
+  baseCalculo            ComissaoBaseCalculo      @default(bruto)
+  percentualComissao     Decimal                  @db.Decimal(7, 4)
+  percentualParticipacao Decimal                  @db.Decimal(7, 4)
+  despesaFixa            Decimal?                 @db.Decimal(14, 2)
+  valorBase              Decimal                  @db.Decimal(14, 2)
+  valorComissao          Decimal                  @db.Decimal(14, 2)
+  observacao             String?
+  aprovadoEm             DateTime?
+  pagoEm                 DateTime?
+  canceladoEm            DateTime?
+  lancamentoSaidaId      String?                  @unique
+  origemLancamento       Lancamento               @relation("ComissaoEventoOrigemRecebimento", fields: [origemLancamentoId], references: [id], onDelete: Cascade)
+  lancamentoSaida        Lancamento?              @relation("ComissaoEventoPagamentoSaida", fields: [lancamentoSaidaId], references: [id], onDelete: SetNull)
+  lead                   Lead                     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadSolucao            LeadSolucao?             @relation(fields: [leadSolucaoId], references: [id], onDelete: SetNull)
+  consultor              ColaboradorRH            @relation(fields: [consultorId], references: [id], onDelete: Restrict)
+  regra                  ComissaoRegra?           @relation(fields: [regraId], references: [id], onDelete: SetNull)
+  participacao           ComissaoParticipacaoVenda? @relation(fields: [participacaoId], references: [id], onDelete: SetNull)
+  lotePagamento          ComissaoLotePagamento?   @relation(fields: [lotePagamentoId], references: [id], onDelete: SetNull)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+
+  @@unique([origemLancamentoId, consultorId], map: "comissao_evento_lanc_cons_un")
+  @@index([competenciaAno, competenciaMes, status])
+  @@index([consultorId, status])
+  @@index([leadId])
 }

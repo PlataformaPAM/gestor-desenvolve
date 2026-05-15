@@ -16,10 +16,18 @@ const DEFAULT_PERMISSOES: Record<ModuloPermissao, boolean> = {
   financeiro: false,
   tarefas: false,
   clientes: false,
+  contratos: false,
   helpdesk: false,
   posVenda: false,
+  solucoes: false,
   rh: false,
   configuracoes: false,
+  relatorios: false,
+  configuracoes_construtor_documentos: false,
+  configuracoes_logs: false,
+  configuracoes_perfis: false,
+  configuracoes_usuarios: false,
+  portal_cliente: false,
 };
 
 type GlobalSearchProps = {

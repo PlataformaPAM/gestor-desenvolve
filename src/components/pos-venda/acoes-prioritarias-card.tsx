@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertCircle, ChevronRight, Phone, FileCheck, RefreshCw, ClipboardList } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronRight,
+  Phone,
+  FileCheck,
+  RefreshCw,
+  ClipboardList,
+  CalendarCheck2,
+  Pencil,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import type { TarefaRegua } from "@/lib/pos-venda/types";
 import { TIPO_TAREFA_LABELS } from "@/lib/pos-venda/constants";
@@ -8,6 +17,7 @@ import clsx from "clsx";
 
 const TIPO_ICON: Record<TarefaRegua["tipo"], ComponentType<{ className?: string }>> = {
   boas_vindas: Phone,
+  agenda_reuniao: CalendarCheck2,
   checkup_30: FileCheck,
   checkup_90: FileCheck,
   renovacao_contrato: RefreshCw,
@@ -136,7 +146,10 @@ export function AcoesPrioritariasCard({ tarefas, onSelecionarTarefa }: AcoesPrio
                         Adiada
                       </span>
                     )}
-                    <ChevronRight className="ml-auto h-4 w-4 text-slate-400 dark:text-slate-500" />
+                    <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-slate-400 dark:text-slate-500">
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      <ChevronRight className="h-4 w-4" aria-hidden />
+                    </span>
                   </div>
                 </div>
 
@@ -166,7 +179,10 @@ export function AcoesPrioritariasCard({ tarefas, onSelecionarTarefa }: AcoesPrio
                       Adiada
                     </span>
                   )}
-                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                  <span className="inline-flex shrink-0 items-center gap-1 text-slate-400 dark:text-slate-500">
+                    <Pencil className="h-4 w-4" aria-hidden />
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </span>
                 </div>
               </button>
             </li>

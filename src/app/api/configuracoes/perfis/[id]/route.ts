@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { mapPerfil } from "../../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { DB_PERMISSION_MODULES } from "@/lib/configuracoes/permission-utils";
+import { savePerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -21,13 +23,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     });
     await tx.perfilPermissao.deleteMany({ where: { perfilId: id } });
     await tx.perfilPermissao.createMany({
-      data: Object.entries(p.permissoes).map(([modulo, permitido]) => ({
-        perfilId: id,
-        modulo: modulo as never,
-        permitido: Boolean(permitido),
-      })),
+      data: Object.entries(p.permissoes)
+        .filter(([modulo]) => DB_PERMISSION_MODULES.includes(modulo as (typeof DB_PERMISSION_MODULES)[number]))
+        .map(([modulo, permitido]) => ({
+          perfilId: id,
+          modulo: modulo as never,
+          permitido: Boolean(permitido),
+        })),
     });
   });
+  await savePerfilPermissoesExtras(prisma, id, p.permissoes);
 
   const updated = await prisma.perfilAcesso.findUniqueOrThrow({
     where: { id },
@@ -38,6 +43,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     modulo: "configuracoes",
     detalhes: `Perfil ${updated.nome}`,
   });
-  return ok({ perfil: mapPerfil(updated) });
+  return ok({ perfil: mapPerfil(updated, p.permissoes) });
 }
 

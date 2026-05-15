@@ -3,7 +3,7 @@
 import type { ElementType, RefObject } from "react";
 import { useId, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FileText, MessageSquare, Paperclip, Eye, X, User, Users, Building2, Tags } from "lucide-react";
+import { FileText, MessageSquare, Eye, X, Save, Plus, User, Users, Building2, Tags } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import { STATUS_LABELS } from "@/lib/tarefas/constants";
 import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
@@ -21,6 +21,7 @@ import {
   formLabelClass,
   formModalCancelButtonClass,
   formModalSubmitButtonClass,
+  formTextareaClass,
 } from "@/components/ui/field-patterns";
 import {
   iconForCategoria,
@@ -293,18 +294,27 @@ export function TarefaDetalheDrawer({
       subtitle: c.nome && c.empresa && c.nome !== c.empresa ? c.nome : undefined,
       icon: Building2,
     }));
+  const clienteOptionsWithAll: SearchableOption[] = [
+    { value: "__TODOS__", label: "Todos os Clientes", icon: Building2 },
+    ...clienteOptions,
+  ];
+  const clienteIdsForSelect = (() => {
+    const base = [...clienteIds];
+    if (clientes.length > 0 && base.length === clientes.length) return ["__TODOS__", ...base];
+    return base;
+  })();
 
   const TABS: { id: TabId; label: string; Icon: ElementType }[] = [
     { id: "detalhes", label: "Detalhes", Icon: FileText },
-    { id: "historico", label: "Histórico & Comentários", Icon: MessageSquare },
+    { id: "historico", label: "Interações", Icon: MessageSquare },
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div
         role="tablist"
         aria-label="Abas do detalhe da tarefa"
-        className="-mx-2 flex w-full shrink-0 flex-wrap border-b border-slate-200 bg-slate-50/50 sm:-mx-3"
+        className="sticky top-0 z-30 flex w-full shrink-0 flex-wrap border-b border-slate-300 bg-slate-50/95 backdrop-blur-sm dark:border-slate-600 dark:bg-slate-800/95"
       >
         {TABS.map((tab) => {
           const Icon = tab.Icon;
@@ -320,7 +330,9 @@ export function TarefaDetalheDrawer({
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
                 "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors",
-                isActive ? "text-[#6D28D9]" : "text-slate-500 hover:text-slate-700"
+                isActive
+                  ? "text-[#6D28D9] dark:text-violet-400"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               )}
             >
               {isActive && (
@@ -344,7 +356,7 @@ export function TarefaDetalheDrawer({
           aria-labelledby={`${tabBaseId}-detalhes`}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 lg:p-6">
             <div ref={sectionTituloRef}>
               <label htmlFor="t-titulo" className={formLabelClass}>
                 Título{" "}
@@ -375,6 +387,7 @@ export function TarefaDetalheDrawer({
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
                   rows={3}
+                  placeholder="Ex.: Entrar em contato com clientes para validar pendências desta semana."
                   className={`${formInputClass} min-h-[80px] resize-y pl-10`}
                 />
               </div>
@@ -457,9 +470,16 @@ export function TarefaDetalheDrawer({
             <div>
               <label className={formLabelClass}>Clientes vinculados</label>
               <SearchableMultiSelect
-                options={clienteOptions}
-                values={clienteIds}
-                onChange={setClienteIds}
+                options={clienteOptionsWithAll}
+                values={clienteIdsForSelect}
+                onChange={(values) => {
+                  const hasAll = values.includes("__TODOS__");
+                  if (hasAll) {
+                    setClienteIds(clientes.map((c) => c.id));
+                    return;
+                  }
+                  setClienteIds(values.filter((id) => id !== "__TODOS__"));
+                }}
                 placeholder="Selecionar clientes..."
                 searchPlaceholder="Buscar cliente..."
                 selectedLabel="Selecionados"
@@ -476,14 +496,20 @@ export function TarefaDetalheDrawer({
 
           </div>
           {(onSalvar || onClose) && (
-            <div className="-mx-2 shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:-mx-3 lg:-mx-3 lg:px-6">
+            <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
                 <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
-                  Cancelar
+                  <span className="inline-flex items-center gap-2">
+                    <X className="h-4 w-4 shrink-0" aria-hidden />
+                    Cancelar
+                  </span>
                 </button>
                 {onSalvar ? (
                   <button type="button" onClick={handleSalvar} className={formModalSubmitButtonClass}>
-                    Salvar alterações
+                    <span className="inline-flex items-center gap-2">
+                      <Save className="h-4 w-4 shrink-0" aria-hidden />
+                      Salvar
+                    </span>
                   </button>
                 ) : null}
               </div>
@@ -499,138 +525,81 @@ export function TarefaDetalheDrawer({
           aria-labelledby={`${tabBaseId}-historico`}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <p className="shrink-0 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Linha do tempo (mais recente no topo)
-          </p>
-          <div ref={listRef} className="flex-1 overflow-y-auto px-4 pb-4 min-h-0">
-            <div className="relative border-l-2 border-slate-100 pl-6 dark:border-slate-700">
-              {historicoOrdenado.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma ação registrada ainda.</p>
-              ) : (
-                <ul className="space-y-6">
-                  {historicoOrdenado.map((entrada) => (
-                    <li key={entrada.id} className="relative">
-                      <div className="absolute -left-[29px] top-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#6D28D9]/15 text-xs font-semibold text-[#6D28D9] shadow-sm dark:border-slate-900 dark:bg-violet-500/20 dark:text-violet-300">
-                        {entrada.autor ? iniciais(entrada.autor) : "S"}
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">
-                          {formatHistoricoData(entrada.data)} - {entrada.autor ?? "Sistema"}
-                        </p>
-                        <p className="mt-0.5 whitespace-pre-wrap text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {entrada.acao}
-                        </p>
-                        {entrada.anexos?.length ? (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {entrada.anexos.map((nome) => (
-                              <button
-                                key={nome}
-                                type="button"
-                                onClick={() => {
-                                  const w = window.open("", "_blank");
-                                  if (!w) return;
-                                  w.document.title = nome;
-                                  w.document.body.innerHTML = `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \\"Liberation Mono\\", \\"Courier New\\", monospace; padding: 16px;">Preview indisponivel para este anexo: ${nome}</pre>`;
-                                }}
-                                className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
-                              >
-                                <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
-                                <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{nome}</span>
-                                <Eye className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          {onAdicionarHistorico && (
-            <form
-              onSubmit={handleEnviarComentario}
-              className="-mx-2 shrink-0 border-t border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:-mx-3"
-            >
-              <input
-                id="file-upload-tarefa"
-                type="file"
-                className="hidden"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  if (!files.length) return;
-                  setArquivosComentario((prev) => {
-                    const existing = new Set(prev.map((f) => `${f.name}-${f.size}-${f.lastModified}`));
-                    const next = [...prev];
-                    files.forEach((f) => {
-                      const key = `${f.name}-${f.size}-${f.lastModified}`;
-                      if (!existing.has(key)) next.push(f);
-                    });
-                    return next;
-                  });
-                  e.target.value = "";
-                }}
-              />
-              <div className="flex gap-2">
-                <input
-                  type="text"
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6">
+            <div className="space-y-4">
+              <div className="relative">
+                <MessageSquare className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                <textarea
                   value={comentario}
                   onChange={(e) => setComentario(e.target.value)}
-                  placeholder="Ex.: Liguei para o cliente, pediu para retornar amanhã"
-                  className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  rows={3}
+                  placeholder="Descreva a ação realizada, resposta ao cliente ou nota interna..."
+                  className={`${formTextareaClass} pl-9`}
                 />
-                <label
-                  htmlFor="file-upload-tarefa"
-                  className="cursor-pointer rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                  aria-label="Anexar arquivo"
-                >
-                  <Paperclip className="h-5 w-5" />
-                </label>
+              </div>
+              <MultiFileAttachment
+                existingFiles={[]}
+                newFiles={arquivosComentario}
+                onNewFilesChange={setArquivosComentario}
+              />
+              <div className="flex justify-end">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => handleEnviarComentario()}
                   disabled={!comentario.trim() && arquivosComentario.length === 0}
-                  className="rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                  className={formModalSubmitButtonClass}
                 >
-                  Adicionar Comentário
+                  <span className="inline-flex items-center gap-2">
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                    Adicionar
+                  </span>
                 </button>
               </div>
-              {arquivosComentario.length > 0 && (
-                <ul className="mt-2 space-y-2">
-                  {arquivosComentario.map((f, idx) => (
-                    <li
-                      key={`${f.name}-${f.size}-${f.lastModified}`}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => openFilePreview(f)}
-                        className="inline-flex items-center gap-2 font-medium text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
-                        title="Visualizar"
-                      >
-                        <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                        <span className="truncate max-w-[320px]">{f.name}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPendingRemoveComentarioAnexo({ index: idx, nome: f.name })
-                        }
-                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-300"
-                        aria-label="Remover arquivo"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Remover
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+            </div>
+            <ul className="relative mt-4 space-y-0 border-t border-slate-200 pt-6 dark:border-slate-700">
+              <span className="absolute bottom-2 left-[11px] top-2 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
+              {historicoOrdenado.length === 0 ? (
+                <li className="text-sm text-slate-500 dark:text-slate-400">Nenhuma ação registrada ainda.</li>
+              ) : (
+                historicoOrdenado.map((entrada) => (
+                  <li key={entrada.id} className="relative flex gap-3 pb-6 last:pb-0">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                      {entrada.autor ? iniciais(entrada.autor) : "S"}
+                    </span>
+                    <div>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {formatHistoricoData(entrada.data)} - {entrada.autor ?? "Sistema"}
+                      </p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {entrada.acao}
+                      </p>
+                      {entrada.anexos?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {entrada.anexos.map((nome) => (
+                            <button
+                              key={nome}
+                              type="button"
+                              onClick={() => {
+                                const w = window.open("", "_blank");
+                                if (!w) return;
+                                w.document.title = nome;
+                                w.document.body.innerHTML = `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \\"Liberation Mono\\", \\"Courier New\\", monospace; padding: 16px;">Preview indisponivel para este anexo: ${nome}</pre>`;
+                              }}
+                              className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+                            >
+                              <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                              <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{nome}</span>
+                              <Eye className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </li>
+                ))
               )}
-            </form>
-          )}
+            </ul>
+          </div>
         </div>
       )}
       <AlertDialog

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { LifeBuoy, Users, CheckCircle2, Clock3, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, LifeBuoy, Users } from "lucide-react";
 import type { Ticket } from "@/lib/helpdesk/types";
 
 type PortalContextPayload = {
@@ -97,20 +97,44 @@ export default function PortalHomePage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Link
           href="/portal/chamados"
-          className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-violet-600/60"
+          className="group flex items-stretch justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#6D28D9]/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
         >
-          <LifeBuoy className="h-5 w-5 text-[#6D28D9] transition-transform group-hover:scale-105" />
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Suporte</p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Abra novos chamados e acompanhe respostas da equipe.</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="inline-flex shrink-0 rounded-xl bg-[#6D28D9]/10 p-2 text-[#6D28D9]">
+              <LifeBuoy className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-slate-900 group-hover:text-[#6D28D9] dark:text-slate-100">Suporte</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Abra novos chamados e acompanhe respostas da equipe.
+              </p>
+            </div>
+          </div>
+          <ChevronRight
+            className="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:text-[#6D28D9] dark:text-slate-500"
+            aria-hidden
+          />
         </Link>
 
         <Link
           href="/portal/usuarios"
-          className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-violet-600/60"
+          className="group flex items-stretch justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#6D28D9]/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
         >
-          <Users className="h-5 w-5 text-[#6D28D9] transition-transform group-hover:scale-105" />
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Usuários</p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Consulte os usuários vinculados ao seu cliente e permissões de acesso.</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="inline-flex shrink-0 rounded-xl bg-[#6D28D9]/10 p-2 text-[#6D28D9]">
+              <Users className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-slate-900 group-hover:text-[#6D28D9] dark:text-slate-100">Usuários</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Consulte os usuários vinculados ao seu cliente e permissões de acesso.
+              </p>
+            </div>
+          </div>
+          <ChevronRight
+            className="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:text-[#6D28D9] dark:text-slate-500"
+            aria-hidden
+          />
         </Link>
       </div>
 

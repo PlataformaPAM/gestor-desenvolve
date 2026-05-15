@@ -4,9 +4,9 @@ import { useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
-  ExternalLink,
   Repeat,
   ChevronRight,
+  Pencil,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -18,6 +18,7 @@ import {
   descricaoParaExibicao,
   linhaLancamentoComAlertaVisual,
   parcelaRotuloCurto,
+  statusFinanceiroEfetivo,
 } from "@/lib/financeiro/lancamento-utils";
 import type { Cliente } from "@/lib/clientes/types";
 import clsx from "clsx";
@@ -41,6 +42,8 @@ type LancamentosTableProps = {
   /** Quando true, mostra coluna Tipo (Entrada/Saída) - aba Fluxo de Caixa */
   showTipo?: boolean;
   pendingByLancamentoId?: Record<string, number>;
+  /** Lista completa (ex.: bootstrap) para alerta de fim de recorrência fixa mensal. */
+  todosLancamentosParaAlerta?: Lancamento[];
 };
 
 function VencimentoComSelo({ vencimento, lanc }: { vencimento: string; lanc: Lancamento }) {
@@ -109,13 +112,14 @@ function LancamentoValorCol({ lanc }: { lanc: Lancamento }) {
 export function LancamentosTable({
   lancamentos,
   clientesMap,
-  onVerCliente,
+  onVerCliente: _onVerCliente,
   onEditar,
   onAlternarBaixa,
   onExcluir,
   disabledActionIds = {},
   showTipo = false,
   pendingByLancamentoId = {},
+  todosLancamentosParaAlerta,
 }: LancamentosTableProps) {
   return (
     <>
@@ -134,7 +138,7 @@ export function LancamentosTable({
                   Descrição
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">
-                  {showTipo ? "Cliente / Fornecedor" : lancamentos[0]?.tipo === "entrada" ? "Cliente" : "Fornecedor"}
+                  Pessoa
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider dark:text-slate-400">
                   Vencimento
@@ -158,7 +162,12 @@ export function LancamentosTable({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {lancamentos.map((lanc) => {
                 const cp = getContraparte(lanc, clientesMap);
-                const mostrarAlerta = linhaLancamentoComAlertaVisual(lanc, pendingByLancamentoId);
+                const statusUi = statusFinanceiroEfetivo(lanc);
+                const mostrarAlerta = linhaLancamentoComAlertaVisual(
+                  lanc,
+                  pendingByLancamentoId,
+                  todosLancamentosParaAlerta
+                );
                 return (
                   <tr
                     key={lanc.id}
@@ -179,18 +188,7 @@ export function LancamentosTable({
                       <p>{descricaoParaExibicao(lanc.descricao)}</p>
                     </td>
                     <td className="px-4 py-3">
-                      {cp?.tipo === "cliente" && cp.cliente && onVerCliente ? (
-                        <button
-                          type="button"
-                          onClick={() => onVerCliente(cp.cliente!)}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-[#6D28D9] hover:underline"
-                        >
-                          {cp.nome}
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </button>
-                      ) : (
-                        <span className="text-sm text-slate-600 dark:text-slate-300">{cp?.nome ?? "—"}</span>
-                      )}
+                      <span className="text-sm text-slate-600 dark:text-slate-300">{cp?.nome ?? "—"}</span>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <VencimentoComSelo vencimento={lanc.vencimento} lanc={lanc} />
@@ -201,9 +199,9 @@ export function LancamentosTable({
                     <td className="px-4 py-3">
                       <span className={clsx(
                         "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                        STATUS_BADGE[lanc.status]
+                        STATUS_BADGE[statusUi]
                       )}>
-                        {STATUS_LABELS[lanc.status]}
+                        {STATUS_LABELS[statusUi]}
                       </span>
                     </td>
                     {onAlternarBaixa && (
@@ -225,7 +223,7 @@ export function LancamentosTable({
                             disabledActionIds[lanc.id] && "cursor-not-allowed opacity-60",
                             lanc.status === "pago"
                               ? "border-emerald-400 bg-emerald-100 text-emerald-700 shadow-sm hover:bg-emerald-200 dark:border-emerald-500/50 dark:bg-emerald-950/60 dark:text-emerald-200 dark:hover:bg-emerald-900/60"
-                              : lanc.status === "atrasado"
+                              : statusUi === "atrasado"
                                 ? "border-red-300 bg-red-50 text-red-800 hover:border-red-400 hover:bg-red-100 dark:border-red-600 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-900/40"
                                 : "border-amber-300 bg-amber-50 text-amber-800 hover:border-amber-500 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-900/40"
                           )}
@@ -262,6 +260,11 @@ export function LancamentosTable({
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
+                        {onEditar && (
+                          <span className="inline-flex text-slate-400" title="Editar" aria-hidden>
+                            <Pencil className="h-4 w-4" />
+                          </span>
+                        )}
                         <ChevronRight className="h-4 w-4 text-slate-400" />
                       </div>
                     </td>
@@ -285,13 +288,16 @@ export function LancamentosTable({
             key={lanc.id}
             lancamento={lanc}
             clientesMap={clientesMap}
-            onVerCliente={onVerCliente}
             onEditar={onEditar}
             onAlternarBaixa={onAlternarBaixa}
             onExcluir={onExcluir}
             disabledActionIds={disabledActionIds}
             showTipo={showTipo}
-            mostrarAlertaLinha={linhaLancamentoComAlertaVisual(lanc, pendingByLancamentoId)}
+            mostrarAlertaLinha={linhaLancamentoComAlertaVisual(
+              lanc,
+              pendingByLancamentoId,
+              todosLancamentosParaAlerta
+            )}
           />
         ))}
         {lancamentos.length === 0 && (
@@ -307,7 +313,6 @@ export function LancamentosTable({
 function LancamentoCard({
   lancamento,
   clientesMap,
-  onVerCliente,
   onEditar,
   onAlternarBaixa,
   onExcluir,
@@ -317,7 +322,6 @@ function LancamentoCard({
 }: {
   lancamento: Lancamento;
   clientesMap: Map<string, Cliente>;
-  onVerCliente?: (c: Cliente) => void;
   onEditar?: (l: Lancamento) => void;
   onAlternarBaixa?: (l: Lancamento) => void;
   onExcluir?: (l: Lancamento) => void;
@@ -328,6 +332,7 @@ function LancamentoCard({
   const [expanded, setExpanded] = useState(false);
   const cp = getContraparte(lancamento, clientesMap);
   const seloVenc = badgeUrgenciaVencimento(lancamento);
+  const statusUi = statusFinanceiroEfetivo(lancamento);
 
   return (
     <div className="relative rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
@@ -374,9 +379,9 @@ function LancamentoCard({
             </div>
             <span className={clsx(
               "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
-              STATUS_BADGE[lancamento.status]
+              STATUS_BADGE[statusUi]
             )}>
-              {STATUS_LABELS[lancamento.status]}
+              {STATUS_LABELS[statusUi]}
             </span>
             {showTipo && (
               <span className={clsx(
@@ -405,7 +410,7 @@ function LancamentoCard({
                 disabledActionIds[lancamento.id] && "cursor-not-allowed opacity-60",
                 lancamento.status === "pago"
                   ? "border-emerald-400 bg-emerald-100 text-emerald-700"
-                  : lancamento.status === "atrasado"
+                  : statusUi === "atrasado"
                     ? "border-red-300 bg-red-50 text-red-800"
                     : "border-amber-300 bg-amber-50 text-amber-800"
               )}
@@ -423,13 +428,19 @@ function LancamentoCard({
       </div>
       <div className="px-4 pb-2">
         <div className="flex items-center justify-end gap-1">
-          <ChevronRight
-            className="h-4 w-4 text-slate-400"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditar?.(lancamento);
-            }}
-          />
+          {onEditar && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditar(lancamento);
+              }}
+              className="inline-flex rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-[#6D28D9] dark:hover:bg-slate-800 dark:hover:text-violet-300"
+              aria-label="Editar lançamento"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
           {onExcluir && (
             <button
               type="button"
@@ -454,19 +465,7 @@ function LancamentoCard({
             </p>
           )}
           <p className="text-xs text-slate-600 dark:text-slate-300">
-            Cliente/Fornecedor:{" "}
-            {cp?.tipo === "cliente" && cp.cliente && onVerCliente ? (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onVerCliente(cp.cliente!); }}
-                className="font-medium text-[#6D28D9] hover:underline inline-flex items-center gap-1"
-              >
-                {cp.nome}
-                <ExternalLink className="h-3 w-3" />
-              </button>
-            ) : (
-              <span>{cp?.nome ?? "—"}</span>
-            )}
+            Pessoa: <span className="font-medium text-slate-800 dark:text-slate-100">{cp?.nome ?? "—"}</span>
           </p>
         </div>
       )}

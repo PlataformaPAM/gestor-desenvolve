@@ -1,10 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Eye, Pencil, Power, Search, Trash2 } from "lucide-react";
+import {
+  Blend,
+  CheckCircle2,
+  CircleSlash2,
+  Eye,
+  FileCode2,
+  Hash,
+  ImageUp,
+  Link2,
+  Pencil,
+  Power,
+  Save,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  Type,
+  X,
+} from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { ConfiguracoesTopNav } from "@/components/configuracoes/configuracoes-top-nav";
+import { DadosEmpresaFormSection } from "@/components/configuracoes/dados-empresa-form";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { Toast } from "@/components/ui/toast";
+import {
+  formAttachmentDropzoneClass,
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { emptyEmpresaDocumentoConfig, type EmpresaDocumentoConfig } from "@/lib/documentos/empresa-config-schema";
 
@@ -48,20 +75,38 @@ const LAYOUT_LABEL: Record<EmpresaDocumentoConfig["layoutModo"], string> = {
   hybrid: "Híbrido (fundo + faixas)",
 };
 
+const IconAtivo = ({ className }: { className?: string }) => <CheckCircle2 className={`${className ?? ""} !text-emerald-600 dark:!text-emerald-400`} />;
+const IconInativo = ({ className }: { className?: string }) => <CircleSlash2 className={`${className ?? ""} !text-slate-500 dark:!text-slate-400`} />;
+const IconLayoutNone = ({ className }: { className?: string }) => <SlidersHorizontal className={`${className ?? ""} !text-slate-600 dark:!text-slate-300`} />;
+const IconLayoutBackground = ({ className }: { className?: string }) => <ImageUp className={`${className ?? ""} !text-sky-600 dark:!text-sky-400`} />;
+const IconLayoutHeaderFooter = ({ className }: { className?: string }) => <FileCode2 className={`${className ?? ""} !text-violet-600 dark:!text-violet-400`} />;
+const IconLayoutHybrid = ({ className }: { className?: string }) => <Blend className={`${className ?? ""} !text-fuchsia-600 dark:!text-fuchsia-400`} />;
+
+const STATUS_OPTIONS: SearchableOption[] = [
+  { value: "ativo", label: "Ativo", icon: IconAtivo },
+  { value: "inativo", label: "Inativo", icon: IconInativo },
+];
+
+const LAYOUT_OPTIONS: SearchableOption[] = [
+  { value: "none", label: LAYOUT_LABEL.none, icon: IconLayoutNone },
+  { value: "background", label: LAYOUT_LABEL.background, icon: IconLayoutBackground },
+  { value: "header_footer", label: LAYOUT_LABEL.header_footer, icon: IconLayoutHeaderFooter },
+  { value: "hybrid", label: LAYOUT_LABEL.hybrid, icon: IconLayoutHybrid },
+];
+
 function defaultRenderConfig(papelTimbradoUrl = ""): LayoutSlice {
-  const base = emptyEmpresaDocumentoConfig();
   return {
     layoutModo: "background",
     papelTimbradoUrl,
-    papelTimbradoOpacity: base.papelTimbradoOpacity,
-    margemTopMm: base.margemTopMm,
-    margemRightMm: base.margemRightMm,
-    margemBottomMm: base.margemBottomMm,
-    margemLeftMm: base.margemLeftMm,
-    headerHeightMm: base.headerHeightMm,
-    footerHeightMm: base.footerHeightMm,
-    cabecalhoPadraoHtml: base.cabecalhoPadraoHtml,
-    rodapePadraoHtml: base.rodapePadraoHtml,
+    papelTimbradoOpacity: 0,
+    margemTopMm: 45,
+    margemRightMm: 20,
+    margemBottomMm: 32,
+    margemLeftMm: 25,
+    headerHeightMm: 28,
+    footerHeightMm: 28,
+    cabecalhoPadraoHtml: "",
+    rodapePadraoHtml: "",
   };
 }
 
@@ -72,6 +117,7 @@ export default function PapeisTimbradosPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerDadosEmpresaOpen, setDrawerDadosEmpresaOpen] = useState(false);
   const [form, setForm] = useState<TimbreFormState>({
     id: null,
     nome: "",
@@ -113,6 +159,7 @@ export default function PapeisTimbradosPage() {
   useEffect(() => {
     setPrimaryAction({
       label: "Novo Timbrado",
+      showPlusIcon: true,
       onClick: () => {
         setForm({
           id: null,
@@ -231,7 +278,7 @@ export default function PapeisTimbradosPage() {
 
   return (
     <section className="w-full min-w-0 space-y-4">
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
+      <div className="sticky top-0 z-10 flex w-full min-w-0 flex-wrap items-center gap-3 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-3 shadow-sm backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto sm:max-w-lg sm:flex-row sm:items-center">
           <div className="relative min-w-0 w-full sm:w-[520px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -240,11 +287,16 @@ export default function PapeisTimbradosPage() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar timbrados..."
-              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className={`${formInputClass} h-10 min-w-0 pl-9`}
             />
           </div>
         </div>
-        <ConfiguracoesTopNav atalhosDocumentos returnHref="/configuracoes/construtor-documentos" returnLabel="Voltar ao Construtor" />
+        <ConfiguracoesTopNav
+          atalhosDocumentos
+          onOpenDadosEmpresaModal={() => setDrawerDadosEmpresaOpen(true)}
+          returnHref="/configuracoes/construtor-documentos"
+          returnLabel="Voltar ao Construtor"
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -284,87 +336,260 @@ export default function PapeisTimbradosPage() {
       {!timbres.length && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">Nenhum papel timbrado cadastrado.</div>}
       {!!timbres.length && !timbresFiltrados.length && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">Nenhum timbrado corresponde à busca.</div>}
 
-      <DrawerSheet open={drawerOpen} onClose={() => setDrawerOpen(false)} title={form.id ? "Editar timbrado" : "Novo timbrado"} maxWidth="sm:max-w-4xl">
-        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 p-1 pr-2">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Nome do timbrado
-              <input value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-            </label>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Status do timbrado
-              <select value={form.ativo ? "ativo" : "inativo"} onChange={(e) => setForm((p) => ({ ...p, ativo: e.target.value === "ativo" }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                <option value="ativo">Ativo</option>
-                <option value="inativo">Inativo</option>
-              </select>
-            </label>
-          </div>
+      <DrawerSheet
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={form.id ? "Editar timbrado" : "Novo timbrado"}
+        maxWidth="sm:max-w-3xl"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Nome do timbrado</label>
+                  <div className="relative">
+                    <Type className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={form.nome}
+                      onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))}
+                      className={`${formInputClass} pl-9`}
+                      placeholder="Ex.: Timbrado institucional"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Status do timbrado</label>
+                  <SearchableSelect
+                    options={STATUS_OPTIONS}
+                    value={form.ativo ? "ativo" : "inativo"}
+                    onChange={(value) => setForm((p) => ({ ...p, ativo: value === "ativo" }))}
+                    placeholder="Selecione o status"
+                    searchPlaceholder="Buscar status..."
+                    searchable={false}
+                  />
+                </div>
+              </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-800/40">
-            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Arquivo do timbrado</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">PNG, JPG ou WEBP até 8MB.</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                {form.arquivo ? "Trocar arquivo" : form.id ? "Selecionar novo arquivo" : "Selecionar arquivo"}
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                if (!f) return;
-                const blobUrl = URL.createObjectURL(f);
-                setForm((p) => ({ ...p, arquivo: f, previewUrl: blobUrl, renderConfig: { ...p.renderConfig, papelTimbradoUrl: p.renderConfig.papelTimbradoUrl || blobUrl } }));
-                e.currentTarget.value = "";
-              }} />
+              <div className="space-y-1">
+                <label className={formLabelClass}>Arquivo do timbrado</label>
+                {form.previewUrl ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className={formAttachmentDropzoneClass}
+                    >
+                      <ImageUp className="h-5 w-5" />
+                      <span>
+                        {form.arquivo ? "Trocar arquivo selecionado" : "Selecionar novo arquivo"}
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">PNG, JPG ou WEBP até 8MB.</span>
+                      </span>
+                    </button>
+                    <div className="relative">
+                      <img
+                        src={form.previewUrl}
+                        alt="Prévia timbrado"
+                        className="h-28 w-full rounded-xl border border-slate-200 bg-white object-contain p-2 dark:border-slate-600 dark:bg-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((p) => ({
+                            ...p,
+                            arquivo: null,
+                            previewUrl: "",
+                            renderConfig: { ...p.renderConfig, papelTimbradoUrl: "" },
+                          }))
+                        }
+                        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-300"
+                        aria-label="Excluir imagem do timbrado"
+                        title="Excluir imagem"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={formAttachmentDropzoneClass}
+                  >
+                    <ImageUp className="h-5 w-5" />
+                    <span>
+                      {form.arquivo ? "Trocar arquivo selecionado" : form.id ? "Selecionar novo arquivo" : "Selecionar arquivo"}
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">PNG, JPG ou WEBP até 8MB.</span>
+                    </span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (!f) return;
+                    const blobUrl = URL.createObjectURL(f);
+                    setForm((p) => ({
+                      ...p,
+                      arquivo: f,
+                      previewUrl: blobUrl,
+                      renderConfig: { ...p.renderConfig, papelTimbradoUrl: p.renderConfig.papelTimbradoUrl || blobUrl },
+                    }));
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Modo de layout</label>
+                  <SearchableSelect
+                    options={LAYOUT_OPTIONS}
+                    value={form.renderConfig.layoutModo}
+                    onChange={(value) =>
+                      setForm((p) => ({
+                        ...p,
+                        renderConfig: { ...p.renderConfig, layoutModo: value as EmpresaDocumentoConfig["layoutModo"] },
+                      }))
+                    }
+                    placeholder="Selecione o modo"
+                    searchPlaceholder="Buscar modo..."
+                    searchable={false}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className={formLabelClass}>URL do timbrado</label>
+                  <div className="relative">
+                    <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={form.renderConfig.papelTimbradoUrl}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, papelTimbradoUrl: e.target.value } }))
+                      }
+                      className={`${formInputClass} pl-9`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className={formLabelClass}>Opacidade ({Math.round(form.renderConfig.papelTimbradoOpacity * 100)}%)</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(form.renderConfig.papelTimbradoOpacity * 100)}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      renderConfig: { ...p.renderConfig, papelTimbradoOpacity: Number(e.target.value) / 100 },
+                    }))
+                  }
+                  className="mt-1 block w-full"
+                />
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <p className="sm:col-span-2 lg:col-span-3 text-xs text-slate-600 dark:text-slate-300">
+                  Todos os campos abaixo utilizam milímetros (mm).
+                </p>
+                {(
+                  [
+                    ["margemTopMm", "Margem superior"],
+                    ["margemRightMm", "Margem direita"],
+                    ["margemBottomMm", "Margem inferior"],
+                    ["margemLeftMm", "Margem esquerda"],
+                    ["headerHeightMm", "Altura cabeçalho"],
+                    ["footerHeightMm", "Altura rodapé"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key} className="space-y-1">
+                    <label className={formLabelClass}>{label}</label>
+                    <div className="relative">
+                      <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="number"
+                        value={form.renderConfig[key]}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          if (!Number.isFinite(n)) return;
+                          setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, [key]: n } }));
+                        }}
+                        className={`${formInputClass} pl-9`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Cabeçalho HTML padrão</label>
+                  <div className="relative">
+                    <FileCode2 className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                    <textarea
+                      rows={3}
+                      value={form.renderConfig.cabecalhoPadraoHtml}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, cabecalhoPadraoHtml: e.target.value } }))
+                      }
+                      className={`${formTextareaClass} pl-9 font-mono text-xs`}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className={formLabelClass}>Rodapé HTML padrão</label>
+                  <div className="relative">
+                    <FileCode2 className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                    <textarea
+                      rows={3}
+                      value={form.renderConfig.rodapePadraoHtml}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, rodapePadraoHtml: e.target.value } }))
+                      }
+                      className={`${formTextareaClass} pl-9 font-mono text-xs`}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            {form.previewUrl ? <img src={form.previewUrl} alt="Prévia timbrado" className="mt-3 h-28 w-full rounded border border-slate-200 bg-white object-contain p-2 dark:border-slate-600 dark:bg-slate-900" /> : null}
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Modo de layout
-              <select value={form.renderConfig.layoutModo} onChange={(e) => setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, layoutModo: e.target.value as EmpresaDocumentoConfig["layoutModo"] } }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
-                {(Object.keys(LAYOUT_LABEL) as EmpresaDocumentoConfig["layoutModo"][]).map((k) => <option key={k} value={k}>{LAYOUT_LABEL[k]}</option>)}
-              </select>
-            </label>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              URL do timbrado
-              <input value={form.renderConfig.papelTimbradoUrl} onChange={(e) => setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, papelTimbradoUrl: e.target.value } }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-            </label>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Opacidade ({Math.round(form.renderConfig.papelTimbradoOpacity * 100)}%)</label>
-            <input type="range" min={0} max={100} value={Math.round(form.renderConfig.papelTimbradoOpacity * 100)} onChange={(e) => setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, papelTimbradoOpacity: Number(e.target.value) / 100 } }))} className="mt-1 block w-full" />
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {([["margemTopMm", "Margem superior"],["margemRightMm", "Margem direita"],["margemBottomMm", "Margem inferior"],["margemLeftMm", "Margem esquerda"],["headerHeightMm", "Altura cabeçalho"],["footerHeightMm", "Altura rodapé"]] as const).map(([key, label]) => (
-              <label key={key} className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                {label} (mm)
-                <input type="number" value={form.renderConfig[key]} onChange={(e) => {
-                  const n = Number(e.target.value);
-                  if (!Number.isFinite(n)) return;
-                  setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, [key]: n } }));
-                }} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-              </label>
-            ))}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Cabeçalho HTML padrão
-              <textarea rows={3} value={form.renderConfig.cabecalhoPadraoHtml} onChange={(e) => setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, cabecalhoPadraoHtml: e.target.value } }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-            </label>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Rodapé HTML padrão
-              <textarea rows={3} value={form.renderConfig.rodapePadraoHtml} onChange={(e) => setForm((p) => ({ ...p, renderConfig: { ...p.renderConfig, rodapePadraoHtml: e.target.value } }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
-            </label>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
-            <button type="button" onClick={() => setDrawerOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Cancelar</button>
-            <button type="button" disabled={savingId !== null} onClick={salvarFormulario} className="rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60">{savingId ? "Salvando..." : "Salvar timbrado"}</button>
+          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
+            <button type="button" onClick={() => setDrawerOpen(false)} className={formModalCancelButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <X className="h-4 w-4 shrink-0" aria-hidden />
+                Cancelar
+              </span>
+            </button>
+            <button type="button" disabled={savingId !== null} onClick={salvarFormulario} className={formModalSubmitButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4 shrink-0" aria-hidden />
+                {savingId ? "Salvando..." : "Salvar"}
+              </span>
+            </button>
           </div>
         </div>
+      </DrawerSheet>
+
+      <DrawerSheet
+        open={drawerDadosEmpresaOpen}
+        onClose={() => setDrawerDadosEmpresaOpen(false)}
+        title="Dados da Empresa"
+        maxWidth="sm:max-w-3xl"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <DadosEmpresaFormSection
+          compact
+          withFixedFooter
+          onCancel={() => setDrawerDadosEmpresaOpen(false)}
+          onSaved={() => setDrawerDadosEmpresaOpen(false)}
+        />
       </DrawerSheet>
 
       <Toast visible={toast.visible} message={toast.message} variant={toast.variant} duration={toast.variant === "error" ? 7000 : 3000} onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))} />

@@ -4,6 +4,8 @@ import { hashPassword, verifyPassword } from "@/lib/server/password";
 import { COOKIE_NAME, encodeSession } from "@/lib/auth";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { loadPerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
+import { withAdminOverride } from "@/lib/configuracoes/permission-utils";
 
 type Payload = {
   cpf: string;
@@ -110,9 +112,17 @@ export async function POST(req: Request) {
         where: { id: usuario.perfilId },
         include: { permissoes: true },
       });
-      permissoes = Object.fromEntries(
+      const permissoesBase = Object.fromEntries(
         (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
       ) as Partial<Record<ModuloPermissao, boolean>>;
+      const extrasByPerfil = await loadPerfilPermissoesExtras(prisma, [usuario.perfilId]);
+      permissoes = withAdminOverride(
+        {
+        ...permissoesBase,
+        ...(extrasByPerfil[usuario.perfilId] ?? {}),
+        },
+        perfil?.nome ?? ""
+      );
       perfilNome = (perfil?.nome ?? "").toLowerCase();
     } catch (error) {
       console.error("[auth/login] falha ao carregar perfil/permissões:", error);
@@ -137,6 +147,7 @@ export async function POST(req: Request) {
         perfilNome.includes("admin") ||
         perfilNome.includes("administrador")
       );
+    const isSystemAdmin = perfilNome.includes("admin") || perfilNome.includes("administrador");
     const redirectTo = isPortalCliente ? "/portal" : "/";
 
     const response = ok({
@@ -157,6 +168,7 @@ export async function POST(req: Request) {
         clienteIds,
         isPortalCliente,
         isAdminCliente,
+        isSystemAdmin,
         permissoes,
       }),
       httpOnly: true,

@@ -1,10 +1,11 @@
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
 import { prisma } from "@/lib/prisma";
+import { PORTAL_CLIENTE_PERFIL_MODULOS } from "@/lib/portal/cliente-perfil-modulos";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { resolvePortalContext } from "@/lib/server/portal-access";
 
 const PREFIX = "PORTAL_CLIENTE";
-const ALLOWED_MODULES: ModuloPermissao[] = ["helpdesk", "configuracoes"];
+const ALLOWED_MODULES = PORTAL_CLIENTE_PERFIL_MODULOS;
 
 function decodeName(raw: string): string {
   const parts = raw.split(":");
@@ -18,10 +19,17 @@ function defaultPermissoes() {
     financeiro: false,
     tarefas: false,
     clientes: false,
+    contratos: false,
     helpdesk: true,
     posVenda: false,
+    solucoes: false,
     rh: false,
     configuracoes: false,
+    relatorios: false,
+    configuracoes_construtor_documentos: false,
+    configuracoes_logs: false,
+    configuracoes_perfis: false,
+    configuracoes_usuarios: false,
   } as Record<ModuloPermissao, boolean>;
 }
 
@@ -51,7 +59,11 @@ export async function PATCH(req: Request, ctxRoute: { params: Promise<{ id: stri
     });
     await tx.perfilPermissao.deleteMany({ where: { perfilId: id } });
     await tx.perfilPermissao.createMany({
-      data: ALLOWED_MODULES.map((modulo) => ({ perfilId: id, modulo, permitido: permissoes[modulo] })),
+      data: ALLOWED_MODULES.map((modulo) => ({
+        perfilId: id,
+        modulo: modulo as never,
+        permitido: permissoes[modulo],
+      })),
     });
   });
 

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { composeCodigoContrato, getContratoCodigoPersonalizadoMap } from "@/lib/contratos/codigo-personalizado";
 import { fail, ok } from "@/lib/server/api-response";
 import { emitAlert } from "@/lib/server/alerts";
+import { reconcileStaleContratosAlerts } from "@/lib/server/alerts-resolve";
 
 function formatContratoCode(year: number, seq: number): string {
   return `CTT-${year}-${String(seq).padStart(4, "0")}`;
@@ -57,6 +58,7 @@ async function suspenderContratosVencidos(): Promise<void> {
 export async function GET() {
   try {
     await suspenderContratosVencidos().catch(() => undefined);
+    await reconcileStaleContratosAlerts(prisma).catch(() => undefined);
 
     const rows = await prisma.contrato.findMany({
       orderBy: { updatedAt: "desc" },

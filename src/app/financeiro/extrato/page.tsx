@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
 import type { Cliente } from "@/lib/clientes/types";
 import { formatCurrency } from "@/lib/clientes/utils";
 import type {
@@ -23,10 +23,14 @@ import {
   descricaoParaExibicao,
   normalizeTextoAlertaMatch,
   parseValorReaisDeTexto,
+  statusFinanceiroEfetivo,
 } from "@/lib/financeiro/lancamento-utils";
 import { subscribeAlertsUpdated } from "@/lib/alerts/live-sync";
 import {
+  appendFixoMensalLinhas,
   buildPayloadsForRecurrenceScope,
+  getGroupMembers,
+  getRecurrenceRootId,
   hasLancamentoEdicaoDiff,
   isRecorrenciaPagamento,
 } from "@/lib/financeiro/recurrence-save";
@@ -189,7 +193,7 @@ export default function FinanceiroExtratoPage() {
     return lancamentos
       .filter((l) => inDateRange(l.vencimento, start, end))
       .filter((l) => (tipo === "todos" ? true : l.tipo === tipo))
-      .filter((l) => (status === "todos" ? true : l.status === status))
+      .filter((l) => (status === "todos" ? true : statusFinanceiroEfetivo(l) === status))
       .filter((l) => (categoriaId === "todos" ? true : (l.categoriaId ?? "") === categoriaId))
       .filter((l) => (contaId === "todos" ? true : (l.contaId ?? "") === contaId))
       .filter((l) => {
@@ -357,6 +361,46 @@ export default function FinanceiroExtratoPage() {
       void salvarEdicaoLancamentosLista([edited]);
     },
     [lancamentoEmEdicao, salvarEdicaoLancamentosLista]
+  );
+
+  const recorrenciaGrupoEdicao = useMemo(() => {
+    if (!lancamentoEmEdicao || lancamentoEmEdicao.tipoRecorrencia !== "fixo_mensal") return undefined;
+    const rootId = getRecurrenceRootId(lancamentoEmEdicao);
+    return getGroupMembers(rootId, lancamentos);
+  }, [lancamentoEmEdicao, lancamentos]);
+
+  const prorrogarFixoMensal = useCallback(
+    async (meses: number): Promise<boolean> => {
+      if (!lancamentoEmEdicao) {
+        showToast("Não foi possível prorrogar a recorrência.", "error");
+        return false;
+      }
+      const root = getRecurrenceRootId(lancamentoEmEdicao);
+      const novos = appendFixoMensalLinhas(root, meses, lancamentos);
+      if (novos.length === 0) {
+        showToast("Informe pelo menos 1 mês para prorrogar.", "error");
+        return false;
+      }
+      try {
+        const res = await fetch("/api/financeiro/lancamentos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lancamentos: novos }),
+        });
+        const json = await parseJsonSafe<{ success?: boolean }>(res);
+        if (!res.ok || !json?.success) {
+          showToast("Não foi possível prorrogar a recorrência.", "error");
+          return false;
+        }
+        await refetchBootstrapSilencioso();
+        showToast(`${novos.length} competência(ns) adicionada(s) à recorrência fixa mensal.`, "success");
+        return true;
+      } catch {
+        showToast("Não foi possível prorrogar a recorrência.", "error");
+        return false;
+      }
+    },
+    [lancamentoEmEdicao, lancamentos, refetchBootstrapSilencioso, showToast]
   );
 
   useEffect(() => {
@@ -554,8 +598,9 @@ export default function FinanceiroExtratoPage() {
                 setCustomStart("");
                 setCustomEnd("");
               }}
-              className="rounded-lg bg-[#6D28D9] px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
             >
+              <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
               Hoje
             </button>
             <label className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
@@ -695,6 +740,7 @@ export default function FinanceiroExtratoPage() {
         disabledActionIds={pendingLancamentoAction}
         showTipo
         pendingByLancamentoId={pendingByLancamentoId}
+        todosLancamentosParaAlerta={lancamentos}
       />
 
       <DrawerSheet
@@ -703,7 +749,7 @@ export default function FinanceiroExtratoPage() {
           setDrawerEditarOpen(false);
           setLancamentoEmEdicao(null);
         }}
-        title={lancamentoEmEdicao ? `Editar Lançamento — ${lancamentoEmEdicao.descricao}` : "Editar Lançamento"}
+        title={lancamentoEmEdicao ? lancamentoEmEdicao.descricao : "Lançamento"}
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {lancamentoEmEdicao && (
@@ -726,6 +772,10 @@ export default function FinanceiroExtratoPage() {
                 void iniciarSalvarEdicao(itens[0]);
               }}
               origemContratoId={origemContratoIdEdit}
+              recorrenciaGrupo={recorrenciaGrupoEdicao}
+              onProrrogarFixoMensal={
+                lancamentoEmEdicao?.tipoRecorrencia === "fixo_mensal" ? prorrogarFixoMensal : undefined
+              }
             />
           )}
         </div>

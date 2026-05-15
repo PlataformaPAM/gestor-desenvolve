@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { FileText, X } from "lucide-react";
+import { FileText, Paperclip, X } from "lucide-react";
 import clsx from "clsx";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 
@@ -78,7 +78,10 @@ export function MultiFileAttachment({
         htmlFor={inputId}
         className="block cursor-pointer rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center transition-colors hover:border-purple-300 hover:bg-purple-50 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-violet-500 dark:hover:bg-violet-950/30"
       >
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Anexos</p>
+        <p className="inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <Paperclip className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+          Anexos
+        </p>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Arraste documentos ou clique para anexar
         </p>

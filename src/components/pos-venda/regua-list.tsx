@@ -1,13 +1,14 @@
 "use client";
 
-import { Phone, FileCheck, RefreshCw, ClipboardList, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Phone, FileCheck, RefreshCw, ClipboardList, ChevronRight, CalendarCheck2, Pencil } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { TarefaRegua } from "@/lib/pos-venda/types";
 import { TIPO_TAREFA_LABELS } from "@/lib/pos-venda/constants";
 import clsx from "clsx";
 
 const TIPO_ICON: Record<TarefaRegua["tipo"], React.ComponentType<{ className?: string }>> = {
   boas_vindas: Phone,
+  agenda_reuniao: CalendarCheck2,
   checkup_30: FileCheck,
   checkup_90: FileCheck,
   renovacao_contrato: RefreshCw,
@@ -59,31 +60,25 @@ function isVenceHoje(t: TarefaRegua): boolean {
   return t.dataAgendada.slice(0, 10) === localYmd(new Date());
 }
 
-export function ReguaList({
-  tarefas,
-  somentePendentes = true,
+type ReguaListPaginatedBodyProps = {
+  listaOrdenada: TarefaRegua[];
+  somentePendentes: boolean;
+  onSelecionarTarefa?: (tarefa: TarefaRegua) => void;
+  compacto: boolean;
+  pageSize: number;
+};
+
+/** Paginação isolada: `key` no pai reinicia a página quando o total ou o tamanho da página mudam (sem setState em effect). */
+function ReguaListPaginatedBody({
+  listaOrdenada,
+  somentePendentes,
   onSelecionarTarefa,
-  compacto = false,
-  pageSize = 3,
-}: ReguaListProps) {
-  const lista = somentePendentes
-    ? tarefas.filter((t) => t.status === "pendente" || t.status === "adiada")
-    : tarefas;
-
-  const listaOrdenada = [...lista].sort(
-    (a, b) =>
-      new Date(`${a.dataAgendada}T00:00:00`).getTime() -
-      new Date(`${b.dataAgendada}T00:00:00`).getTime()
-  );
-
+  compacto,
+  pageSize,
+}: ReguaListPaginatedBodyProps) {
   const total = listaOrdenada.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const [pagina, setPagina] = useState(0);
-
-  useEffect(() => {
-    setPagina(0);
-  }, [total, pageSize]);
-
   const paginaAtual = Math.min(pagina, pageCount - 1);
   const listaExibida = useMemo(() => {
     const start = paginaAtual * pageSize;
@@ -190,7 +185,10 @@ export function ReguaList({
                     </span>
                   )}
                   {onSelecionarTarefa && (t.status === "pendente" || t.status === "adiada") && (
-                    <ChevronRight className="ml-auto h-4 w-4 text-slate-400 dark:text-slate-500" />
+                    <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-slate-400 dark:text-slate-500">
+                      <Pencil className="h-4 w-4" aria-hidden />
+                      <ChevronRight className="h-4 w-4" aria-hidden />
+                    </span>
                   )}
                 </div>
               </div>
@@ -235,7 +233,10 @@ export function ReguaList({
                   </span>
                 )}
                 {onSelecionarTarefa && (t.status === "pendente" || t.status === "adiada") && (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                  <span className="inline-flex shrink-0 items-center gap-1 text-slate-400 dark:text-slate-500">
+                    <Pencil className="h-4 w-4" aria-hidden />
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </span>
                 )}
               </div>
             </li>
@@ -273,5 +274,36 @@ export function ReguaList({
         </div>
       )}
     </div>
+  );
+}
+
+export function ReguaList({
+  tarefas,
+  somentePendentes = true,
+  onSelecionarTarefa,
+  compacto = false,
+  pageSize = 3,
+}: ReguaListProps) {
+  const lista = somentePendentes
+    ? tarefas.filter((t) => t.status === "pendente" || t.status === "adiada")
+    : tarefas;
+
+  const listaOrdenada = [...lista].sort(
+    (a, b) =>
+      new Date(`${a.dataAgendada}T00:00:00`).getTime() -
+      new Date(`${b.dataAgendada}T00:00:00`).getTime()
+  );
+
+  const total = listaOrdenada.length;
+
+  return (
+    <ReguaListPaginatedBody
+      key={`${total}-${pageSize}`}
+      listaOrdenada={listaOrdenada}
+      somentePendentes={somentePendentes}
+      onSelecionarTarefa={onSelecionarTarefa}
+      compacto={compacto}
+      pageSize={pageSize}
+    />
   );
 }

@@ -25,7 +25,7 @@ import {
   Package,
   FileText,
   BarChart3,
-  Ticket,
+  LayoutGrid,
 } from "lucide-react";
 import { GlobalHeader } from "./global-header";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
@@ -45,6 +45,21 @@ type NavItem = {
   requireAdminCliente?: boolean;
 };
 
+const NAV_ITEMS: NavItem[] = [
+  { label: "Central", href: "/", icon: LayoutDashboard },
+  { label: "Comercial", href: "/comercial", icon: Handshake, modulo: "comercial" },
+  { label: "Financeiro", href: "/financeiro", icon: Wallet, modulo: "financeiro" },
+  { label: "Clientes", href: "/clientes", icon: Users, modulo: "clientes" },
+  { label: "Contratos", href: "/contratos", icon: FileText, modulo: "contratos" },
+  { label: "Soluções", href: "/solucoes", icon: Package, modulo: "solucoes" },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, modulo: "helpdesk" },
+  { label: "Pós-venda", href: "/pos-venda", icon: CheckCircle2, modulo: "posVenda" },
+  { label: "Minha Caixa", href: "/alertas", icon: Bell },
+  { label: "Tarefas Internas", href: "/tarefas", icon: ListTodo, modulo: "tarefas" },
+  { label: "Relatórios", href: "/relatorios", icon: BarChart3, modulo: "relatorios" },
+  { label: "RH e Parceiros", href: "/rh", icon: UserCog, modulo: "rh" },
+];
+
 type BootstrapAlerta = {
   id: string;
   modulo: "tarefas" | "financeiro" | "sistema" | "comercial" | "contratos" | "helpdesk" | "posVenda" | string;
@@ -55,24 +70,9 @@ type BootstrapAlerta = {
   slaLabel?: string | null;
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Central", href: "/", icon: LayoutDashboard },
-  { label: "Comercial", href: "/comercial", icon: Handshake, modulo: "comercial" },
-  { label: "Financeiro", href: "/financeiro", icon: Wallet, modulo: "financeiro" },
-  { label: "Clientes", href: "/clientes", icon: Users, modulo: "clientes" },
-  { label: "Contratos", href: "/contratos", icon: FileText, modulo: "clientes" },
-  { label: "Soluções", href: "/solucoes", icon: Package, modulo: "posVenda" },
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, modulo: "helpdesk" },
-  { label: "Pós-venda", href: "/pos-venda", icon: CheckCircle2, modulo: "posVenda" },
-  { label: "Minha Caixa", href: "/alertas", icon: Bell },
-  { label: "Tarefas Internas", href: "/tarefas", icon: ListTodo, modulo: "tarefas" },
-  { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
-  { label: "RH e Parceiros", href: "/rh", icon: UserCog, modulo: "rh" },
-];
-
 const CLIENT_PORTAL_NAV_ITEMS: NavItem[] = [
-  { label: "Portal do Cliente", href: "/portal", icon: LayoutDashboard, modulo: "helpdesk" },
-  { label: "Suporte", href: "/portal/chamados", icon: Ticket, modulo: "helpdesk" },
+  { label: "Portal do Cliente", href: "/portal", icon: LayoutGrid, modulo: "helpdesk" },
+  { label: "Suporte", href: "/portal/chamados", icon: LifeBuoy, modulo: "helpdesk" },
   { label: "Usuários", href: "/portal/usuarios", icon: Users, modulo: "configuracoes" },
   { label: "Minha Caixa", href: "/alertas", icon: Bell },
 ];
@@ -94,10 +94,15 @@ function filterNavByPerfil(
 function buildNavItems(
   permissoes: Partial<Record<ModuloPermissao, boolean>>,
   isPortalCliente: boolean,
-  isAdminCliente: boolean
+  isAdminCliente: boolean,
+  pathname: string
 ): NavItem[] {
-  if (isPortalCliente) {
+  const preferPortalNav = pathname.startsWith("/portal");
+  if (isPortalCliente || preferPortalNav) {
     const base = CLIENT_PORTAL_NAV_ITEMS.filter((item) => !item.requireAdminCliente || isAdminCliente);
+    if (preferPortalNav && !isPortalCliente && permissoes.portal_cliente === true) {
+      return base;
+    }
     return filterNavByPerfil(base, permissoes);
   }
   return filterNavByPerfil(NAV_ITEMS, permissoes);
@@ -128,7 +133,7 @@ function DesktopSidebar({
 }) {
   const pathname = usePathname();
   const [collapsedMenuOpen, setCollapsedMenuOpen] = useState(false);
-  const navItems = buildNavItems(permissoes, isPortalCliente, isAdminCliente);
+  const navItems = buildNavItems(permissoes, isPortalCliente, isAdminCliente, pathname);
   const nomeExibicao = userName || "Usuário";
   const cpfExibicao = userCpf || "—";
 
@@ -316,7 +321,7 @@ function MobileMenuDrawerContent({
   isAdminCliente: boolean;
 }) {
   const pathname = usePathname();
-  const navItemsBase = buildNavItems(permissoes, isPortalCliente, isAdminCliente);
+  const navItemsBase = buildNavItems(permissoes, isPortalCliente, isAdminCliente, pathname);
   const navItems = !isPortalCliente && (Object.keys(permissoes).length === 0 || permissoes.configuracoes === true)
     ? [...navItemsBase, { label: "Configurações", href: "/configuracoes", icon: Settings, modulo: "configuracoes" as ModuloPermissao }]
     : navItemsBase;
@@ -615,11 +620,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         for (const a of rows) {
           if (a.lida) continue;
           next["/alertas"] = (next["/alertas"] ?? 0) + 1;
-          if (a.modulo === "financeiro") continue;
           const href = moduleToHref[a.modulo] ?? null;
           if (href) next[href] = (next[href] ?? 0) + 1;
         }
-        next["/financeiro"] = financeiroCount;
+        const finFromAlerts = next["/financeiro"] ?? 0;
+        next["/financeiro"] = Math.max(finFromAlerts, financeiroCount);
         setUnreadByHref(next);
       } catch {
         // noop

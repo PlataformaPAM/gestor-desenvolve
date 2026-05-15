@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { mapLog, mapPerfil, mapUsuario } from "../_shared";
 import { fail, ok } from "@/lib/server/api-response";
+import { loadPerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
 
 export async function GET() {
   try {
@@ -17,10 +18,26 @@ export async function GET() {
       prisma.logSistema.findMany({ include: { usuario: true }, orderBy: { data: "desc" }, take: 300 }),
     ]);
     const [colaboradores, clientes] = await Promise.all([
-      prisma.colaboradorRH.findMany({
-        select: { id: true, nome: true, cpfCnpj: true, cargoOuFuncao: true, tipoPessoa: true },
-        orderBy: { nome: "asc" },
-      }),
+      (async () => {
+        try {
+          return await prisma.colaboradorRH.findMany({
+            select: {
+              id: true,
+              nome: true,
+              cpfCnpj: true,
+              cargoOuFuncao: true,
+              tipoPessoa: true,
+              cadastroEfetivado: true,
+            },
+            orderBy: { nome: "asc" },
+          });
+        } catch {
+          return prisma.colaboradorRH.findMany({
+            select: { id: true, nome: true, cpfCnpj: true, cargoOuFuncao: true, tipoPessoa: true },
+            orderBy: { nome: "asc" },
+          });
+        }
+      })(),
       prisma.cliente.findMany({
         select: { id: true, nome: true, cpfCnpj: true, empresa: true },
         orderBy: { nome: "asc" },
@@ -29,7 +46,7 @@ export async function GET() {
 
     const pessoasVinculo = [
       ...colaboradores
-        .filter((c) => Boolean(c.cpfCnpj))
+        .filter((c) => (c as { cadastroEfetivado?: boolean }).cadastroEfetivado !== false && Boolean(c.cpfCnpj))
         .map((c) => ({
           id: c.id,
           nome: c.nome,
@@ -63,7 +80,11 @@ export async function GET() {
         vinculacao: vinculos[0] ?? mapped.vinculacao,
       };
     });
-    const mappedPerfis = perfis.map(mapPerfil);
+    const extrasByPerfil = await loadPerfilPermissoesExtras(
+      prisma,
+      perfis.map((p) => p.id)
+    );
+    const mappedPerfis = perfis.map((p) => mapPerfil(p, extrasByPerfil[p.id]));
     const mappedLogs = logs.map(mapLog);
     return ok({
       usuarios: mappedUsuarios,

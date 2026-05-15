@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -13,7 +13,7 @@ import { PIPELINE_STAGES, PRIORIDADE_LABELS } from "@/lib/comercial/constants";
 import type { Lead, PipelineStageId } from "@/lib/comercial/types";
 import type { Cliente } from "@/lib/clientes/types";
 import type { ColumnsState } from "@/lib/comercial/columns";
-import { STAGE_COLORS } from "@/lib/comercial/stage-colors";
+import { STAGE_COLORS, STAGE_HIGHLIGHT_HEX } from "@/lib/comercial/stage-colors";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 import { LeadCardSkeleton } from "./lead-card";
 import { formatCurrency } from "@/lib/comercial/utils";
@@ -43,6 +43,8 @@ type ComercialKanbanProps = {
   isLoading: boolean;
   pendingLeadCountById?: Record<string, number>;
   pendingStageCountById?: Partial<Record<PipelineStageId, number>>;
+  /** Borda em destaque (~3s) após criar/editar/mover o lead. */
+  pulsingLeadIds?: Record<string, boolean>;
 };
 
 export function ComercialKanban({
@@ -54,13 +56,16 @@ export function ComercialKanban({
   isLoading,
   pendingLeadCountById = {},
   pendingStageCountById = {},
+  pulsingLeadIds = {},
 }: ComercialKanbanProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [buscasColunas, setBuscasColunas] = useState<Record<string, string>>({});
   const clienteMap = useMemo(() => new Map(clientes.map((c) => [c.id, c])), [clientes]);
 
   useEffect(() => {
-    setIsMounted(true);
+    queueMicrotask(() => {
+      setIsMounted(true);
+    });
   }, []);
 
   const getPriorityBadgeClass = (priority: Lead["priority"]) => {
@@ -211,80 +216,95 @@ export function ComercialKanban({
                                       onKeyDown={(e) => e.key === "Enter" && onSelectLead(lead)}
                                       style={{
                                         ...dragProvided.draggableProps.style,
+                                        ...(pulsingLeadIds[String(lead.id)]
+                                          ? ({
+                                              ["--pam-stage-outline"]: STAGE_HIGHLIGHT_HEX[lead.stageId],
+                                            } as CSSProperties)
+                                          : {}),
                                       }}
                                       className={clsx(
-                                        "relative mb-2 last:mb-0 w-full cursor-grab rounded-lg border border-slate-200 bg-white p-3 transition-all duration-200 dark:border-slate-600 dark:bg-slate-900",
+                                        "relative mb-2 last:mb-0 w-full cursor-grab overflow-hidden rounded-lg border border-slate-200 bg-white p-3 duration-200 dark:border-slate-600 dark:bg-slate-900",
+                                        "transition-[transform,opacity] motion-reduce:transition-none",
                                         snapshot.isDragging
                                           ? "z-50 cursor-grabbing scale-105 rotate-1 shadow-xl ring-2 ring-purple-500 dark:ring-violet-400"
-                                          : "shadow-sm",
-                                        selectedLeadId === lead.id && "ring-2 ring-[#6D28D9]/20 dark:ring-violet-500/40"
+                                          : !pulsingLeadIds[String(lead.id)] && "shadow-sm",
+                                        selectedLeadId === lead.id && "ring-2 ring-[#6D28D9]/20 dark:ring-violet-500/40",
+                                        pulsingLeadIds[String(lead.id)] && "pam-comercial-edge-pulse"
                                       )}
                                     >
-                                      <p
-                                        className="pr-6 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
-                                        style={{
-                                          display: "-webkit-box",
-                                          WebkitLineClamp: 2,
-                                          WebkitBoxOrient: "vertical",
-                                          overflow: "hidden",
-                                        }}
-                                      >
-                                        {lead.name}
-                                      </p>
-                                      {cliente ? (
-                                        <div className="mt-1.5 min-w-0">
-                                          <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                                            Cliente:
-                                          </p>
-                                          <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                            {cliente.empresa || cliente.nome}
-                                          </p>
-                                        </div>
-                                      ) : null}
-                                      {(pendingLeadCountById[lead.id] ?? 0) > 0 && (
-                                        <span className="absolute right-2 top-2 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                                          {(pendingLeadCountById[lead.id] ?? 0) > 99 ? "99+" : (pendingLeadCountById[lead.id] ?? 0)}
-                                        </span>
-                                      )}
-                                      <p className="mt-2 text-sm font-semibold text-[#6D28D9]">
-                                        {formatCurrency(lead.valorTotal > 0 ? lead.valorTotal : lead.value)}
-                                      </p>
-                                      <div className="mt-2 space-y-2">
-                                        <div className="min-w-0">
-                                          <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                                            Responsável:
-                                          </p>
-                                          <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                            {ownership.responsavelNome ?? "—"}
-                                          </p>
-                                        </div>
-                                        <div className="min-w-0">
-                                          <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                                            Última alteração:
-                                          </p>
-                                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                            {formatUltimaAlteracao(lead.registroAtualizadoEm)}
-                                          </p>
-                                        </div>
-                                        {(["proposta", "contratacao", "fechado", "perdido"] as PipelineStageId[]).includes(lead.stageId) && (
-                                          <div className="min-w-0">
+                                      <div className="relative min-h-0">
+                                        <p
+                                          className="pr-6 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
+                                          style={{
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                          }}
+                                        >
+                                          {lead.name}
+                                        </p>
+                                        {cliente ? (
+                                          <div className="mt-1.5 min-w-0">
                                             <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                                              Vencimento:
+                                              Cliente:
                                             </p>
-                                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                              {formatVencimento(lead.previsaoFechamento)}
+                                            <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                              {cliente.empresa || cliente.nome}
                                             </p>
                                           </div>
+                                        ) : null}
+                                        {(pendingLeadCountById[lead.id] ?? 0) > 0 && (
+                                          <span className="absolute right-2 top-2 z-[3] inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                            {(pendingLeadCountById[lead.id] ?? 0) > 99
+                                              ? "99+"
+                                              : (pendingLeadCountById[lead.id] ?? 0)}
+                                          </span>
                                         )}
+                                        <p className="mt-2 text-sm font-semibold text-[#6D28D9]">
+                                          {formatCurrency(lead.valorTotal > 0 ? lead.valorTotal : lead.value)}
+                                        </p>
+                                        <div className="mt-2 space-y-2">
+                                          <div className="min-w-0">
+                                            <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                              Responsável:
+                                            </p>
+                                            <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                              {ownership.responsavelNome ?? "—"}
+                                            </p>
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                              Última alteração:
+                                            </p>
+                                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                              {formatUltimaAlteracao(
+                                                lead.registroAtualizadoEm ?? lead.enteredStageAt
+                                              )}
+                                            </p>
+                                          </div>
+                                          {(
+                                            ["proposta", "contratacao", "fechado", "perdido"] as PipelineStageId[]
+                                          ).includes(lead.stageId) && (
+                                            <div className="min-w-0">
+                                              <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                                Vencimento:
+                                              </p>
+                                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                                {formatVencimento(lead.previsaoFechamento)}
+                                              </p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <span
+                                          className={clsx(
+                                            "mt-2.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
+                                            getPriorityBadgeClass(lead.priority)
+                                          )}
+                                        >
+                                          {getPriorityLabel(lead.priority)}
+                                        </span>
                                       </div>
-                                      <span
-                                        className={clsx(
-                                          "mt-2.5 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
-                                          getPriorityBadgeClass(lead.priority)
-                                        )}
-                                      >
-                                        {getPriorityLabel(lead.priority)}
-                                      </span>
                                     </div>
                                   )}
                                 </Draggable>

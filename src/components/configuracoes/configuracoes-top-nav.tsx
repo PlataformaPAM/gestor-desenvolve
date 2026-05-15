@@ -6,6 +6,7 @@ type Props = {
   className?: string;
   /** Só no fluxo do Construtor de Documentos (atalhos para Dados da Empresa / Papéis Timbrados). */
   atalhosDocumentos?: boolean;
+  onOpenDadosEmpresaModal?: () => void;
   returnHref?: string;
   returnLabel?: string;
 };
@@ -13,6 +14,7 @@ type Props = {
 export function ConfiguracoesTopNav({
   className = "ml-auto",
   atalhosDocumentos = false,
+  onOpenDadosEmpresaModal,
   returnHref = "/configuracoes",
   returnLabel = "Voltar ao Configurações",
 }: Props) {
@@ -20,12 +22,22 @@ export function ConfiguracoesTopNav({
     <div className={`${className} flex flex-wrap items-center gap-2`}>
       {atalhosDocumentos ? (
         <>
-          <Link
-            href="/configuracoes/dados-empresa"
-            className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            Dados da Empresa
-          </Link>
+          {onOpenDadosEmpresaModal ? (
+            <button
+              type="button"
+              onClick={onOpenDadosEmpresaModal}
+              className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Dados da Empresa
+            </button>
+          ) : (
+            <Link
+              href="/configuracoes/dados-empresa"
+              className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Dados da Empresa
+            </Link>
+          )}
           <Link
             href="/configuracoes/papeis-timbrados"
             className="inline-flex h-10 shrink-0 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"

@@ -18,6 +18,7 @@ export type SessionPayload = {
   clienteIds?: string[];
   isPortalCliente?: boolean;
   isAdminCliente?: boolean;
+  isSystemAdmin?: boolean;
   permissoes?: Partial<Record<ModuloPermissao, boolean>>;
 };
 
@@ -48,14 +49,18 @@ const PATH_TO_MODULE: Record<string, ModuloPermissao> = {
   "/comercial": "comercial",
   "/financeiro": "financeiro",
   "/clientes": "clientes",
-  "/contratos": "clientes",
+  "/contratos": "contratos",
   "/helpdesk": "helpdesk",
   "/suporte": "helpdesk",
-  "/portal/usuarios": "configuracoes",
-  "/portal": "helpdesk",
   "/pos-venda": "posVenda",
+  "/solucoes": "solucoes",
   "/tarefas": "tarefas",
   "/rh": "rh",
+  "/relatorios": "relatorios",
+  "/configuracoes/construtor-documentos": "configuracoes_construtor_documentos",
+  "/configuracoes/logs": "configuracoes_logs",
+  "/configuracoes/perfis": "configuracoes_perfis",
+  "/configuracoes/usuarios": "configuracoes_usuarios",
   "/configuracoes": "configuracoes",
 };
 
@@ -72,6 +77,11 @@ function getModuleForPath(pathname: string): ModuloPermissao | null {
  * Usado no middleware (Edge) e no client. Não depende de getPerfilById para evitar imports pesados no Edge.
  */
 export function hasModuleAccess(session: SessionPayload, pathname: string): boolean {
+  if (session?.isSystemAdmin) return true;
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) {
+    if (session?.isPortalCliente === true) return true;
+    return session?.permissoes?.portal_cliente === true;
+  }
   const moduleRequired = getModuleForPath(pathname);
   if (moduleRequired === null) return true; // rota sem módulo (ex: /, /login, /acesso-negado)
   if (!session?.perfilId) return false;

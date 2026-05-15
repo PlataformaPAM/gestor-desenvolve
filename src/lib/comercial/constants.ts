@@ -10,18 +10,18 @@ export const PIPELINE_STAGES: PipelineStage[] = [
 ];
 import type { LeadOrigem, LeadPriority, PapelContatoOportunidade } from "./types";
 
-/** Opções de origem para select (Novo Lead e Dados Gerais) */
+/** Opções de origem para select (Novo Lead e Dados Gerais), por ordem alfabética da etiqueta */
 export const ORIGEM_OPCOES: { value: LeadOrigem; label: string }[] = [
   { value: "email", label: "E-mail" },
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "ligacao", label: "Ligação" },
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
-  { value: "site", label: "Site" },
   { value: "email_marketing", label: "E-mail Marketing" },
   { value: "evento", label: "Evento" },
+  { value: "facebook", label: "Facebook" },
   { value: "indicacao", label: "Indicação" },
+  { value: "instagram", label: "Instagram" },
+  { value: "ligacao", label: "Ligação" },
   { value: "outro", label: "Outro" },
+  { value: "site", label: "Site" },
+  { value: "whatsapp", label: "WhatsApp" },
 ];
 
 /** Origens que exibem campo "Detalhar origem" */

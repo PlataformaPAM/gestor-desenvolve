@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Save, Search, X } from "lucide-react";
 import { AcoesPrioritariasCard } from "@/components/pos-venda/acoes-prioritarias-card";
 import { HealthScoreGlobal } from "@/components/pos-venda/health-score-global";
 import { HealthDashboard } from "@/components/pos-venda/health-dashboard";
@@ -17,6 +17,13 @@ import {
 import type { ClienteHealth, EventoHistorico, TarefaRegua } from "@/lib/pos-venda/types";
 import type { Cliente } from "@/lib/clientes/types";
 import { emitAlertsUpdated } from "@/lib/alerts/live-sync";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formNativeSelectClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
 
 function generateId(): string {
   return `tr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -80,7 +87,7 @@ function buildAlertPlaybookTask(alerta: { id: string; titulo: string; descricao:
 export default function PosVendaPage() {
   const { setPrimaryAction } = usePageHeader();
   const [tarefas, setTarefas] = useState<TarefaRegua[]>([]);
-  const [eventos, setEventos] = useState<EventoHistorico[]>([]);
+  const [, setEventos] = useState<EventoHistorico[]>([]);
   const [clienteHealth, setClienteHealth] = useState<ClienteHealth[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [lixeira, setLixeira] = useState<TarefaRegua[]>([]);
@@ -90,9 +97,6 @@ export default function PosVendaPage() {
   const [alertTasks, setAlertTasks] = useState<TarefaRegua[]>([]);
   const [podeVerLixeira, setPodeVerLixeira] = useState(false);
   const [lixeiraOpen, setLixeiraOpen] = useState(false);
-  const [removerOpen, setRemoverOpen] = useState(false);
-  const [removerTarefa, setRemoverTarefa] = useState<TarefaRegua | null>(null);
-  const [motivoRemocao, setMotivoRemocao] = useState("");
   const [removendo, setRemovendo] = useState(false);
   const [restaurarOpen, setRestaurarOpen] = useState(false);
   const [restaurarItem, setRestaurarItem] = useState<TarefaRegua | null>(null);
@@ -110,6 +114,7 @@ export default function PosVendaPage() {
     setPrimaryAction({
       label: "Novo Agendamento",
       onClick: () => setDrawerAgendarOpen(true),
+      showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
   }, [setPrimaryAction]);
@@ -198,16 +203,6 @@ export default function PosVendaPage() {
   const abrirPlaybook = (tarefa: TarefaRegua) => {
     setPlaybookTarefa(tarefa);
     setDrawerPlaybookOpen(true);
-  };
-
-  const abrirRemocao = (tarefa: TarefaRegua) => {
-    if (tarefa.id.startsWith("alert-")) {
-      window.alert("Alertas do sistema não vão para a lixeira de tarefas. Abra o item e marque como tratado.");
-      return;
-    }
-    setRemoverTarefa(tarefa);
-    setMotivoRemocao("");
-    setRemoverOpen(true);
   };
 
   const handleRegistrarResultado = (tarefa: TarefaRegua, descricaoResultado: string) => {
@@ -342,8 +337,8 @@ export default function PosVendaPage() {
     setDrawerAgendarOpen(false);
   };
 
-  const handleEnviarParaLixeira = async () => {
-    if (!removerTarefa) {
+  const handleEnviarParaLixeira = async (motivoRemocao: string) => {
+    if (!playbookTarefa) {
       window.alert("Não foi possível enviar para a lixeira: item não selecionado.");
       return;
     }
@@ -353,7 +348,7 @@ export default function PosVendaPage() {
     }
     setRemovendo(true);
     try {
-      const res = await fetch(`/api/pos-venda/tarefas/${removerTarefa.id}`, {
+      const res = await fetch(`/api/pos-venda/tarefas/${playbookTarefa.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ motivo: motivoRemocao.trim() }),
@@ -361,16 +356,13 @@ export default function PosVendaPage() {
       if (!res.ok) {
         if (res.status === 404) {
           // Item local ainda não persistido no banco: mantém comportamento de lixeira no front.
-          setTarefas((prev) => prev.filter((t) => t.id !== removerTarefa.id));
+          setTarefas((prev) => prev.filter((t) => t.id !== playbookTarefa.id));
           setLixeira((prev) => [
             ...prev,
-            { ...removerTarefa, removidaEm: new Date().toISOString(), removidaMotivo: motivoRemocao.trim() },
+            { ...playbookTarefa, removidaEm: new Date().toISOString(), removidaMotivo: motivoRemocao.trim() },
           ]);
-          setRemoverOpen(false);
           setDrawerPlaybookOpen(false);
           setPlaybookTarefa(null);
-          setRemoverTarefa(null);
-          setMotivoRemocao("");
           return;
         }
         const payload = await res.json().catch(() => null) as { error?: { message?: string } } | null;
@@ -378,28 +370,25 @@ export default function PosVendaPage() {
         window.alert(message);
         return;
       }
-      setTarefas((prev) => prev.filter((t) => t.id !== removerTarefa.id));
+      setTarefas((prev) => prev.filter((t) => t.id !== playbookTarefa.id));
       setLixeira((prev) => [
         ...prev,
-        { ...removerTarefa, removidaEm: new Date().toISOString(), removidaMotivo: motivoRemocao.trim() },
+        { ...playbookTarefa, removidaEm: new Date().toISOString(), removidaMotivo: motivoRemocao.trim() },
       ]);
       setEventos((prev) => [
         ...prev,
         {
           id: `ev-${Date.now()}`,
-          clienteId: removerTarefa.clienteId,
+          clienteId: playbookTarefa.clienteId,
           tipo: "alerta",
-          titulo: `Item movido para lixeira: ${removerTarefa.titulo}`,
+          titulo: `Item movido para lixeira: ${playbookTarefa.titulo}`,
           descricao: motivoRemocao.trim(),
           data: new Date().toISOString(),
-          categoria: removerTarefa.categoria,
+          categoria: playbookTarefa.categoria,
         },
       ]);
-      setRemoverOpen(false);
       setDrawerPlaybookOpen(false);
       setPlaybookTarefa(null);
-      setRemoverTarefa(null);
-      setMotivoRemocao("");
     } catch {
       window.alert("Falha de rede ao enviar para a lixeira. Verifique o servidor e tente novamente.");
     } finally {
@@ -451,21 +440,11 @@ export default function PosVendaPage() {
   if (janela === "7d") fimJanela.setDate(fimJanela.getDate() + 7);
   if (janela === "30d") fimJanela.setDate(fimJanela.getDate() + 30);
   if (janela === "60d") fimJanela.setDate(fimJanela.getDate() + 60);
-  const inicioHistorico = new Date(hoje);
-  if (janela === "7d") inicioHistorico.setDate(inicioHistorico.getDate() - 7);
-  if (janela === "30d") inicioHistorico.setDate(inicioHistorico.getDate() - 30);
-  if (janela === "60d") inicioHistorico.setDate(inicioHistorico.getDate() - 60);
-
   const tarefasVisao = tarefas.filter((t) => new Date(`${t.dataAgendada}T00:00:00`).getTime() <= fimJanela.getTime());
   const alertTasksVisao = alertTasks.filter((t) => new Date(`${t.dataAgendada}T00:00:00`).getTime() <= fimJanela.getTime());
   // A Régua e as Ações Prioritárias precisam mostrar também atrasos (datas < hoje).
   const tarefasRegua = tarefas;
   const alertTasksFuturas = alertTasks;
-  const eventosVisao = eventos.filter((ev) => {
-    const data = new Date(ev.data).getTime();
-    if (janela === "hoje") return data >= hoje.getTime();
-    return data >= inicioHistorico.getTime();
-  });
   const lixeiraFiltrada = useMemo(() => {
     const term = lixeiraBusca.trim().toLowerCase();
     const deTs = lixeiraDe ? new Date(`${lixeiraDe}T00:00:00`).getTime() : null;
@@ -544,83 +523,34 @@ export default function PosVendaPage() {
           setPlaybookTarefa(null);
         }}
         title={playbookTarefa ? `${playbookTarefa.titulo} — ${playbookTarefa.clienteNome}` : "Detalhes da ação"}
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PlaybookDrawer
             tarefa={playbookTarefa}
             onRegistrarResultado={handleRegistrarResultado}
             onAdiar={handleAdiar}
+            podeEnviarParaLixeira={!!playbookTarefa && !playbookTarefa.id.startsWith("alert-")}
+            enviandoLixeira={removendo}
+            onEnviarParaLixeira={(motivo) => void handleEnviarParaLixeira(motivo)}
             onFechar={() => {
               setDrawerPlaybookOpen(false);
               setPlaybookTarefa(null);
             }}
           />
-          {playbookTarefa && !playbookTarefa.id.startsWith("alert-") && (
-            <div className="border-t border-slate-200 p-4 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => {
-                  if (removerOpen && removerTarefa?.id === playbookTarefa.id) {
-                    setRemoverOpen(false);
-                    setRemoverTarefa(null);
-                    setMotivoRemocao("");
-                    return;
-                  }
-                  abrirRemocao(playbookTarefa);
-                }}
-                className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
-              >
-                Enviar para lixeira
-              </button>
-              {removerOpen && removerTarefa?.id === playbookTarefa.id && (
-                <div className="mt-3 space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-3 dark:border-red-500/40 dark:bg-red-950/20">
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    Este item não será excluído permanentemente. Ele ficará na lixeira para rastreabilidade.
-                  </p>
-                  <div>
-                    <label htmlFor="motivo-remocao-inline" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Motivo da remoção
-                    </label>
-                    <textarea
-                      id="motivo-remocao-inline"
-                      value={motivoRemocao}
-                      onChange={(e) => setMotivoRemocao(e.target.value)}
-                      rows={3}
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                      placeholder="Descreva o motivo para enviar este item à lixeira."
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRemoverOpen(false);
-                        setRemoverTarefa(null);
-                        setMotivoRemocao("");
-                      }}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={removendo || !motivoRemocao.trim()}
-                      onClick={() => void handleEnviarParaLixeira()}
-                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {removendo ? "Enviando..." : "Confirmar envio"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </DrawerSheet>
 
       {/* Drawer: Agendar tarefa (régua recorrente opcional) */}
-      <DrawerSheet open={drawerAgendarOpen} onClose={() => setDrawerAgendarOpen(false)} title="Novo agendamento">
-        <div className="overflow-y-auto">
+      <DrawerSheet
+        open={drawerAgendarOpen}
+        onClose={() => setDrawerAgendarOpen(false)}
+        title="Novo agendamento"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AgendarTarefaForm
             clientes={clientes}
             onSave={handleAgendar}
@@ -630,31 +560,34 @@ export default function PosVendaPage() {
       </DrawerSheet>
 
       <DrawerSheet open={lixeiraOpen} onClose={() => setLixeiraOpen(false)} title="Lixeira do Pós-venda" maxWidth="sm:max-w-3xl">
-        <div className="space-y-3 p-4 lg:p-6">
+        <div className="space-y-3 overflow-y-auto overscroll-contain p-4 lg:p-6">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <input
-              type="search"
-              value={lixeiraBusca}
-              onChange={(e) => setLixeiraBusca(e.target.value)}
-              placeholder="Buscar na lixeira"
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-            />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+              <input
+                type="search"
+                value={lixeiraBusca}
+                onChange={(e) => setLixeiraBusca(e.target.value)}
+                placeholder="Buscar na lixeira"
+                className={`${formInputClass} pl-9`}
+              />
+            </div>
             <input
               type="date"
               value={lixeiraDe}
               onChange={(e) => setLixeiraDe(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+              className={formInputClass}
             />
             <input
               type="date"
               value={lixeiraAte}
               onChange={(e) => setLixeiraAte(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+              className={formInputClass}
             />
             <select
               value={lixeiraPeriodo}
               onChange={(e) => setLixeiraPeriodo(e.target.value as "todos" | "7" | "30" | "60")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+              className={formNativeSelectClass}
             >
               <option value="todos">Período: Todos</option>
               <option value="7">Últimos 7 dias</option>
@@ -679,9 +612,9 @@ export default function PosVendaPage() {
                 <button
                   type="button"
                   onClick={() => abrirRestauro(item)}
-                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                   Restaurar
                 </button>
               )}
@@ -691,32 +624,40 @@ export default function PosVendaPage() {
       </DrawerSheet>
 
       <DrawerSheet open={restaurarOpen} onClose={() => setRestaurarOpen(false)} title="Restaurar item da lixeira" maxWidth="sm:max-w-xl">
-        <div className="space-y-4 p-4 lg:p-6">
+        <div className="space-y-4 overflow-y-auto overscroll-contain p-4 lg:p-6">
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Informe o motivo do retorno para manter rastreabilidade completa.
           </p>
-          <textarea
-            value={motivoRestauro}
-            onChange={(e) => setMotivoRestauro(e.target.value)}
-            rows={4}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-            placeholder="Motivo da restauração"
-          />
+          <div>
+            <label htmlFor="motivo-restauro-pos-venda" className={formLabelClass}>
+              Motivo da restauração
+            </label>
+            <textarea
+              id="motivo-restauro-pos-venda"
+              value={motivoRestauro}
+              onChange={(e) => setMotivoRestauro(e.target.value)}
+              rows={4}
+              className={`${formTextareaClass} mt-1`}
+              placeholder="Descreva por que este item está voltando à régua."
+            />
+          </div>
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setRestaurarOpen(false)}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
-            >
-              Cancelar
+            <button type="button" onClick={() => setRestaurarOpen(false)} className={formModalCancelButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <X className="h-4 w-4 shrink-0" aria-hidden />
+                Cancelar
+              </span>
             </button>
             <button
               type="button"
               disabled={restaurando || !motivoRestauro.trim()}
               onClick={() => void handleRestaurarDaLixeira()}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-slate-900"
             >
-              {restaurando ? "Restaurando..." : "Confirmar restauração"}
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4 shrink-0" aria-hidden />
+                {restaurando ? "Restaurando..." : "Confirmar restauração"}
+              </span>
             </button>
           </div>
         </div>

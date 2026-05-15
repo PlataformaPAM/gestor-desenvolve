@@ -34,8 +34,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (vinculo.tipo === "rh") {
       const pessoa = await prisma.colaboradorRH.findUnique({
         where: { id: vinculo.id },
-        select: { cpfCnpj: true },
+        select: { cpfCnpj: true, cadastroEfetivado: true },
       });
+      if (pessoa?.cadastroEfetivado === false) {
+        return fail(
+          "BAD_REQUEST",
+          "Não é permitido vincular usuário a consultor em pré-cadastro. Efetive o cadastro no RH antes.",
+          400
+        );
+      }
       if (!pessoa?.cpfCnpj) {
         return fail("BAD_REQUEST", "Pessoa vinculada sem CPF/CNPJ.", 400);
       }

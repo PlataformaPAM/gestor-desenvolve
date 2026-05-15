@@ -12,6 +12,12 @@ export type FornecedorRhSlim = {
   cpfCnpj?: string;
 };
 
+/** Consultores RH elegíveis a comissão (lista do bootstrap Financeiro). */
+export type ConsultorComissaoSlim = {
+  id: string;
+  nome: string;
+};
+
 export type Lancamento = {
   id: string;
   tipo: LancamentoTipo;

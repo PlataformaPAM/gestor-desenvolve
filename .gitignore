@@ -28,6 +28,7 @@
 # backups locais (não versionar zips / bundles exportados)
 /backups/*.zip
 /backups/*.bundle
+/backups/archive/
 
 # misc
 .DS_Store

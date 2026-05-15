@@ -5,6 +5,7 @@ import { TicketsTable } from "@/components/helpdesk/tickets-table";
 import type { Ticket, TicketCategoria, TicketPrioridade, TicketStatus } from "@/lib/helpdesk/types";
 import { CATEGORIA_LABELS, PRIORIDADE_LABELS, STATUS_LABELS, getSlaEstado } from "@/lib/helpdesk/constants";
 import { Search } from "lucide-react";
+import { formInputClass, formNativeSelectClass } from "@/components/ui/field-patterns";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { OperacaoViews } from "@/components/ui/operacao-views";
 import { getSituacaoOperacional, sortByPriorizacao, type OperacaoViewId } from "@/lib/operacao/priorizacao";
@@ -59,6 +60,7 @@ export default function PortalChamadosPage() {
   useEffect(() => {
     setPrimaryAction({
       label: "Novo Chamado",
+      showPlusIcon: true,
       onClick: () => {
         setTicketSelecionado(null);
         setSheetOpen(true);
@@ -138,50 +140,51 @@ export default function PortalChamadosPage() {
     }
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+  const selectClass = `${formNativeSelectClass} h-10 min-w-0`;
   if (carregando) return <p className="text-sm text-slate-500 dark:text-slate-400">Carregando chamados...</p>;
 
   return (
     <section className="w-full min-w-0 space-y-6">
-      <OperacaoViews value={operacaoView} onChange={setOperacaoView} closedLabel="Fechados" />
+      <div className="sticky top-0 z-10 space-y-4 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-3 shadow-sm backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/90">
+        <OperacaoViews value={operacaoView} onChange={setOperacaoView} closedLabel="Fechados" />
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3">
-        <div className="relative w-full min-w-0 lg:max-w-sm lg:flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Busca por ID, assunto ou cliente..."
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-        </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:items-end lg:gap-2">
-          <select value={statusFilter} onChange={(e) => setStatusFilter((e.target.value || "") as "" | TicketStatus)} className={`${inputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
-            <option value="">Status: Todos</option>
-            {(Object.entries(STATUS_LABELS) as [TicketStatus, string][]).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select value={categoriaFilter} onChange={(e) => setCategoriaFilter((e.target.value || "") as "" | TicketCategoria)} className={`${inputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
-            <option value="">Categoria: Todas</option>
-            {(Object.entries(CATEGORIA_LABELS) as [TicketCategoria, string][]).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select value={prioridadeFilter} onChange={(e) => setPrioridadeFilter((e.target.value || "") as "" | TicketPrioridade)} className={`${inputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
-            <option value="">Prioridade: Todas</option>
-            {(Object.entries(PRIORIDADE_LABELS) as [TicketPrioridade, string][]).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select value={slaFilter} onChange={(e) => setSlaFilter((e.target.value || "") as "" | "no_prazo" | "atencao" | "atrasado")} className={`${inputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
-            <option value="">SLA: Todos</option>
-            <option value="no_prazo">No Prazo</option>
-            <option value="atencao">Atenção</option>
-            <option value="atrasado">Atrasado</option>
-          </select>
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3">
+          <div className="relative w-full min-w-0 lg:max-w-sm lg:flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Busca por ID, assunto ou cliente..."
+              className={`${formInputClass} h-10 min-w-0 pl-9`}
+            />
+          </div>
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:items-end lg:gap-2">
+            <select value={statusFilter} onChange={(e) => setStatusFilter((e.target.value || "") as "" | TicketStatus)} className={`${selectClass} w-full lg:min-w-[7.5rem]`}>
+              <option value="">Status: Todos</option>
+              {(Object.entries(STATUS_LABELS) as [TicketStatus, string][]).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <select value={categoriaFilter} onChange={(e) => setCategoriaFilter((e.target.value || "") as "" | TicketCategoria)} className={`${selectClass} w-full lg:min-w-[7.5rem]`}>
+              <option value="">Categoria: Todas</option>
+              {(Object.entries(CATEGORIA_LABELS) as [TicketCategoria, string][]).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <select value={prioridadeFilter} onChange={(e) => setPrioridadeFilter((e.target.value || "") as "" | TicketPrioridade)} className={`${selectClass} w-full lg:min-w-[7.5rem]`}>
+              <option value="">Prioridade: Todas</option>
+              {(Object.entries(PRIORIDADE_LABELS) as [TicketPrioridade, string][]).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <select value={slaFilter} onChange={(e) => setSlaFilter((e.target.value || "") as "" | "no_prazo" | "atencao" | "atrasado")} className={`${selectClass} w-full lg:min-w-[7.5rem]`}>
+              <option value="">SLA: Todos</option>
+              <option value="no_prazo">No Prazo</option>
+              <option value="atencao">Atenção</option>
+              <option value="atrasado">Atrasado</option>
+            </select>
+          </div>
         </div>
       </div>
 

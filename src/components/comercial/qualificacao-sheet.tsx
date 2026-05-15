@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { Save, X } from "lucide-react";
 import { DrawerSheet } from "./drawer-sheet";
 import type { Lead } from "@/lib/comercial/types";
-import { comercialInputClass, comercialLabelClass } from "./field-styles";
+import {
+  comercialInputClass,
+  comercialLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "./field-styles";
 
 type QualificacaoSheetProps = {
   open: boolean;
@@ -64,19 +70,18 @@ export function QualificacaoSheet({
               Use o ID do cliente já cadastrado no módulo Clientes, ou cadastre primeiro e depois vincule aqui.
             </p>
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 font-medium text-slate-600 hover:bg-slate-100"
-            >
-              Cancelar
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
+            <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <X className="h-4 w-4" />
+                Cancelar
+              </span>
             </button>
-            <button
-              type="submit"
-              className="flex-1 rounded-lg bg-[#6D28D9] px-4 py-2.5 font-semibold text-white hover:bg-purple-700"
-            >
-              Vincular e liberar
+            <button type="submit" className={formModalSubmitButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Vincular e liberar
+              </span>
             </button>
           </div>
         </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { X } from "lucide-react";
 import confetti from "canvas-confetti";
 
 type FechadoCelebrationModalProps = {
@@ -83,8 +84,9 @@ export function FechadoCelebrationModal({
         <button
           type="button"
           onClick={onClose}
-          className="w-full rounded-lg bg-[#6D28D9] py-2.5 text-sm font-medium text-white hover:bg-[#5B21B6]"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#6D28D9] py-2.5 text-sm font-medium text-white hover:bg-[#5B21B6]"
         >
+          <X className="h-4 w-4 shrink-0" aria-hidden />
           Fechar
         </button>
       </div>

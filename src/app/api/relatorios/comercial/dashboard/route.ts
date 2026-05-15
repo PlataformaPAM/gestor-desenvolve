@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const { now, start, end } = monthBounds();
     const leads = await prisma.lead.findMany({
-      where: { createdAt: { gte: start, lte: end } },
+      where: { createdAt: { gte: start, lte: end }, registroLead: "oportunidade" },
       orderBy: { createdAt: "asc" },
     });
 

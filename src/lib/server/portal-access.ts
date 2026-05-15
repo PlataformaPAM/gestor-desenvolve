@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { COOKIE_NAME, decodeSession } from "@/lib/auth";
+import type { ModuloPermissao } from "@/lib/configuracoes/types";
+import { withAdminOverride } from "@/lib/configuracoes/permission-utils";
+import { loadPerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
 
 export type PortalContext = {
   userId: string;
@@ -31,17 +34,38 @@ export async function resolvePortalContext(req: Request): Promise<PortalContext 
     }),
     prisma.perfilAcesso.findUnique({
       where: { id: perfilId },
-      select: { nome: true },
+      include: { permissoes: true },
     }),
   ]);
 
   if (!usuario?.ativo) return null;
-  const clienteIds = Array.from(new Set(vinculos.map((v) => v.pessoaId)));
+
+  const permissoesBase = Object.fromEntries(
+    (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
+  ) as Partial<Record<ModuloPermissao, boolean>>;
+  const extrasByPerfil = await loadPerfilPermissoesExtras(prisma, [perfilId]);
+  const mergedPermissoes = withAdminOverride(
+    {
+      ...permissoesBase,
+      ...(extrasByPerfil[perfilId] ?? {}),
+    },
+    perfil?.nome ?? ""
+  );
+
+  let clienteIds = Array.from(new Set(vinculos.map((v) => v.pessoaId)));
+  const hadVinculoCliente = clienteIds.length > 0;
+
+  if (!hadVinculoCliente && mergedPermissoes.portal_cliente) {
+    const all = await prisma.cliente.findMany({ select: { id: true } });
+    clienteIds = all.map((c) => c.id);
+  }
+
   if (clienteIds.length === 0) return null;
+
   const perfilNome = (perfil?.nome ?? "").toLowerCase();
   const canManagePortalUsers =
     session?.isAdminCliente === true ||
-    session?.permissoes?.configuracoes === true ||
+    mergedPermissoes.configuracoes === true ||
     (perfilNome.includes("cliente") && (perfilNome.includes("admin") || perfilNome.includes("administrador")));
 
   return {
@@ -56,4 +80,3 @@ export function hasClienteAccess(ctx: PortalContext, clienteId: string | null | 
   if (!clienteId) return false;
   return ctx.clienteIds.includes(clienteId);
 }
-

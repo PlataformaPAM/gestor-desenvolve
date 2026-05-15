@@ -70,6 +70,18 @@ export function encodeDescricao(descricaoTecnica: string, meta: SolucaoMeta): st
   return `${META_MARKER}${JSON.stringify(out)}\n${descricaoTecnica || ""}`.trim();
 }
 
+/**
+ * Categoria usada em regras e filtros: coluna `SolucaoCatalogo.categoria` (preferencial) ou legado em `[SOLUCAO_META]` na descrição.
+ */
+export function categoriaEfetivaSolucaoCatalogo(
+  s: Pick<SolucaoCatalogo, "descricao" | "categoria">
+): string {
+  const col = (s.categoria ?? "").trim();
+  if (col) return col;
+  const parsed = decodeMeta(s.descricao);
+  return (parsed.meta.categoria ?? "").trim();
+}
+
 export function mapSolucao(s: SolucaoCatalogo): SolucaoFront {
   const parsed = decodeMeta(s.descricao);
   const { recorrencia, parcelasPadrao } = normalizeRecorrenciaMeta(parsed.meta);
@@ -77,7 +89,7 @@ export function mapSolucao(s: SolucaoCatalogo): SolucaoFront {
     id: s.id,
     nome: s.nome,
     descricaoTecnica: parsed.descricaoTecnica,
-    categoria: parsed.meta.categoria || "",
+    categoria: categoriaEfetivaSolucaoCatalogo(s),
     tipo: parsed.meta.tipo || "servico",
     valorVenda: s.valorBase || 0,
     recorrencia,

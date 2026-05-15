@@ -16,6 +16,7 @@ export async function GET() {
         orderBy: { createdAt: "desc" },
       }),
       prisma.lead.findMany({
+        where: { registroLead: "oportunidade" },
         include: {
           criadoPor: { select: { nomeExibicao: true } },
           atualizadoPor: { select: { nomeExibicao: true } },

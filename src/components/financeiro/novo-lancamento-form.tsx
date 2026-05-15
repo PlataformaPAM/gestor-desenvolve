@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { Lancamento, LancamentoTipo, TipoRecorrencia } from "@/lib/financeiro/types";
+import { LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES } from "@/lib/financeiro/constants";
 import { splitValorTotalEmParcelas } from "@/lib/financeiro/lancamento-utils";
 import clsx from "clsx";
+import { Save, X } from "lucide-react";
 import { DateField } from "@/components/ui/date-field";
 import {
   formLabelClass,
@@ -62,7 +64,7 @@ export function buildLancamentosFromForm(
     return [{ ...base, id: generateId("u", newBatchStamp(), 0), vencimento } as Lancamento];
   }
 
-  const n = Math.max(2, tipoRecorrencia === "parcelado" ? parcelas : 12);
+  const n = Math.max(2, tipoRecorrencia === "parcelado" ? parcelas : LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES);
   const batch = newBatchStamp();
   const idPai = generateId("g", batch, 0);
   const valoresParcelas =
@@ -98,7 +100,7 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
   );
   const [valor, setValor] = useState("");
   const [tipoRecorrencia, setTipoRecorrencia] = useState<TipoRecorrencia>("unico");
-  const [parcelas, setParcelas] = useState(12);
+  const [parcelas, setParcelas] = useState(LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +113,7 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
       vencimento,
       valorNum,
       tipoRecorrencia,
-      tipoRecorrencia === "parcelado" ? Math.max(2, parcelas) : 12
+      tipoRecorrencia === "parcelado" ? Math.max(2, parcelas) : LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES
     );
     onSave(list);
   };
@@ -184,7 +186,7 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {tipoRecorrencia === "unico" && "Lançamento padrão, uma única vez."}
           {tipoRecorrencia === "fixo_mensal" &&
-            "Projeta o mesmo valor para os próximos 12 meses no fluxo de caixa."}
+            `Projeta o mesmo valor para os próximos ${LANCAMENTO_FIXO_MENSAL_PROJECAO_MESES} meses no fluxo de caixa.`}
           {tipoRecorrencia === "parcelado" &&
             "O valor informado é o total do acordo: o sistema divide em N parcelas de mesmo valor (centavos distribuídos nas primeiras parcelas, se necessário), com vencimento mensal a partir da data."}
         </p>
@@ -231,10 +233,16 @@ export function NovoLancamentoForm({ onSave, onCancel }: NovoLancamentoFormProps
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end sm:gap-3">
         <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
-          Cancelar
+          <span className="inline-flex items-center gap-2">
+            <X className="h-4 w-4 shrink-0" aria-hidden />
+            Cancelar
+          </span>
         </button>
         <button type="submit" className={formModalSubmitButtonClass}>
-          Salvar
+          <span className="inline-flex items-center gap-2">
+            <Save className="h-4 w-4 shrink-0" aria-hidden />
+            Salvar
+          </span>
         </button>
       </div>
     </form>

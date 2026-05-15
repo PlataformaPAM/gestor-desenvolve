@@ -3,7 +3,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapColaborador } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
+import {
+  failCadastroEfetivadoMigrationPending,
+  isCadastroEfetivadoMissingInDatabase,
+} from "@/lib/server/rh-colaborador-db-errors";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { RH_CONSULTOR_PRE_CADASTRO_CARGO } from "@/lib/rh/pre-cadastro-consultor";
 
 function digitsOnly(v: string | undefined): string {
   return (v ?? "").replace(/\D/g, "");
@@ -27,9 +32,71 @@ function isTipoContratoEnumError(error: unknown): boolean {
 }
 
 export async function POST(req: Request) {
-  const body = await parseJsonSafe<{ colaborador?: ColaboradorParceiro }>(req);
+  const body = await parseJsonSafe<{ colaborador?: ColaboradorParceiro; preCadastroConsultor?: boolean }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const c = body.value.colaborador;
+  const preCadastroConsultor = body.value.preCadastroConsultor === true;
+
+  if (preCadastroConsultor) {
+    if (!c || c.tipo !== "vendedor_externo") {
+      return fail("BAD_REQUEST", "Pré-cadastro inválido: use tipo consultor (vendedor_externo).", 400);
+    }
+    if (!c.nome?.trim() || !c.tipoContrato) {
+      return fail("BAD_REQUEST", "Informe nome e tipo de contrato para o pré-cadastro.", 400);
+    }
+    try {
+      const dataPre = {
+        id: c.id || undefined,
+        nome: c.nome.trim(),
+        cargoOuFuncao: RH_CONSULTOR_PRE_CADASTRO_CARGO,
+        tipoContrato: c.tipoContrato,
+        status: "ativo" as const,
+        tipoPessoa: "vendedor_externo" as const,
+        cadastroEfetivado: false,
+        email: null,
+        telefone: null,
+        cpfCnpj: null,
+        totalVendasMes: null,
+        ultimoAcesso: null,
+        contatosFornecedor: Prisma.JsonNull,
+      };
+      const include = { dadosBancarios: true, documentos: true };
+      let created;
+      try {
+        created = await prisma.colaboradorRH.create({ data: dataPre, include });
+      } catch (error) {
+        if (isCadastroEfetivadoMissingInDatabase(error)) {
+          return failCadastroEfetivadoMigrationPending();
+        }
+        if (isContatosFornecedorColumnError(error)) {
+          const { contatosFornecedor: _, ...semContatos } = dataPre;
+          created = await prisma.colaboradorRH.create({ data: semContatos, include });
+        } else {
+          throw error;
+        }
+      }
+      await writeAuditLog(prisma, {
+        acao: "Consultor pré-cadastrado",
+        modulo: "rh",
+        detalhes: `Pré-cadastro ${created.nome} (${created.id})`,
+      });
+      return ok({ colaborador: mapColaborador(created) }, 201);
+    } catch (error) {
+      if (isCadastroEfetivadoMissingInDatabase(error)) {
+        return failCadastroEfetivadoMigrationPending();
+      }
+      if (isTipoContratoEnumError(error)) {
+        return fail(
+          "BAD_REQUEST",
+          "Tipo de contrato indisponível no banco atual. Atualize as migrations e tente novamente.",
+          400
+        );
+      }
+      console.error("[rh/colaboradores POST pre]", error);
+      return fail("INTERNAL_ERROR", "Não foi possível salvar o pré-cadastro. Tente novamente.", 500);
+    }
+  }
+
   if (!c?.nome?.trim() || !c?.cargoOuFuncao?.trim()) {
     return fail("BAD_REQUEST", "Payload inválido.", 400);
   }
@@ -55,6 +122,7 @@ export async function POST(req: Request) {
       tipoContrato: c.tipoContrato,
       status: c.status,
       tipoPessoa: c.tipo,
+      cadastroEfetivado: true,
       email: c.email ?? null,
       telefone: c.telefone ?? null,
       cpfCnpj: c.cpfCnpj ?? null,
@@ -94,12 +162,17 @@ export async function POST(req: Request) {
     try {
       created = await prisma.colaboradorRH.create({ data: dataComContatos, include });
     } catch (error) {
+      if (isCadastroEfetivadoMissingInDatabase(error)) {
+        return failCadastroEfetivadoMigrationPending();
+      }
       if (
-        !((c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo") &&
-          isContatosFornecedorColumnError(error))
-      )
+        (c.tipo === "fornecedor_parceiro" || c.tipo === "vendedor_externo") &&
+        isContatosFornecedorColumnError(error)
+      ) {
+        created = await prisma.colaboradorRH.create({ data: baseData, include });
+      } else {
         throw error;
-      created = await prisma.colaboradorRH.create({ data: baseData, include });
+      }
     }
 
     await writeAuditLog(prisma, {
@@ -109,6 +182,9 @@ export async function POST(req: Request) {
     });
     return ok({ colaborador: mapColaborador(created) }, 201);
   } catch (error) {
+    if (isCadastroEfetivadoMissingInDatabase(error)) {
+      return failCadastroEfetivadoMigrationPending();
+    }
     if (isTipoContratoEnumError(error)) {
       return fail(
         "BAD_REQUEST",
@@ -119,4 +195,3 @@ export async function POST(req: Request) {
     return fail("INTERNAL_ERROR", "Não foi possível salvar a pessoa. Tente novamente.", 500);
   }
 }
-

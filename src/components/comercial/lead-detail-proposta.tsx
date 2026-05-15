@@ -1,18 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { FileDown, FileText, Trash2, Wallet, Circle, RefreshCw, ListOrdered } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FileDown,
+  FileText,
+  Mail,
+  Plus,
+  Trash2,
+  Wallet,
+  Circle,
+  RefreshCw,
+  ListOrdered,
+  X,
+  Eye,
+} from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { SearchableOption } from "@/components/ui/searchable-select";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { Toast } from "@/components/ui/toast";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 import {
   comercialInputClass,
   comercialInputCompactClass,
   comercialLabelClass,
   FormDateField,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
 } from "./field-styles";
 import type {
   Lead,
@@ -263,6 +279,7 @@ export function LeadDetailProposta({
   const [condicoesStr, setCondicoesStr] = useState("");
   const [solucaoIdxParaRemover, setSolucaoIdxParaRemover] = useState<number | null>(null);
   const [modelosDocumento, setModelosDocumento] = useState<ModeloDocumentoLista[]>([]);
+  const [modelosFetchStatus, setModelosFetchStatus] = useState<"loading" | "error" | "ready">("loading");
   const [modeloDocumentoId, setModeloDocumentoId] = useState("");
   const [docPreviewOpen, setDocPreviewOpen] = useState(false);
   const [docPreviewLoading, setDocPreviewLoading] = useState(false);
@@ -332,26 +349,35 @@ export function LeadDetailProposta({
     };
   }, [lead.id]);
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const res = await fetch("/api/configuracoes/documentos-modelos", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          success?: boolean;
-          data?: { modelos?: ModeloDocumentoLista[] };
-        };
-        if (!active || !json.success || !Array.isArray(json.data?.modelos)) return;
-        setModelosDocumento(json.data.modelos.filter((m) => m.ativo));
-      } catch {
-        // noop
+  const fetchModelos = useCallback(async () => {
+    setModelosFetchStatus("loading");
+    try {
+      const res = await fetch("/api/configuracoes/documentos-modelos", { cache: "no-store" });
+      if (!res.ok) {
+        setModelosDocumento([]);
+        setModelosFetchStatus("error");
+        return;
       }
-    })();
-    return () => {
-      active = false;
-    };
+      const json = (await res.json()) as {
+        success?: boolean;
+        data?: { modelos?: ModeloDocumentoLista[] };
+      };
+      if (!json.success || !Array.isArray(json.data?.modelos)) {
+        setModelosDocumento([]);
+        setModelosFetchStatus("error");
+        return;
+      }
+      setModelosDocumento(json.data.modelos.filter((m) => m.ativo));
+      setModelosFetchStatus("ready");
+    } catch {
+      setModelosDocumento([]);
+      setModelosFetchStatus("error");
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchModelos();
+  }, [fetchModelos]);
 
   useEffect(() => {
     if (addingId && selectedCatalog) {
@@ -764,7 +790,9 @@ export function LeadDetailProposta({
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <label className={comercialLabelClass}>Condições de pagamento *</label>
+                <label className={comercialLabelClass}>
+                  Condições de pagamento <span className="text-red-600 dark:text-red-400">*</span>
+                </label>
                 <input
                   type="text"
                   value={condicoesStr}
@@ -779,7 +807,10 @@ export function LeadDetailProposta({
                 disabled={!condicoesStr.trim()}
                 className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
               >
-                Adicionar
+                <span className="inline-flex items-center gap-2">
+                  <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                  Adicionar
+                </span>
               </button>
               <button
                 type="button"
@@ -787,9 +818,12 @@ export function LeadDetailProposta({
                   setAddingId(null);
                   setCondicoesStr("");
                 }}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                className={formModalCancelButtonClass}
               >
-                Cancelar
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </span>
               </button>
             </div>
           </div>
@@ -902,20 +936,47 @@ export function LeadDetailProposta({
         )}
       </div>
 
-      {modelosDocumento.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Documento a partir de modelo
-          </h3>
-          <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
-            Usa os dados desta oportunidade e do cliente vinculado (quando houver) para preencher as variáveis do
-            modelo criado em Configurações → Construtor de Documentos.
-          </p>
+      <div>
+        <h3 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+          Documento a partir de modelo
+        </h3>
+        <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
+          Usa os dados desta oportunidade e do cliente vinculado (quando houver) para preencher as variáveis do modelo
+          criado em Configurações → Construtor de Documentos.
+        </p>
+        {modelosFetchStatus === "loading" ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Carregando modelos…</p>
+        ) : modelosFetchStatus === "error" ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-100">
+            <p>Não foi possível carregar os modelos de documento.</p>
+            <button
+              type="button"
+              onClick={() => void fetchModelos()}
+              className={`${formModalCancelButtonClass} mt-2`}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : modelosDocumento.length === 0 ? (
+          <div className="rounded-md border border-slate-200 bg-slate-50/90 p-3 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-200">
+            <p className="mb-2">
+              Não há modelos ativos disponíveis. Cadastre ou ative um modelo em{" "}
+              <Link
+                href="/configuracoes/construtor-documentos"
+                className="font-medium text-[#6D28D9] underline underline-offset-2 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+              >
+                Configurações → Construtor de Documentos
+              </Link>
+              .
+            </p>
+            <button type="button" onClick={() => void fetchModelos()} className={formModalCancelButtonClass}>
+              Atualizar lista
+            </button>
+          </div>
+        ) : (
           <div className="space-y-3">
             <div className="w-full">
-              <label className={comercialLabelClass}>
-                Modelo ativo
-              </label>
+              <label className={comercialLabelClass}>Modelo ativo</label>
               <SearchableSelect
                 options={modeloDocumentoOptions}
                 value={modeloDocumentoId}
@@ -926,37 +987,41 @@ export function LeadDetailProposta({
                 leadingIcon={FileText}
               />
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 type="button"
                 onClick={() => void visualizarDocumentoModelo()}
                 disabled={docPreviewLoading || !modeloDocumentoId}
-                className="inline-flex min-h-[2.625rem] min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className={formModalCancelButtonClass}
               >
-                {docPreviewLoading ? (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <FileText className="h-4 w-4 shrink-0" />
-                )}
-                <span className="min-w-0">Visualizar prévia</span>
+                <span className="inline-flex items-center gap-2">
+                  {docPreviewLoading ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <FileText className="h-4 w-4 shrink-0" />
+                  )}
+                  Visualizar prévia
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => void gerarDocumentoModelo()}
                 disabled={docGerarLoading || !modeloDocumentoId}
-                className="inline-flex min-h-[2.625rem] min-w-0 items-center justify-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                className={formModalSubmitButtonClass}
               >
-                {docGerarLoading ? (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <FileDown className="h-4 w-4 shrink-0" />
-                )}
-                <span className="min-w-0">Gerar e registrar</span>
+                <span className="inline-flex items-center gap-2">
+                  {docGerarLoading ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <FileDown className="h-4 w-4 shrink-0" />
+                  )}
+                  Gerar e registrar
+                </span>
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div>
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Documentos já gerados</h3>
@@ -992,15 +1057,17 @@ export function LeadDetailProposta({
                     <button
                       type="button"
                       onClick={() => abrirDocumentoPdf(d.id)}
-                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                      className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
                     >
+                      <Eye className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       Abrir PDF
                     </button>
                     <button
                       type="button"
                       onClick={() => baixarDocumentoPdf(d.id)}
-                      className="rounded border border-[#6D28D9] bg-white px-2 py-1 text-xs text-[#6D28D9] hover:bg-violet-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
+                      className="inline-flex items-center gap-1 rounded border border-[#6D28D9] bg-white px-2 py-1 text-xs text-[#6D28D9] hover:bg-violet-50 dark:border-violet-500 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-800"
                     >
+                      <FileDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       Baixar PDF
                     </button>
                   </div>
@@ -1042,8 +1109,9 @@ export function LeadDetailProposta({
                                   type="button"
                                   onClick={() => void enviarDocumentoPorEmail(d.id, ct.email)}
                                   disabled={!emailValido(ct.email) || sending}
-                                  className="rounded border border-emerald-300 bg-white px-2 py-0.5 text-[11px] text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 dark:hover:bg-slate-800"
+                                  className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-white px-2 py-0.5 text-[11px] text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 dark:hover:bg-slate-800"
                                 >
+                                  <Mail className="h-3 w-3 shrink-0" aria-hidden />
                                   {sending ? "Enviando…" : "E-mail"}
                                 </button>
                                 <button
@@ -1056,8 +1124,9 @@ export function LeadDetailProposta({
                                     setWhatsConfirm({ doc: d, dest: ct });
                                   }}
                                   disabled={!sanitizeTelefoneWhatsapp(ct.telefone)}
-                                  className="rounded border border-green-300 bg-white px-2 py-0.5 text-[11px] text-green-800 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-green-800 dark:bg-slate-900 dark:text-green-200 dark:hover:bg-slate-800"
+                                  className="inline-flex items-center gap-1 rounded border border-green-300 bg-white px-2 py-0.5 text-[11px] text-green-800 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-green-800 dark:bg-slate-900 dark:text-green-200 dark:hover:bg-slate-800"
                                 >
+                                  <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" />
                                   WhatsApp
                                 </button>
                               </div>

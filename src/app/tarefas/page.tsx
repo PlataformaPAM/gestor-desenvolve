@@ -175,6 +175,7 @@ export default function TarefasPage() {
         setSelectedTarefa(null);
         setIsSheetOpen(true);
       },
+      showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
   }, [setPrimaryAction]);
@@ -307,6 +308,11 @@ export default function TarefasPage() {
     void saveTarefa(created, true)
       .then((saved) => {
         setTarefas((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
+        // Garante visibilidade imediata da tarefa recém-criada (independente da visão/filtros anteriores).
+        setOperacaoView("abertos");
+        setStatusFilter("");
+        setPrioridadeFilter("");
+        setResponsavelFilter("");
         showToast("Tarefa interna salva com sucesso.", "success");
       })
       .catch((error) => {
@@ -587,11 +593,7 @@ export default function TarefasPage() {
     });
   }, [tarefaToDelete, selectedTarefa?.id, deleteTarefa, showToast]);
 
-  const sheetTitle = selectedTarefa ? (
-    <span className="truncate font-semibold text-[#6D28D9] dark:text-violet-300">{selectedTarefa.codigo}</span>
-  ) : (
-    "Nova Tarefa"
-  );
+  const sheetTitle = selectedTarefa ? selectedTarefa.codigo : "Nova Tarefa";
 
   return (
     <section className="w-full min-w-0 space-y-6">
@@ -663,6 +665,8 @@ export default function TarefasPage() {
         open={isSheetOpen}
         onClose={handleCloseSheet}
         title={sheetTitle}
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {selectedTarefa ? (
@@ -719,15 +723,13 @@ export default function TarefasPage() {
               onSalvar={handleSalvarTarefa}
             />
           ) : (
-            <div className="overflow-y-auto">
-              <NovaTarefaForm
-                usuarios={usuarios}
-                clientes={clientes}
-                currentUserId={usuarioAtualId || "usuario-atual"}
-                onSave={handleNovaTarefa}
-                onCancel={handleCloseSheet}
-              />
-            </div>
+            <NovaTarefaForm
+              usuarios={usuarios}
+              clientes={clientes}
+              currentUserId={usuarioAtualId || "usuario-atual"}
+              onSave={handleNovaTarefa}
+              onCancel={handleCloseSheet}
+            />
           )}
         </div>
       </DrawerSheet>

@@ -28,7 +28,7 @@ type UpcomingItem = {
 export async function GET() {
   try {
     const [leads, lancamentos, tickets, clientes, tarefas] = await Promise.all([
-      querySafe(() => prisma.lead.findMany(), []),
+      querySafe(() => prisma.lead.findMany({ where: { registroLead: "oportunidade" } }), []),
       querySafe(() => prisma.lancamento.findMany(), []),
       querySafe(() => prisma.helpdeskTicket.findMany(), []),
       querySafe(() => prisma.cliente.findMany(), []),

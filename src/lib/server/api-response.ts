@@ -6,7 +6,9 @@ export type ApiErrorCode =
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "CONFLICT"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  /** Schema do banco atrás do Prisma (ex.: migration não aplicada). */
+  | "MIGRATION_REQUIRED";
 
 export function ok<T>(data: T, status = 200) {
   return NextResponse.json({ success: true, data }, { status });

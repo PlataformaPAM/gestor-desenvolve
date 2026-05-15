@@ -1,3 +1,4 @@
+import type { TipoPessoaRH } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapTarefaFromDb } from "../_shared";
 import { ok } from "@/lib/server/api-response";
@@ -105,20 +106,34 @@ type ColaboradorRhLite = {
   cpfCnpj: string | null;
 };
 
+const RH_TIPOS_COLABORADOR: TipoPessoaRH[] = ["equipe_interna", "vendedor_externo", "fornecedor_parceiro"];
+
+const rhAtivosBaseWhere = {
+  status: "ativo" as const,
+  tipoPessoa: { in: RH_TIPOS_COLABORADOR },
+};
+
 async function loadColaboradoresRhSafe(): Promise<ColaboradorRhLite[]> {
   try {
     return await prisma.colaboradorRH.findMany({
       where: {
-        status: "ativo",
-        tipoPessoa: { in: ["equipe_interna", "vendedor_externo", "fornecedor_parceiro"] },
+        ...rhAtivosBaseWhere,
+        NOT: { AND: [{ tipoPessoa: "vendedor_externo" }, { cadastroEfetivado: false }] },
       },
       orderBy: { nome: "asc" },
       select: { nome: true, email: true, cpfCnpj: true },
     });
   } catch (e) {
-    // RH não pode derrubar bootstrap de tarefas.
-    console.warn("[tarefas/bootstrap] RH indisponível; seguindo apenas com usuarios.", e);
-    return [];
+    try {
+      return await prisma.colaboradorRH.findMany({
+        where: rhAtivosBaseWhere,
+        orderBy: { nome: "asc" },
+        select: { nome: true, email: true, cpfCnpj: true },
+      });
+    } catch (e2) {
+      console.warn("[tarefas/bootstrap] RH indisponível; seguindo apenas com usuarios.", e2);
+      return [];
+    }
   }
 }
 

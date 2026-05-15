@@ -1,8 +1,12 @@
 "use client";
 
+import { Calendar, CalendarClock, Layers, X } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import type { RecurrenceScope } from "@/lib/financeiro/recurrence-save";
-import { formModalCancelButtonClass } from "@/components/ui/field-patterns";
+import {
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "@/components/ui/field-patterns";
 
 type RecurrenceScopeDialogProps = {
   open: boolean;
@@ -40,14 +44,17 @@ export function RecurrenceScopeDialog({ open, onClose, onConfirm, disabled }: Re
           Valores já pagos não têm o valor monetário alterado em lote (exceto na linha que você editou). Texto e
           dados de cadastro replicam conforme a opção.
         </p>
-        <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:flex-wrap sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
           <button
             type="button"
             disabled={disabled}
             onClick={onClose}
             className={formModalCancelButtonClass}
           >
-            Cancelar
+            <span className="inline-flex items-center gap-2">
+              <X className="h-4 w-4 shrink-0" aria-hidden />
+              Cancelar
+            </span>
           </button>
           <button
             type="button"
@@ -55,7 +62,10 @@ export function RecurrenceScopeDialog({ open, onClose, onConfirm, disabled }: Re
             onClick={() => onConfirm("single")}
             className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
           >
-            Alterar apenas este
+            <span className="inline-flex items-center gap-2">
+              <Calendar className="h-4 w-4 shrink-0" aria-hidden />
+              Alterar apenas este
+            </span>
           </button>
           <button
             type="button"
@@ -63,15 +73,21 @@ export function RecurrenceScopeDialog({ open, onClose, onConfirm, disabled }: Re
             onClick={() => onConfirm("future")}
             className="rounded-lg border border-[#6D28D9]/40 bg-violet-50 px-4 py-2.5 text-sm font-medium text-[#5B21B6] hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-950/40 dark:text-violet-200 dark:hover:bg-violet-900/50"
           >
-            Este e os próximos
+            <span className="inline-flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
+              Este e os próximos
+            </span>
           </button>
           <button
             type="button"
             disabled={disabled}
             onClick={() => onConfirm("all")}
-            className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+            className={formModalSubmitButtonClass}
           >
-            Alterar todos
+            <span className="inline-flex items-center gap-2">
+              <Layers className="h-4 w-4 shrink-0" aria-hidden />
+              Alterar todos
+            </span>
           </button>
         </div>
       </div>

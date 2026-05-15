@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, AlertCircle, AlertTriangle } from "lucide-react";
+import { Trash2, AlertCircle, AlertTriangle, Pencil, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import type { Tarefa } from "@/lib/tarefas/types";
 import { STATUS_LABELS, PRIORIDADE_LABELS, getSlaTarefa } from "@/lib/tarefas/constants";
@@ -147,19 +147,28 @@ export function TarefasTable({
                   className="px-6 py-4 text-right align-middle"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {onExcluir && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onExcluir(t);
-                      }}
-                      className="rounded-full p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
-                      aria-label="Excluir"
+                  <div className="inline-flex items-center justify-end gap-1">
+                    <span
+                      className="pointer-events-none inline-flex items-center gap-0.5 text-slate-400 dark:text-slate-500"
+                      aria-hidden
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                      <Pencil className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4" />
+                    </span>
+                    {onExcluir && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onExcluir(t);
+                        }}
+                        className="rounded-full p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                        aria-label="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

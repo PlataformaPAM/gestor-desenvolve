@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { AlertTriangle, Globe2, Mail, Phone, Text, User } from "lucide-react";
+import { AlertTriangle, Globe2, Mail, Phone, Save, Text, User, X } from "lucide-react";
 import type { Lead, LeadOrigem, LeadPriority } from "@/lib/comercial/types";
 import type { PrioridadeTarefa } from "@/lib/tarefas/types";
 import { iconForPrioridade, PRIORIDADE_LEADING_ICON } from "@/lib/tarefas/option-icons";
@@ -19,7 +19,6 @@ import { LeadResponsavelEquipe } from "./lead-responsavel-equipe";
 import { useAuth } from "@/contexts/auth-context";
 import { buildOwnershipInteraction, getLeadOwnership } from "@/lib/comercial/ownership";
 import {
-  comercialReadOnlyClass,
   FormSearchableSelectField,
   FormTextInput,
   formModalCancelButtonClass,
@@ -28,6 +27,7 @@ import {
 import { formLabelClass } from "@/components/ui/field-patterns";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { iconForOrigem } from "./origem-icons";
+import { formatBrazilianPhoneInput } from "@/lib/comercial/phone-input";
 
 type LeadDetailDadosProps = {
   lead: Lead;
@@ -46,16 +46,9 @@ type LeadDetailDadosProps = {
 };
 
 function deepCloneLead(l: Lead): Lead {
-  return JSON.parse(JSON.stringify(l)) as Lead;
-}
-
-function formatPhoneInput(v: string): string {
-  const digits = v.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 2) return digits.replace(/(\d{0,2})/, "($1");
-  return digits
-    .replace(/(\d{2})(\d)/, "($1) $2")
-    .replace(/(\d{5})(\d)/, "$1-$2")
-    .slice(0, 15);
+  const out = JSON.parse(JSON.stringify(l)) as Lead;
+  if (!out.registroLead) out.registroLead = "oportunidade";
+  return out;
 }
 
 function createLogId(): string {
@@ -90,24 +83,35 @@ export function LeadDetailDados({
   const [formData, setFormData] = useState<Lead>(() => deepCloneLead(lead));
   const [draftClientes, setDraftClientes] = useState<Cliente[]>(() => [...clientes]);
 
-  const [saveFeedback, setSaveFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
   /** Novo lead ou vínculo de cliente atualizado no pai (ex.: cli-local → UUID após POST cliente). */
   useEffect(() => {
-    setSnapshotOriginal(deepCloneLead(lead));
-    setFormData(deepCloneLead(lead));
-    setDraftClientes([...clientes]);
+    const next = deepCloneLead(lead);
+    if (next.phone?.trim()) {
+      next.phone = formatBrazilianPhoneInput(next.phone);
+    }
+    const catalog = [...clientes];
+    queueMicrotask(() => {
+      setSnapshotOriginal(deepCloneLead(next));
+      setFormData(next);
+      setDraftClientes(catalog);
+    });
+    // Só ao trocar lead/cliente; omitir `lead`/`clientes` evita reset do rascunho a cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, lead.clienteId]);
 
   /** Catálogo do pai atualiza sem trocar o lead (ex.: outro fluxo adiciona cliente). */
   useEffect(() => {
-    setDraftClientes((prev) => {
-      const map = new Map<string, Cliente>();
-      clientes.forEach((c) => map.set(c.id, c));
-      prev.forEach((c) => {
-        if (!map.has(c.id)) map.set(c.id, c);
+    queueMicrotask(() => {
+      setDraftClientes((prev) => {
+        const map = new Map<string, Cliente>();
+        clientes.forEach((c) => map.set(c.id, c));
+        prev.forEach((c) => {
+          if (!map.has(c.id)) map.set(c.id, c);
+        });
+        return Array.from(map.values());
       });
-      return Array.from(map.values());
     });
   }, [clientes]);
 
@@ -115,7 +119,6 @@ export function LeadDetailDados({
   const isProspecao = formData.stageId === "prospecao";
   const isQualificacao = formData.stageId === "qualificacao";
   const isAfterProspecao = !isProspecao;
-  const hasContatoOficial = (formData.contatosOportunidade?.length ?? 0) > 0;
   const motivoPerdaDestaque = useMemo(() => {
     if (formData.stageId !== "perdido") return null;
     const interactions = formData.interactions ?? [];
@@ -155,6 +158,7 @@ export function LeadDetailDados({
     /** Campos mantidos na aba Proposta / estado do pai — não podem ser sobrescritos por formData desatualizado. */
     const merged: Lead = {
       ...formData,
+      registroLead: formData.registroLead ?? lead.registroLead ?? "oportunidade",
       name: formData.name.trim() || formData.name,
       notes: showOrigemDetalhe ? formData.notes?.trim() || undefined : undefined,
       contact: formData.contact?.trim() || undefined,
@@ -297,11 +301,10 @@ export function LeadDetailDados({
       const baseline = deepCloneLead(payloadParaSalvar);
       setSnapshotOriginal(baseline);
       setFormData(baseline);
-      setSaveFeedback({ kind: "success", text: "Salvo com sucesso!" });
-      setTimeout(() => setSaveFeedback(null), 4000);
+      setSaveErrorMessage(null);
     } catch {
-      setSaveFeedback({ kind: "error", text: "Erro ao salvar os dados." });
-      setTimeout(() => setSaveFeedback(null), 6000);
+      setSaveErrorMessage("Erro ao salvar os dados.");
+      setTimeout(() => setSaveErrorMessage(null), 6000);
     }
   };
 
@@ -319,16 +322,12 @@ export function LeadDetailDados({
   return (
     <form onSubmit={handleSalvar} className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 lg:p-6">
-      {saveFeedback && (
+      {saveErrorMessage && (
         <div
-          role="status"
-          className={
-            saveFeedback.kind === "success"
-              ? "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
-              : "rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
-          }
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
         >
-          {saveFeedback.text}
+          {saveErrorMessage}
         </div>
       )}
 
@@ -441,42 +440,6 @@ export function LeadDetailDados({
               onClienteRegistrado?.(newCliente);
             }}
           />
-          {!hasContatoOficial && (
-            <div className="space-y-4">
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                Contato original da prospecção
-              </p>
-              <FormTextInput
-                id="lead-co-contact"
-                label="Contato"
-                icon={User}
-                value={formData.contact ?? ""}
-                readOnly
-                disabled
-                inputClassName={comercialReadOnlyClass}
-              />
-              <FormTextInput
-                id="lead-co-phone"
-                label="Telefone"
-                icon={Phone}
-                type="tel"
-                value={formData.phone ?? ""}
-                readOnly
-                disabled
-                inputClassName={comercialReadOnlyClass}
-              />
-              <FormTextInput
-                id="lead-co-email"
-                label="E-mail"
-                icon={Mail}
-                type="email"
-                value={formData.email ?? ""}
-                readOnly
-                disabled
-                inputClassName={comercialReadOnlyClass}
-              />
-            </div>
-          )}
           <LeadDadosContatosOportunidade
             lead={formData}
             onApplyLocal={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
@@ -513,9 +476,9 @@ export function LeadDetailDados({
             label="Telefone"
             icon={Phone}
             type="tel"
-            value={formData.phone ?? ""}
+            value={formData.phone ? formatBrazilianPhoneInput(formData.phone) : ""}
             onChange={(e) =>
-              setFormData((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))
+              setFormData((prev) => ({ ...prev, phone: formatBrazilianPhoneInput(e.target.value) }))
             }
             placeholder="(00) 00000-0000"
           />
@@ -532,7 +495,7 @@ export function LeadDetailDados({
       )}
 
       {isQualificacao && (
-        <div className="space-y-2">
+        <div className="space-y-2 border-t border-slate-200 pt-5 dark:border-slate-700">
           <p className={formLabelClass}>Checklist da Etapa</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Conclua os itens para qualificar o lead.
@@ -569,11 +532,17 @@ export function LeadDetailDados({
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         {onClose ? (
           <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
-            Cancelar
+            <span className="inline-flex items-center gap-2">
+              <X className="h-4 w-4" />
+              Cancelar
+            </span>
           </button>
         ) : null}
         <button type="submit" className={formModalSubmitButtonClass}>
-          Salvar
+          <span className="inline-flex items-center gap-2">
+            <Save className="h-4 w-4" />
+            Salvar
+          </span>
         </button>
         </div>
       </div>

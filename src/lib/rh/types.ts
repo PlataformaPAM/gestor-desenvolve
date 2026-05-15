@@ -33,6 +33,8 @@ export type ColaboradorParceiro = {
   tipoContrato: TipoContrato;
   status: StatusColaborador;
   tipo: TipoPessoaRH;
+  /** Só consultores: `false` = pré-cadastro (indicação); omitido/`true` = cadastro efetivo. */
+  cadastroEfetivado?: boolean;
   email?: string;
   telefone?: string;
   cpfCnpj?: string;

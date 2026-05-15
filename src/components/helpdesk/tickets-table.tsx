@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import type { Ticket } from "@/lib/suporte/types";
 import { PRIORIDADE_LABELS, STATUS_LABELS, CATEGORIA_LABELS } from "@/lib/suporte/constants";
 import clsx from "clsx";
@@ -53,14 +53,15 @@ export function TicketsTable({ tickets, onSelectTicket, pendingByTicketId = {} }
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
       <div className="hidden md:block">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-contain">
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[42%]" />
-              <col className="w-[22%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
+              <col className="w-[38%]" />
+              <col className="w-[20%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[14%]" />
+              <col className="w-[6%]" />
             </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80">
@@ -69,6 +70,9 @@ export function TicketsTable({ tickets, onSelectTicket, pendingByTicketId = {} }
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Categoria</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Prioridade</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Situação</th>
+                <th className="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <span className="sr-only">Abrir</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -79,7 +83,7 @@ export function TicketsTable({ tickets, onSelectTicket, pendingByTicketId = {} }
                   <tr
                     key={ticket.id}
                     onClick={() => onSelectTicket(ticket)}
-                    className="relative cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80"
+                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80"
                   >
                     <td className="px-6 py-4 align-top">
                       <div className="space-y-1.5">
@@ -115,9 +119,9 @@ export function TicketsTable({ tickets, onSelectTicket, pendingByTicketId = {} }
                         {PRIORIDADE_LABELS[ticket.prioridade]}
                       </span>
                     </td>
-                    <td className="px-6 py-4 align-middle">
+                    <td className="relative px-6 py-4 align-middle">
                       {(pendingByTicketId[ticket.id] ?? 0) > 0 && (
-                        <span className="absolute right-2 top-2 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        <span className="absolute right-2 top-2 z-[1] inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                           {(pendingByTicketId[ticket.id] ?? 0) > 99 ? "99+" : (pendingByTicketId[ticket.id] ?? 0)}
                         </span>
                       )}
@@ -130,6 +134,12 @@ export function TicketsTable({ tickets, onSelectTicket, pendingByTicketId = {} }
                             {situacaoBadge.label}
                           </span>
                         ) : null}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-middle">
+                      <div className="flex items-center justify-end gap-1.5 text-slate-400">
+                        <Pencil className="h-4 w-4" aria-hidden />
+                        <ChevronRight className="h-4 w-4" aria-hidden />
                       </div>
                     </td>
                   </tr>
@@ -183,8 +193,9 @@ export function TicketsTable({ tickets, onSelectTicket, pendingByTicketId = {} }
                 {getSituacaoBadge(ticket.previsaoConclusao)?.label ?? "No prazo"}
               </span>
             </div>
-            <div className="mt-2 flex items-center justify-end">
-              <ChevronRight className="h-4 w-4 text-slate-400" />
+            <div className="mt-2 flex items-center justify-end gap-1 text-slate-400">
+              <Pencil className="h-4 w-4" aria-hidden />
+              <ChevronRight className="h-4 w-4" aria-hidden />
             </div>
           </div>
         ))}

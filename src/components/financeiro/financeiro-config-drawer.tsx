@@ -486,7 +486,7 @@ export function FinanceiroConfigDrawer({
         <div
           role="tablist"
           aria-label="Configurações do financeiro"
-          className="shrink-0 flex w-full flex-wrap border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50"
+          className="shrink-0 flex w-full flex-wrap border-b border-slate-300 bg-slate-50/50 dark:border-slate-600 dark:bg-slate-800/50"
         >
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -607,10 +607,12 @@ export function FinanceiroConfigDrawer({
                   type="button"
                   onClick={() => void criarConta()}
                   disabled={saving === "create-conta"}
-                  className={clsx(formModalSubmitButtonClass, "inline-flex items-center justify-center gap-2 sm:col-span-2")}
+                  className={clsx(formModalSubmitButtonClass, "sm:col-span-2")}
                 >
-                  <Plus className="h-4 w-4" />
-                  Adicionar
+                  <span className="inline-flex items-center gap-2">
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                    Adicionar
+                  </span>
                 </button>
               </div>
             </div>
@@ -744,10 +746,12 @@ export function FinanceiroConfigDrawer({
                   type="button"
                   onClick={() => void criarCategoria()}
                   disabled={saving === "create-categoria"}
-                  className={clsx(formModalSubmitButtonClass, "inline-flex items-center justify-center gap-2")}
+                  className={formModalSubmitButtonClass}
                 >
-                  <Plus className="h-4 w-4" />
-                  Adicionar
+                  <span className="inline-flex items-center gap-2">
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                    Adicionar
+                  </span>
                 </button>
               </div>
             </div>
@@ -881,10 +885,12 @@ export function FinanceiroConfigDrawer({
                   type="button"
                   onClick={() => void criarMeio()}
                   disabled={saving === "create-meio"}
-                  className={clsx(formModalSubmitButtonClass, "inline-flex shrink-0 items-center justify-center gap-2")}
+                  className={clsx(formModalSubmitButtonClass, "shrink-0")}
                 >
-                  <Plus className="h-4 w-4" />
-                  Adicionar
+                  <span className="inline-flex items-center gap-2">
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                    Adicionar
+                  </span>
                 </button>
               </div>
             </div>

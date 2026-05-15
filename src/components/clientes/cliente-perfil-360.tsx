@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Mail,
   Phone,
@@ -12,6 +13,10 @@ import {
   Calendar,
   Repeat,
   ClipboardList,
+  User,
+  Briefcase,
+  Wallet,
+  Sparkles,
 } from "lucide-react";
 import type { Cliente } from "@/lib/clientes/types";
 import { formatCurrency } from "@/lib/clientes/utils";
@@ -26,12 +31,12 @@ import clsx from "clsx";
 
 type TabId = "geral" | "comercial" | "financeiro" | "suporte" | "pos_venda";
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "geral", label: "Geral" },
-  { id: "comercial", label: "Comercial" },
-  { id: "financeiro", label: "Financeiro" },
-  { id: "suporte", label: "Suporte" },
-  { id: "pos_venda", label: "Pós-Venda" },
+const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
+  { id: "geral", label: "Geral", icon: User },
+  { id: "comercial", label: "Comercial", icon: Briefcase },
+  { id: "financeiro", label: "Financeiro", icon: Wallet },
+  { id: "suporte", label: "Suporte", icon: Headphones },
+  { id: "pos_venda", label: "Pós-Venda", icon: Sparkles },
 ];
 
 type ClientePerfil360Props = {
@@ -109,21 +114,25 @@ export function ClientePerfil360({
       {/* Tabs */}
       <div className="border-b border-slate-200 px-4 lg:px-6 shrink-0">
         <nav className="flex gap-1 -mb-px" aria-label="Abas do perfil">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={clsx(
-                "px-3 py-3 text-sm font-medium border-b-2 transition-colors",
-                tab === t.id
-                  ? "border-[#6D28D9] text-[#6D28D9]"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+          {TABS.map((t) => {
+            const TabIcon = t.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={clsx(
+                  "inline-flex items-center gap-2 px-3 py-3 text-sm font-medium border-b-2 transition-colors",
+                  tab === t.id
+                    ? "border-[#6D28D9] text-[#6D28D9]"
+                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                )}
+              >
+                <TabIcon className="h-4 w-4 shrink-0" aria-hidden />
+                {t.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
 

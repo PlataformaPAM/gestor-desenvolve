@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma, type PipelineStageId } from "@prisma/client";
 import type { Lead } from "@/lib/comercial/types";
-import { mapLeadFromDb, resolveLeadInteractionUserId, toDateOrUndefined } from "../../_shared";
+import {
+  ensureLeadPriorityEnumIncludesUrgente,
+  mapLeadFromDb,
+  resolveLeadInteractionUserId,
+  toDateOrUndefined,
+} from "../../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
@@ -37,8 +42,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return fail("BAD_REQUEST", "Payload inválido.", 400);
   }
 
+  const meta = await prisma.lead.findUnique({
+    where: { id },
+    select: { registroLead: true },
+  });
+  if (meta?.registroLead === "venda_direta_financeiro") {
+    return fail(
+      "FORBIDDEN",
+      "Este registro foi criado como venda direta no Financeiro e não pode ser editado pelo Comercial.",
+      403
+    );
+  }
+
   const existingBefore = mapLeadFromDb(await loadLead(id));
   const ownershipBefore = getLeadOwnership(existingBefore);
+
+  await ensureLeadPriorityEnumIncludesUrgente(prisma);
 
   await prisma.$transaction(async (tx) => {
     const lastInteractionBefore = await tx.leadInteraction.findFirst({

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
+import { formInputClass } from "@/components/ui/field-patterns";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { UsuariosTable } from "@/components/configuracoes/usuarios-table";
 import { PerfisAcessoTable } from "@/components/configuracoes/perfis-acesso-table";
@@ -59,12 +60,17 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
   };
 
   useEffect(() => {
+    if (section === "logs") {
+      setPrimaryAction(null);
+      return () => setPrimaryAction(null);
+    }
     setPrimaryAction({
-      label: section === "usuarios" ? "Novo Usuário" : section === "perfis" ? "Novo Perfil" : "Novo",
+      label: section === "usuarios" ? "Novo Usuário" : "Novo Perfil",
       onClick: () => {
         if (section === "usuarios") setDrawerNovoUsuarioOpen(true);
         if (section === "perfis") setDrawerNovoPerfilOpen(true);
       },
+      showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
   }, [setPrimaryAction, section]);
@@ -235,7 +241,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
 
   return (
     <section className="w-full min-w-0 space-y-6">
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
+      <div className="sticky top-0 z-10 flex w-full min-w-0 flex-wrap items-center gap-3 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-3 shadow-sm backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto sm:max-w-lg sm:flex-row sm:items-center">
           <div className="relative min-w-0 w-full sm:w-[520px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -244,7 +250,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
               value={filtroBusca}
               onChange={(e) => setFiltroBusca(e.target.value)}
               placeholder="Buscar..."
-              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className={`${formInputClass} h-10 min-w-0 pl-9`}
             />
           </div>
           {section === "usuarios" && (
@@ -285,8 +291,14 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
       )}
       {section === "logs" && <LogsTable logs={logsFiltrados} />}
 
-      <DrawerSheet open={drawerNovoUsuarioOpen} onClose={() => setDrawerNovoUsuarioOpen(false)} title="Novo usuário">
-        <div className="overflow-y-auto">
+      <DrawerSheet
+        open={drawerNovoUsuarioOpen}
+        onClose={() => setDrawerNovoUsuarioOpen(false)}
+        title="Novo usuário"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <NovoUsuarioForm
             perfis={perfis}
             pessoasVinculo={pessoasVinculo}
@@ -303,8 +315,10 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           setUsuarioEmEdicao(null);
         }}
         title="Editar usuário"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <NovoUsuarioForm
             perfis={perfis}
             pessoasVinculo={pessoasVinculo}
@@ -318,8 +332,14 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
         </div>
       </DrawerSheet>
 
-      <DrawerSheet open={drawerNovoPerfilOpen} onClose={() => setDrawerNovoPerfilOpen(false)} title="Novo Perfil">
-        <div className="overflow-y-auto">
+      <DrawerSheet
+        open={drawerNovoPerfilOpen}
+        onClose={() => setDrawerNovoPerfilOpen(false)}
+        title="Novo perfil"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PerfilForm onSave={handleSalvarPerfil} onCancel={() => setDrawerNovoPerfilOpen(false)} />
         </div>
       </DrawerSheet>
@@ -330,9 +350,11 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           setDrawerEditarPerfilOpen(false);
           setPerfilEmEdicao(null);
         }}
-        title="Editar Perfil"
+        title="Editar perfil"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PerfilForm
             initialPerfil={perfilEmEdicao}
             onSave={handleSalvarPerfil}

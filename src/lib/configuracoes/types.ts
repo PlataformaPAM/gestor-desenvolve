@@ -4,10 +4,18 @@ export type ModuloPermissao =
   | "financeiro"
   | "tarefas"
   | "clientes"
+  | "contratos"
   | "helpdesk"
   | "posVenda"
+  | "solucoes"
   | "rh"
-  | "configuracoes";
+  | "configuracoes"
+  | "relatorios"
+  | "configuracoes_construtor_documentos"
+  | "configuracoes_logs"
+  | "configuracoes_perfis"
+  | "configuracoes_usuarios"
+  | "portal_cliente";
 
 /** Todo usuário é obrigatoriamente identificado por CPF. */
 export type UsuarioSistema = {

@@ -7,7 +7,7 @@ import {
   type DropResult,
 } from "@hello-pangea/dnd";
 import { useState } from "react";
-import { Search, ListTodo } from "lucide-react";
+import { Search, ListTodo, Pencil, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import type { Tarefa, StatusTarefa } from "@/lib/tarefas/types";
 import { STATUS_LABELS, PRIORIDADE_LABELS, getSlaTarefa } from "@/lib/tarefas/constants";
@@ -166,22 +166,33 @@ export function TarefasKanban({
                                 : "shadow-sm"
                             )}
                           >
-                            {t.codigo ? (
-                              <p className="mb-1 inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-500/40 dark:bg-violet-950/40 dark:text-violet-300">
-                                {t.codigo}
-                              </p>
-                            ) : null}
-                            <p
-                              className="text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
-                              style={{
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {t.titulo}
-                            </p>
+                            <div className="mb-1 flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                {t.codigo ? (
+                                  <p className="mb-1 inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-500/40 dark:bg-violet-950/40 dark:text-violet-300">
+                                    {t.codigo}
+                                  </p>
+                                ) : null}
+                                <p
+                                  className="text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
+                                  style={{
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {t.titulo}
+                                </p>
+                              </div>
+                              <span
+                                className="pointer-events-none shrink-0 inline-flex items-center gap-0.5 text-slate-400 dark:text-slate-500"
+                                aria-hidden
+                              >
+                                <Pencil className="h-4 w-4" />
+                                <ChevronRight className="h-4 w-4" />
+                              </span>
+                            </div>
                             <div className="mt-2 space-y-2">
                               <div className="min-w-0">
                                 <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">

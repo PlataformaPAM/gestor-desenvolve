@@ -70,6 +70,7 @@ export default function ClientesPage() {
         setSelectedCliente(null);
         setFormSheetOpen(true);
       },
+      showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
   }, [setPrimaryAction]);

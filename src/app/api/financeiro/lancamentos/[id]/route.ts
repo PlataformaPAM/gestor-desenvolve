@@ -5,6 +5,8 @@ import { mapLancamentoFromDb } from "../../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
+import { markAlertsReadForLancamentoPaid } from "@/lib/server/alerts-resolve";
+import { syncComissoesFromLancamentoPagamento } from "@/lib/server/comissoes-service";
 
 function toDate(v: string): Date {
   const d = new Date(v);
@@ -33,7 +35,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const before = await prisma.lancamento.findUnique({
     where: { id },
-    select: { id: true, status: true, vencimento: true, descricao: true, valor: true },
+    select: {
+      id: true,
+      status: true,
+      vencimento: true,
+      descricao: true,
+      valor: true,
+      tipo: true,
+      leadIdOrigem: true,
+    },
   });
   const updated = await prisma.lancamento.update({
     where: { id },
@@ -68,6 +78,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   });
 
   const becamePending = before?.status === "pago" && updated.status !== "pago";
+  if (updated.tipo === "entrada" || before?.tipo === "entrada") {
+    await syncComissoesFromLancamentoPagamento(prisma, updated.id);
+  }
+  if (updated.status === "pago") {
+    await markAlertsReadForLancamentoPaid(prisma, {
+      id: updated.id,
+      descricao: updated.descricao,
+    });
+  }
+
   if (becamePending) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

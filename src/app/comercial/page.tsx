@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import type { DropResult } from "@hello-pangea/dnd";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { TabsView, type ViewMode } from "@/components/comercial/tabs-view";
 import { LeadList } from "@/components/comercial/lead-list";
 import { LeadDetailPanel } from "@/components/comercial/lead-detail-panel";
@@ -27,6 +28,7 @@ import { usePageHeader } from "@/contexts/page-header-context";
 import { useAuth } from "@/contexts/auth-context";
 import { createLeadCreatedLog, generateAuditLogs } from "@/lib/comercial/audit";
 import { createInitialOwnershipInteraction } from "@/lib/comercial/ownership";
+import { formModalCancelButtonClass } from "@/components/ui/field-patterns";
 
 function withAudit(
   oldLead: Lead,
@@ -39,6 +41,14 @@ function withAudit(
     ...newLead,
     interactions: [...newLogs, ...(newLead.interactions ?? [])],
   };
+}
+
+/** ID estável e único para o lead antes do POST (evita colisão de `Date.now()` no mesmo ms). */
+function newLeadClientId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `lead-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 function createSystemLog(
@@ -87,7 +97,10 @@ function ComercialPageContent() {
   const [novoLeadOpen, setNovoLeadOpen] = useState(false);
   const [toastError, setToastError] = useState({ visible: false, message: "", duration: 12000 });
   const [toastPdfSuccess, setToastPdfSuccess] = useState({ visible: false, message: "" });
-  const [toastSave, setToastSave] = useState({ visible: false, message: "" });
+  const [toastSave, setToastSave] = useState<{ visible: boolean; message: string; duration?: number }>({
+    visible: false,
+    message: "",
+  });
   const [fechadoCelebration, setFechadoCelebration] = useState<{ show: boolean; valorTotal: number }>({
     show: false,
     valorTotal: 0,
@@ -97,6 +110,10 @@ function ComercialPageContent() {
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
   const [pendingLeadCountById, setPendingLeadCountById] = useState<Record<string, number>>({});
   const [pendingStageCountById, setPendingStageCountById] = useState<Partial<Record<PipelineStageId, number>>>({});
+  /** Destaque visual no card (~3s) após criar, editar ou mudar etapa. */
+  const [pulsingLeadIds, setPulsingLeadIds] = useState<Record<string, boolean>>({});
+  /** IDs retornados por `window.setTimeout` no browser (compatível com DOM + tipos Node). */
+  const pulseClearTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [kanbanPerdaModal, setKanbanPerdaModal] = useState<{
     sourceId: PipelineStageId;
     destId: PipelineStageId;
@@ -129,7 +146,7 @@ function ComercialPageContent() {
     if (!saved) return;
     setColumns((prev) => {
       const all = leadsFromColumns(prev);
-      const i = all.findIndex((l) => l.id === saved.id);
+      const i = all.findIndex((l) => String(l.id) === String(saved.id));
       if (i === -1) return prev;
       const nextList = [...all.slice(0, i), saved, ...all.slice(i + 1)];
       return columnsFromLeads(nextList);
@@ -142,8 +159,23 @@ function ComercialPageContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lead }),
     });
-    if (!res.ok) {
-      throw new Error("Falha ao criar lead no servidor.");
+    const json = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      data?: { lead?: Lead };
+      error?: { message?: string };
+    };
+    if (!res.ok || json?.success === false) {
+      throw new Error(json?.error?.message ?? `Falha ao criar lead (${res.status}).`);
+    }
+    const saved = json?.data?.lead;
+    if (saved) {
+      setColumns((prev) => {
+        const all = leadsFromColumns(prev);
+        const i = all.findIndex((l) => String(l.id) === String(lead.id));
+        if (i === -1) return prev;
+        const nextList = [...all.slice(0, i), saved, ...all.slice(i + 1)];
+        return columnsFromLeads(nextList);
+      });
     }
   }, []);
 
@@ -168,9 +200,34 @@ function ComercialPageContent() {
 
   const loadBootstrap = useCallback(async () => {
     const res = await fetch("/api/comercial/bootstrap", { cache: "no-store" });
-    if (!res.ok) throw new Error("Falha no bootstrap");
-    const payload = (await res.json()) as { data?: { leads?: Lead[]; clientes?: Cliente[] } };
-    return { leads: payload?.data?.leads ?? [], clientes: payload?.data?.clientes ?? [] };
+    const text = await res.text();
+    const trimmed = text.trim();
+    let body: { success?: boolean; data?: unknown; error?: { message?: string } };
+    try {
+      const parsed: unknown = trimmed ? JSON.parse(trimmed) : {};
+      body =
+        typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          ? (parsed as typeof body)
+          : {};
+    } catch {
+      throw new Error("Resposta inválida do servidor.");
+    }
+    if (!res.ok) {
+      throw new Error(body?.error?.message ?? `Erro ${res.status}`);
+    }
+    if (body.success === false) {
+      throw new Error(body.error?.message ?? "Bootstrap comercial indisponível.");
+    }
+    const root = (body.data ?? {}) as {
+      leads?: unknown;
+      clientes?: unknown;
+      data?: { leads?: unknown; clientes?: unknown };
+    };
+    const leadsRaw = root.leads ?? root.data?.leads;
+    const clientesRaw = root.clientes ?? root.data?.clientes;
+    const leads = Array.isArray(leadsRaw) ? (leadsRaw as Lead[]) : [];
+    const clientes = Array.isArray(clientesRaw) ? (clientesRaw as Cliente[]) : [];
+    return { leads, clientes };
   }, []);
 
   const persistOrder = useCallback((state: ColumnsState) => {
@@ -220,7 +277,87 @@ function ComercialPageContent() {
     setClientes(data.clientes ?? []);
   }, [loadBootstrap, applyPersistedOrder]);
 
+  const recomputePendingAlerts = useCallback(async (leadList: Lead[]) => {
+    try {
+      const res = await fetch("/api/alertas/bootstrap", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        data?: { alertas?: Array<{ titulo: string; descricao: string; modulo: string; lida: boolean }> };
+      };
+      const rows = (data?.data?.alertas ?? []).filter((a) => !a.lida && a.modulo === "comercial");
+      setPendingLeadCountById((prev) => {
+        const next: Record<string, number> = {};
+        for (const l of leadList) {
+          const name = l.name?.toLowerCase() ?? "";
+          const count = rows.filter((a) =>
+            `${a.titulo} ${a.descricao}`.toLowerCase().includes(name)
+          ).length;
+          if (count > 0) next[l.id] = count;
+        }
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+    } catch {
+      // noop
+    }
+  }, []);
+
+  /** Alertas de “novo lead” ficam associados ao nome; ao sair de Prospecção o card não deve mais exibir o badge. */
+  const clearComercialPendingBadgeIfLeftProspecao = useCallback(
+    (leadId: string, fromStage: PipelineStageId, toStage: PipelineStageId) => {
+      if (fromStage !== "prospecao" || toStage === "prospecao") return;
+      const id = String(leadId);
+      setPendingLeadCountById((prev) => {
+        if ((prev[id] ?? 0) === 0) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    []
+  );
+
+  const pulseLeadCard = useCallback((leadId: string) => {
+    const id = String(leadId);
+    const existing = pulseClearTimeoutsRef.current.get(id);
+    if (existing) window.clearTimeout(existing);
+    /* Remove e recoloca a classe para o CSS animation voltar a rodar a cada ação. */
+    setPulsingLeadIds((p) => {
+      const next = { ...p };
+      delete next[id];
+      return next;
+    });
+    queueMicrotask(() => {
+      setPulsingLeadIds((p) => ({ ...p, [id]: true }));
+      const t = window.setTimeout(() => {
+        setPulsingLeadIds((p) => {
+          const next = { ...p };
+          delete next[id];
+          return next;
+        });
+        pulseClearTimeoutsRef.current.delete(id);
+      }, 3000);
+      pulseClearTimeoutsRef.current.set(id, t);
+    });
+  }, []);
+
+  /** Após arrastar ou salvar: o DnD/React ainda ajustam o frame no mesmo tick; 2× rAF deixa o pulso visível. */
+  const scheduleLeadCardPulse = useCallback(
+    (leadId: string) => {
+      const id = String(leadId);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          pulseLeadCard(id);
+        });
+      });
+    },
+    [pulseLeadCard]
+  );
+
   const leads = useMemo(() => leadsFromColumns(columns), [columns]);
+  const leadsRef = useRef<Lead[]>([]);
+  leadsRef.current = leads;
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
   const selectedLead = useMemo(
     () => (selectedLeadId ? leads.find((l) => l.id === selectedLeadId) ?? null : null),
     [leads, selectedLeadId]
@@ -234,6 +371,7 @@ function ComercialPageContent() {
     setPrimaryAction({
       label: "Novo Lead",
       onClick: () => setNovoLeadOpen(true),
+      showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
   }, [setPrimaryAction]);
@@ -248,7 +386,8 @@ function ComercialPageContent() {
         setClientes(data.clientes ?? []);
       } catch {
         if (!active) return;
-        showErrorToast("Falha ao carregar dados reais do Comercial.");
+        setColumns(getEmptyColumns());
+        setClientes([]);
       } finally {
         if (active) setLoading(false);
       }
@@ -288,35 +427,20 @@ function ComercialPageContent() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const loadAlertMarkers = async () => {
-      try {
-        const res = await fetch("/api/alertas/bootstrap", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          data?: { alertas?: Array<{ titulo: string; descricao: string; modulo: string; lida: boolean }> };
-        };
-        if (!active) return;
-        const rows = (data?.data?.alertas ?? []).filter((a) => !a.lida && a.modulo === "comercial");
-        setPendingLeadCountById((prev) => {
-          const next: Record<string, number> = {};
-          for (const lead of leads) {
-            const count = rows.filter((a) => `${a.titulo} ${a.descricao}`.toLowerCase().includes(lead.name.toLowerCase())).length;
-            if (count > 0) next[lead.id] = count;
-          }
-          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-        });
-      } catch {
-        // noop
-      }
-    };
-    void loadAlertMarkers();
-    const timer = window.setInterval(() => void loadAlertMarkers(), 30000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [leads]);
+    void recomputePendingAlerts(leadsRef.current);
+    const timer = window.setInterval(() => {
+      void recomputePendingAlerts(leadsRef.current);
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [leads, recomputePendingAlerts]);
+
+  useEffect(
+    () => () => {
+      pulseClearTimeoutsRef.current.forEach((t) => window.clearTimeout(t));
+      pulseClearTimeoutsRef.current.clear();
+    },
+    []
+  );
 
   useEffect(() => {
     const next: Partial<Record<PipelineStageId, number>> = {};
@@ -402,11 +526,13 @@ function ComercialPageContent() {
         }
 
         movedLeadForFechado = removed;
+        const moveNow = new Date().toISOString();
         const updated: Lead = movingAcrossStages
           ? {
               ...removed,
               stageId: destId,
-              enteredStageAt: new Date().toISOString(),
+              enteredStageAt: moveNow,
+              registroAtualizadoEm: moveNow,
               financeiroFluxo:
                 destId === "fechado"
                   ? {
@@ -447,14 +573,27 @@ function ComercialPageContent() {
         const valorTotal = movedLeadForFechado.valorTotal ?? movedLeadForFechado.value;
         setFechadoCelebration({ show: true, valorTotal });
       }
+      if (movedLeadPersist) {
+        scheduleLeadCardPulse(String(movedLeadPersist.id));
+      }
       if (movedLeadPersist && sourceId !== destId) {
+        clearComercialPendingBadgeIfLeftProspecao(String(movedLeadPersist.id), sourceId, destId);
         void persistLead(movedLeadPersist).catch(() => {
           void rollbackFromServer();
           showErrorToast("Não foi possível salvar a movimentação. Os dados foram recarregados.");
         });
       }
     },
-    [currentUserName, session.userId, persistLead, rollbackFromServer, persistOrder, showErrorToast]
+    [
+      currentUserName,
+      session.userId,
+      persistLead,
+      rollbackFromServer,
+      persistOrder,
+      showErrorToast,
+      scheduleLeadCardPulse,
+      clearComercialPendingBadgeIfLeftProspecao,
+    ]
   );
 
   const onDragEnd = useCallback((result: DropResult) => {
@@ -476,6 +615,12 @@ function ComercialPageContent() {
         leadName: sourceLead?.name ?? "Lead",
       });
       setKanbanMotivoPerda("");
+      setToastSave({
+        visible: true,
+        message:
+          "O cartão volta à coluna de origem até você confirmar. Preencha o motivo da perda na janela para concluir o envio para Perdido.",
+        duration: 12000,
+      });
       return;
     }
 
@@ -488,38 +633,58 @@ function ComercialPageContent() {
   }, [columns, applyKanbanMove]);
 
   const handleNovoLeadSubmit = useCallback(
-    (raw: Partial<Lead> & Pick<Lead, "name" | "value" | "stageId" | "priority">) => {
+    async (raw: Partial<Lead> & Pick<Lead, "name" | "value" | "stageId" | "priority">) => {
+      const now = new Date().toISOString();
+      const lead: Lead = {
+        origem: "outro",
+        registroLead: "oportunidade",
+        clienteId: null,
+        solucoes: [],
+        valorTotal: raw.valorTotal ?? raw.value,
+        checklistProgress: {},
+        ...raw,
+        id: newLeadClientId(),
+        enteredStageAt: now,
+        registroAtualizadoEm: now,
+        criadoPorId: session.userId ?? null,
+        interactions: [
+          createLeadCreatedLog({ nome: currentUserName, userId: session.userId }),
+          createInitialOwnershipInteraction(session.userId, currentUserName),
+        ],
+      };
       try {
-        const lead: Lead = {
-          origem: "outro",
-          clienteId: null,
-          solucoes: [],
-          valorTotal: raw.valorTotal ?? raw.value,
-          checklistProgress: {},
-          ...raw,
-          id: String(Date.now()),
-          enteredStageAt: new Date().toISOString(),
-          criadoPorId: session.userId ?? null,
-          interactions: [
-            createLeadCreatedLog({ nome: currentUserName, userId: session.userId }),
-            createInitialOwnershipInteraction(session.userId, currentUserName),
-          ],
-        };
-        setColumns((prev) => ({
-          ...prev,
-          prospecao: [...(prev.prospecao ?? []), lead],
-        }));
-        void createLead(lead).catch(() => {
-          void rollbackFromServer();
-          showErrorToast("Não foi possível criar o lead no banco. Os dados foram recarregados.");
+        flushSync(() => {
+          setColumns((prev) => ({
+            ...prev,
+            prospecao: [...(prev.prospecao ?? []), lead],
+          }));
         });
+        pulseLeadCard(lead.id);
+        await createLead(lead);
+        void recomputePendingAlerts(leadsFromColumns(columnsRef.current));
         setToastSave({ visible: true, message: "Lead salvo com sucesso!" });
         setNovoLeadOpen(false);
-      } catch {
-        showErrorToast("Erro ao salvar lead.");
+      } catch (err) {
+        void rollbackFromServer();
+        const detail = err instanceof Error && err.message.trim() ? err.message.trim() : "";
+        showErrorToast(
+          detail
+            ? `Não foi possível criar o lead: ${detail}`
+            : "Não foi possível criar o lead no banco. Os dados foram recarregados.",
+          12000
+        );
+        throw err;
       }
     },
-    [currentUserName, session.userId, createLead, rollbackFromServer, showErrorToast]
+    [
+      currentUserName,
+      session.userId,
+      createLead,
+      rollbackFromServer,
+      showErrorToast,
+      pulseLeadCard,
+      recomputePendingAlerts,
+    ]
   );
 
   const handleUpdateLead = useCallback(
@@ -542,15 +707,16 @@ function ComercialPageContent() {
         const next = { ...prev };
         for (const id of Object.keys(next) as PipelineStageId[]) {
           const list = next[id];
-          const idx = list.findIndex((l) => l.id === selectedLeadId);
+          const idx = list.findIndex((l) => String(l.id) === String(selectedLeadId));
           if (idx === -1) continue;
           next[id] = list.slice();
           const current = list[idx];
           const updated = { ...current, ...updates } as Lead;
-          updatedLeadPersist = withAudit(current, updated, {
+          const audited = withAudit(current, updated, {
             nome: currentUserName,
             userId: session.userId,
           });
+          updatedLeadPersist = { ...audited, registroAtualizadoEm: new Date().toISOString() };
           next[id][idx] = updatedLeadPersist;
           saved = true;
           return next;
@@ -558,6 +724,7 @@ function ComercialPageContent() {
         return prev;
       });
       if (saved && updatedLeadPersist) {
+        scheduleLeadCardPulse(String(selectedLeadId));
         void persistLead(updatedLeadPersist).catch(() => {
           void rollbackFromServer();
           showErrorToast("Não foi possível salvar a alteração. Os dados foram recarregados.");
@@ -578,6 +745,7 @@ function ComercialPageContent() {
     persistLead,
     rollbackFromServer,
     showErrorToast,
+    scheduleLeadCardPulse,
   ]);
 
   const handleMudarEtapa = useCallback(
@@ -596,12 +764,14 @@ function ComercialPageContent() {
         showErrorToast(`Ação bloqueada. Pendências:\n${gate.reasons.join("\n")}`, 10000);
         return;
       }
+      const nowEtapa = new Date().toISOString();
       const updated = withAudit(
         selectedLead,
         {
           ...selectedLead,
           stageId,
-          enteredStageAt: new Date().toISOString(),
+          enteredStageAt: nowEtapa,
+          registroAtualizadoEm: nowEtapa,
           financeiroFluxo:
             stageId === "fechado"
               ? {
@@ -626,18 +796,21 @@ function ComercialPageContent() {
         },
         { nome: currentUserName, userId: session.userId }
       );
+      clearComercialPendingBadgeIfLeftProspecao(String(selectedLeadId), selectedLead.stageId, stageId);
       setColumns((prev) => {
+        const sid = String(selectedLeadId);
         const next: ColumnsState = {
-          prospecao: (prev.prospecao ?? []).filter((l) => l.id !== selectedLeadId),
-          qualificacao: (prev.qualificacao ?? []).filter((l) => l.id !== selectedLeadId),
-          proposta: (prev.proposta ?? []).filter((l) => l.id !== selectedLeadId),
-          contratacao: (prev.contratacao ?? []).filter((l) => l.id !== selectedLeadId),
-          fechado: (prev.fechado ?? []).filter((l) => l.id !== selectedLeadId),
-          perdido: (prev.perdido ?? []).filter((l) => l.id !== selectedLeadId),
+          prospecao: (prev.prospecao ?? []).filter((l) => String(l.id) !== sid),
+          qualificacao: (prev.qualificacao ?? []).filter((l) => String(l.id) !== sid),
+          proposta: (prev.proposta ?? []).filter((l) => String(l.id) !== sid),
+          contratacao: (prev.contratacao ?? []).filter((l) => String(l.id) !== sid),
+          fechado: (prev.fechado ?? []).filter((l) => String(l.id) !== sid),
+          perdido: (prev.perdido ?? []).filter((l) => String(l.id) !== sid),
         };
         next[stageId] = [...(next[stageId] ?? []), updated];
         return next;
       });
+      scheduleLeadCardPulse(String(selectedLeadId));
       void persistLead(updated).catch(() => {
         void rollbackFromServer();
         showErrorToast("Não foi possível salvar a etapa. Os dados foram recarregados.");
@@ -649,12 +822,23 @@ function ComercialPageContent() {
         setToastSave({ visible: true, message: "Etapa atualizada com sucesso!" });
       }
     },
-    [selectedLeadId, selectedLead, currentUserName, session.userId, persistLead, rollbackFromServer, showErrorToast]
+    [
+      selectedLeadId,
+      selectedLead,
+      currentUserName,
+      session.userId,
+      persistLead,
+      rollbackFromServer,
+      showErrorToast,
+      scheduleLeadCardPulse,
+      clearComercialPendingBadgeIfLeftProspecao,
+    ]
   );
 
   /** Move o lead para a coluna Qualificação e aplica updates (ex.: clienteId) */
   const moveLeadToQualificacao = useCallback((leadId: string, updates: Partial<Lead> = {}) => {
     let updatedPersist: Lead | null = null;
+    let movedFromStage: PipelineStageId | null = null;
     setColumns((prev) => {
       let originalLead: Lead | null = null;
       let updatedLead: Lead | null = null;
@@ -670,8 +854,9 @@ function ComercialPageContent() {
       for (const id of stageIds) {
         const list = prev[id] ?? [];
         for (const lead of list) {
-          if (lead.id === leadId) {
+          if (String(lead.id) === String(leadId)) {
             originalLead = lead;
+            const qNow = new Date().toISOString();
             const clienteLog =
               updates.clienteId &&
               String(updates.clienteId) !== String(lead.clienteId ?? "") &&
@@ -687,7 +872,8 @@ function ComercialPageContent() {
               ...lead,
               ...updates,
               stageId: "qualificacao",
-              enteredStageAt: new Date().toISOString(),
+              enteredStageAt: qNow,
+              registroAtualizadoEm: qNow,
               interactions: [...(lead.interactions ?? []), ...clienteLog],
             };
           } else {
@@ -696,22 +882,36 @@ function ComercialPageContent() {
         }
       }
       if (originalLead && updatedLead) {
-        updatedPersist = withAudit(originalLead, updatedLead, {
+        movedFromStage = originalLead.stageId;
+        const audited = withAudit(originalLead, updatedLead, {
           nome: currentUserName,
           userId: session.userId,
         });
+        updatedPersist = { ...audited, registroAtualizadoEm: updatedLead.registroAtualizadoEm };
         next.qualificacao.push(updatedPersist);
       }
       return next;
     });
+    if (movedFromStage != null) {
+      clearComercialPendingBadgeIfLeftProspecao(leadId, movedFromStage, "qualificacao");
+    }
     if (updatedPersist) {
+      scheduleLeadCardPulse(leadId);
       void persistLead(updatedPersist).catch(() => {
         void rollbackFromServer();
         showErrorToast("Não foi possível mover para Qualificação. Os dados foram recarregados.");
       });
     }
     setLeadToQualifyId(null);
-  }, [currentUserName, session.userId, persistLead, rollbackFromServer, showErrorToast]);
+  }, [
+    currentUserName,
+    session.userId,
+    persistLead,
+    rollbackFromServer,
+    showErrorToast,
+    scheduleLeadCardPulse,
+    clearComercialPendingBadgeIfLeftProspecao,
+  ]);
 
   const handleQualificarComExistente = useCallback((leadId: string, clienteId: string) => {
     moveLeadToQualificacao(leadId, { clienteId });
@@ -811,6 +1011,7 @@ function ComercialPageContent() {
             isLoading={loading}
             pendingLeadCountById={pendingLeadCountById}
             pendingStageCountById={pendingStageCountById}
+            pulsingLeadIds={pulsingLeadIds}
           />
         </div>
       ) : (
@@ -822,6 +1023,7 @@ function ComercialPageContent() {
             selectedLeadId={selectedLeadId}
             onSelectLead={openDetail}
             isLoading={loading}
+            pulsingLeadIds={pulsingLeadIds}
           />
         </div>
       )}
@@ -864,6 +1066,11 @@ function ComercialPageContent() {
           onMouseDown={() => {
             setKanbanPerdaModal(null);
             setKanbanMotivoPerda("");
+            setToastSave({
+              visible: true,
+              message: "Movimentação para Perdido cancelada.",
+              duration: 4500,
+            });
           }}
         >
           <div
@@ -891,16 +1098,24 @@ function ComercialPageContent() {
               placeholder="Descreva o motivo da perda..."
             />
 
-            <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <div className="mt-4 flex flex-col-reverse gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setKanbanPerdaModal(null);
                   setKanbanMotivoPerda("");
+                  setToastSave({
+                    visible: true,
+                    message: "Movimentação para Perdido cancelada.",
+                    duration: 4500,
+                  });
                 }}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                className={formModalCancelButtonClass}
               >
-                Cancelar
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </span>
               </button>
               <button
                 type="button"
@@ -922,7 +1137,10 @@ function ComercialPageContent() {
                 }}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
               >
-                Marcar como Perdido
+                <span className="inline-flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Marcar como Perdido
+                </span>
               </button>
             </div>
           </div>
@@ -949,7 +1167,7 @@ function ComercialPageContent() {
         visible={toastSave.visible}
         onDismiss={() => setToastSave((t) => ({ ...t, visible: false }))}
         variant="success"
-        duration={2500}
+        duration={toastSave.duration ?? 2500}
       />
       <FechadoCelebrationModal
         open={fechadoCelebration.show}

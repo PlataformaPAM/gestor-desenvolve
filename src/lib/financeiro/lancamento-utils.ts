@@ -1,4 +1,5 @@
 import type { Lancamento } from "./types";
+import { getGroupMembers, getRecurrenceRootId } from "./recurrence-save";
 
 /** Distribui o total em N parcelas em centavos (soma exata ao total). */
 export function splitValorTotalEmParcelas(total: number, n: number): number[] {
@@ -53,6 +54,13 @@ export function badgeUrgenciaVencimento(
   return null;
 }
 
+/** Status para UI: vencimento passado e não pago → atrasado (alinha à coluna com selo VENCIDO). */
+export function statusFinanceiroEfetivo(l: Lancamento): Lancamento["status"] {
+  if (l.status === "pago") return "pago";
+  if (diasAteVencimentoCalendar(l.vencimento) < 0) return "atrasado";
+  return l.status;
+}
+
 /** Conta para badge na sidebar: VENCIDO ou VENCE LOGO (exclui hoje, amanhã e >7 dias). */
 export function lancamentoVencidoOuVenceLogo(l: Lancamento): boolean {
   if (l.status === "pago") return false;
@@ -62,12 +70,34 @@ export function lancamentoVencidoOuVenceLogo(l: Lancamento): boolean {
   return false;
 }
 
-/** Linha deve exibir bolinha de alerta (central e/ou vencimento urgente ou vencido). */
+/**
+ * Recorrência fixa mensal: entre 30 dias antes e o dia do vencimento da última linha em aberto,
+ * alerta nas linhas não pagas do grupo (badge na lista + diálogo ao editar).
+ */
+export function lancamentoAlertaFimFixoMensal(l: Lancamento, all: Lancamento[]): boolean {
+  if (l.status === "pago") return false;
+  const rootId = getRecurrenceRootId(l);
+  const gfm = getGroupMembers(rootId, all).filter((x) => x.tipoRecorrencia === "fixo_mensal");
+  if (gfm.length === 0 || !gfm.some((x) => x.id === l.id)) return false;
+  const last = gfm[gfm.length - 1];
+  if (last.status === "pago") return false;
+  const dias = diasAteVencimentoCalendar(last.vencimento);
+  return dias >= 0 && dias <= 30;
+}
+
+/** Linha deve exibir bolinha de alerta (central e/ou vencimento urgente ou vencido ou fim de fixo mensal na janela 30d–vencimento). */
 export function linhaLancamentoComAlertaVisual(
   l: Lancamento,
-  pendingByLancamentoId: Record<string, number>
+  pendingByLancamentoId: Record<string, number>,
+  todosLancamentos?: Lancamento[]
 ): boolean {
-  return (pendingByLancamentoId[l.id] ?? 0) > 0 || badgeUrgenciaVencimento(l) != null;
+  if ((pendingByLancamentoId[l.id] ?? 0) > 0 || badgeUrgenciaVencimento(l) != null) {
+    return true;
+  }
+  if (todosLancamentos?.length && lancamentoAlertaFimFixoMensal(l, todosLancamentos)) {
+    return true;
+  }
+  return false;
 }
 
 export function normalizeTextoAlertaMatch(s: string): string {
@@ -95,4 +125,13 @@ export function parcelaRotuloCurto(l: Lancamento): string | null {
   if (l.tipoRecorrencia !== "parcelado") return null;
   if (l.parcelaNumero == null || l.parcelas == null || l.parcelas < 2) return null;
   return `Parcela ${l.parcelaNumero}/${l.parcelas}`;
+}
+
+/** Mantém a última ocorrência de cada id (evita chaves React duplicadas na grade). */
+export function dedupeLancamentosPorId(list: Lancamento[]): Lancamento[] {
+  const byId = new Map<string, Lancamento>();
+  for (const l of list) {
+    byId.set(l.id, l);
+  }
+  return [...byId.values()];
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/server/api-response";
 import { getSessionFromCookieHeader } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
+import { reconcileStaleModuleAlerts } from "@/lib/server/alerts-resolve";
 
 const MODULE_TO_PERMISSION: Record<string, string | null> = {
   sistema: null,
@@ -60,6 +61,8 @@ export async function GET(req: Request) {
 
   let rows: Alerta[] = [];
   try {
+    await reconcileStaleModuleAlerts(prisma).catch(() => undefined);
+
     rows = await prisma.alerta.findMany({
       where: { ...whereUsuario, modulo: { in: [...allowed] } },
       orderBy: { data: "desc" },

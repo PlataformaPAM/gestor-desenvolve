@@ -1,6 +1,7 @@
 import type { ColaboradorRH } from "@prisma/client";
 import type { ColaboradorParceiro } from "@/lib/rh/types";
 import type { Contato } from "@/lib/clientes/types";
+import { RH_CONSULTOR_PRE_CADASTRO_CARGO } from "@/lib/rh/pre-cadastro-consultor";
 
 function contatosFromJson(raw: unknown): Contato[] | undefined {
   if (!raw || !Array.isArray(raw)) return undefined;
@@ -20,6 +21,18 @@ export function mapColaborador(
   }
 ): ColaboradorParceiro {
   const contatos = contatosFromJson((c as ColaboradorRH & { contatosFornecedor?: unknown }).contatosFornecedor);
+  const rawEfetivado = (c as { cadastroEfetivado?: boolean }).cadastroEfetivado;
+  let cadastroEfetivado: boolean;
+  if (typeof rawEfetivado === "boolean") {
+    cadastroEfetivado = rawEfetivado;
+  } else if (
+    c.tipoPessoa === "vendedor_externo" &&
+    c.cargoOuFuncao === RH_CONSULTOR_PRE_CADASTRO_CARGO
+  ) {
+    cadastroEfetivado = false;
+  } else {
+    cadastroEfetivado = true;
+  }
   return {
     id: c.id,
     nome: c.nome,
@@ -27,6 +40,7 @@ export function mapColaborador(
     tipoContrato: c.tipoContrato as ColaboradorParceiro["tipoContrato"],
     status: c.status as ColaboradorParceiro["status"],
     tipo: c.tipoPessoa as ColaboradorParceiro["tipo"],
+    cadastroEfetivado,
     email: c.email ?? undefined,
     telefone: c.telefone ?? undefined,
     cpfCnpj: c.cpfCnpj ?? undefined,

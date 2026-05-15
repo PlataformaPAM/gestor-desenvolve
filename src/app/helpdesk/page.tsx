@@ -16,6 +16,7 @@ import {
   type OperacaoViewId,
 } from "@/lib/operacao/priorizacao";
 import { useAuth } from "@/contexts/auth-context";
+import { formLabelClass } from "@/components/ui/field-patterns";
 
 type SlaFilter = "" | "no_prazo" | "atencao" | "atrasado";
 const OPERACAO_VIEW_STORAGE_KEY = "operacao_view_suporte";
@@ -67,6 +68,7 @@ export default function SuportePage() {
   useEffect(() => {
     setPrimaryAction({
       label: "Novo Ticket",
+      showPlusIcon: true,
       onClick: () => {
         setSelectedTicket(null);
         setIsSheetOpen(true);
@@ -281,7 +283,6 @@ export default function SuportePage() {
 
   const filterInputClass =
     "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
-  const labelClass = "text-sm font-medium text-slate-700 dark:text-slate-300";
 
   return (
     <section className="w-full min-w-0 space-y-6">
@@ -300,7 +301,7 @@ export default function SuportePage() {
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:items-end lg:gap-2">
           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 lg:flex-1">
-            <label htmlFor="filter-status" className={`${labelClass} shrink-0`}>Status</label>
+            <label htmlFor="filter-status" className={`${formLabelClass} shrink-0`}>Status</label>
             <select id="filter-status" value={statusFilter} onChange={(e) => setStatusFilter((e.target.value || "") as "" | TicketStatus)} className={`${filterInputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
               <option value="">Todos</option>
               {statusOptions.map(({ value, label }) => (
@@ -309,7 +310,7 @@ export default function SuportePage() {
             </select>
           </div>
           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 lg:flex-1">
-            <label htmlFor="filter-categoria" className={`${labelClass} shrink-0`}>Categoria</label>
+            <label htmlFor="filter-categoria" className={`${formLabelClass} shrink-0`}>Categoria</label>
             <select id="filter-categoria" value={categoriaFilter} onChange={(e) => setCategoriaFilter((e.target.value || "") as "" | TicketCategoria)} className={`${filterInputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
               <option value="">Todas</option>
               {categoriaOptions.map(({ value, label }) => (
@@ -318,7 +319,7 @@ export default function SuportePage() {
             </select>
           </div>
           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 lg:flex-1">
-            <label htmlFor="filter-prioridade" className={`${labelClass} shrink-0`}>Prioridade</label>
+            <label htmlFor="filter-prioridade" className={`${formLabelClass} shrink-0`}>Prioridade</label>
             <select id="filter-prioridade" value={prioridadeFilter} onChange={(e) => setPrioridadeFilter((e.target.value || "") as "" | TicketPrioridade)} className={`${filterInputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
               <option value="">Todas</option>
               <option value="baixa">Baixa</option>
@@ -328,7 +329,7 @@ export default function SuportePage() {
             </select>
           </div>
           <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 lg:flex-1">
-            <label htmlFor="filter-sla" className={`${labelClass} shrink-0`}>SLA</label>
+            <label htmlFor="filter-sla" className={`${formLabelClass} shrink-0`}>SLA</label>
             <select id="filter-sla" value={slaFilter} onChange={(e) => setSlaFilter((e.target.value || "") as SlaFilter)} className={`${filterInputClass} min-w-0 w-full lg:min-w-[7.5rem]`}>
               <option value="">Todos</option>
               <option value="no_prazo">No Prazo</option>

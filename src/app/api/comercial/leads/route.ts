@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma, type PipelineStageId } from "@prisma/client";
 import type { Lead } from "@/lib/comercial/types";
-import { mapLeadFromDb, resolveLeadInteractionUserId, toDateOrUndefined } from "../_shared";
+import {
+  ensureLeadPriorityEnumIncludesUrgente,
+  filterUsuarioIdsExisting,
+  mapLeadFromDb,
+  resolveLeadInteractionUserId,
+  resolveUsuarioIdForPrismaFk,
+  toDateOrUndefined,
+} from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
@@ -27,15 +34,25 @@ async function loadLead(id: string) {
 }
 
 export async function POST(req: Request) {
-  const parsed = await parseJsonSafe<{ lead?: Lead }>(req);
-  if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
-  const lead = parsed.value.lead;
-  if (!lead?.id) {
-    return fail("BAD_REQUEST", "Lead inválido.", 400);
-  }
-  const sessionUserId = getSessionUserId(req);
+  try {
+    const parsed = await parseJsonSafe<{ lead?: Lead }>(req);
+    if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
+    const lead = parsed.value.lead;
+    if (!lead?.id) {
+      return fail("BAD_REQUEST", "Lead inválido.", 400);
+    }
+    const sessionUserId = await resolveUsuarioIdForPrismaFk(prisma, getSessionUserId(req));
+    const interactionCandidates = (lead.interactions ?? []).map((i) =>
+      resolveLeadInteractionUserId(i, sessionUserId)
+    );
+    const validInteractionUserIds = await filterUsuarioIdsExisting(
+      prisma,
+      interactionCandidates.filter((x): x is string => Boolean(x))
+    );
 
-  await prisma.$transaction(async (tx) => {
+    await ensureLeadPriorityEnumIncludesUrgente(prisma);
+
+    await prisma.$transaction(async (tx) => {
     await tx.lead.create({
       data: {
         id: lead.id,
@@ -138,6 +155,9 @@ export async function POST(req: Request) {
 
     if (lead.interactions?.length) {
       for (const i of lead.interactions) {
+        const uidRaw = resolveLeadInteractionUserId(i, sessionUserId);
+        const userId =
+          uidRaw && validInteractionUserIds.has(uidRaw) ? uidRaw : null;
         await tx.leadInteraction.create({
           data: {
             id: i.id,
@@ -150,7 +170,7 @@ export async function POST(req: Request) {
             fieldKey: i.fieldKey ?? null,
             oldValue: i.oldValue ?? Prisma.JsonNull,
             newValue: i.newValue ?? Prisma.JsonNull,
-            userId: resolveLeadInteractionUserId(i, sessionUserId),
+            userId,
             autorNome: i.user?.trim() || null,
             anexos: {
               create: (i.anexos ?? []).map((a) =>
@@ -186,5 +206,13 @@ export async function POST(req: Request) {
     dedupeKey: `novo-lead-${saved.id}`,
   });
   return ok({ lead: mapLeadFromDb(saved) }, 201);
+  } catch (e) {
+    console.error("[POST /api/comercial/leads]", e);
+    return fail(
+      "INTERNAL_ERROR",
+      "Não foi possível salvar o lead. Verifique sua sessão e tente novamente.",
+      500
+    );
+  }
 }
 

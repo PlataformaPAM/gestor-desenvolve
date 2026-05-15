@@ -3,6 +3,7 @@ import type { Lancamento } from "@/lib/financeiro/types";
 import { mapLancamentoFromDb } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { syncComissoesFromLancamentoPagamento } from "@/lib/server/comissoes-service";
 
 function toDate(v: string): Date {
   const d = new Date(v);
@@ -51,6 +52,11 @@ export async function POST(req: Request) {
     where: { id: { in: lancamentos.map((l) => l.id) } },
     orderBy: { vencimento: "asc" },
   });
+  for (const row of saved) {
+    if (row.tipo === "entrada" && row.leadIdOrigem) {
+      await syncComissoesFromLancamentoPagamento(prisma, row.id);
+    }
+  }
   await writeAuditLog(prisma, {
     acao: "Lançamento(s) financeiro(s) criado(s)",
     modulo: "financeiro",

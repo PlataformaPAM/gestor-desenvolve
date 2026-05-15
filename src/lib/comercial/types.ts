@@ -20,6 +20,9 @@ export type LeadOrigem =
   | "indicacao"
   | "outro";
 
+/** Oportunidade no funil Comercial vs. registro criado pelo Financeiro para vendas diretas (comissão). */
+export type LeadRegistro = "oportunidade" | "venda_direta_financeiro";
+
 export type LeadInteraction = {
   id: string;
   date: string; // ISO
@@ -86,6 +89,8 @@ export type Lead = {
   enteredStageAt: string;
   /** Origem do lead (obrigatório) */
   origem: LeadOrigem;
+  /** Oportunidade no funil vs. venda direta materializada pelo Financeiro */
+  registroLead: LeadRegistro;
   /** Preenchido na Qualificação; null no início */
   clienteId: string | null;
   /** Soluções atreladas à oportunidade */

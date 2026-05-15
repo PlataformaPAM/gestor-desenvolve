@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, ShieldCheck, Users, Activity } from "lucide-react";
+import { Activity, ChevronRight, FileText, ShieldCheck, Users } from "lucide-react";
 
 const cards = [
   {
@@ -38,10 +38,10 @@ export default function ConfiguracoesPage() {
             <Link
               key={card.title}
               href={card.href}
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#6D28D9]/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+              className="group flex items-stretch justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#6D28D9]/40 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
             >
-              <div className="flex items-start gap-3">
-                <span className="inline-flex rounded-xl bg-[#6D28D9]/10 p-2 text-[#6D28D9]">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="inline-flex shrink-0 rounded-xl bg-[#6D28D9]/10 p-2 text-[#6D28D9]">
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
@@ -51,6 +51,10 @@ export default function ConfiguracoesPage() {
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{card.description}</p>
                 </div>
               </div>
+              <ChevronRight
+                className="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:text-[#6D28D9] dark:text-slate-500"
+                aria-hidden
+              />
             </Link>
           );
         })}

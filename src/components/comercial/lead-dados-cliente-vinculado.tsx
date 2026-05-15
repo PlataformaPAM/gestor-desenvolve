@@ -1,14 +1,20 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Lock, Building2, Mail, Phone, MapPin, Hash } from "lucide-react";
+import { Plus, Lock, Building2, Mail, Phone, MapPin, Hash, Save, Unlink, X } from "lucide-react";
 import type { Lead } from "@/lib/comercial/types";
 import type { Cliente, ClienteEndereco } from "@/lib/clientes/types";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { comercialInputClass, comercialLabelClass } from "./field-styles";
+import {
+  comercialInputClass,
+  comercialLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "./field-styles";
 import { formInputCompactClass } from "@/components/ui/field-patterns";
+import { formatBrazilianPhoneInput } from "@/lib/comercial/phone-input";
 
 type LeadDadosClienteVinculadoProps = {
   lead: Lead;
@@ -55,7 +61,9 @@ export function LeadDadosClienteVinculado({
     const digits = cnpjRaw.replace(/\D/g, "");
     if (digits.length !== 14) return;
     let cancelled = false;
-    setLoadingCnpj(true);
+    queueMicrotask(() => {
+      if (!cancelled) setLoadingCnpj(true);
+    });
     fetchCnpjBrasilApi(digits)
       .then((res) => {
         if (cancelled || !res) return;
@@ -63,7 +71,7 @@ export function LeadDadosClienteVinculado({
         setNomeFantasia(res.nomeFantasia);
         setEndereco((prev) => ({ ...defaultEndereco, ...prev, ...res.endereco }));
         if (res.email) setEmailEmpresa(res.email);
-        if (res.telefone) setTelefoneEmpresa(res.telefone);
+        if (res.telefone) setTelefoneEmpresa(formatBrazilianPhoneInput(res.telefone));
       })
       .finally(() => setLoadingCnpj(false));
     return () => {
@@ -75,8 +83,11 @@ export function LeadDadosClienteVinculado({
     if (!expandNovo) return;
     if (empresa.trim()) return;
     if (initialEmpresaName.trim()) {
-      setEmpresa(initialEmpresaName.trim());
-      setNomeFantasia(initialEmpresaName.trim());
+      const nome = initialEmpresaName.trim();
+      queueMicrotask(() => {
+        setEmpresa(nome);
+        setNomeFantasia(nome);
+      });
     }
   }, [expandNovo, empresa, initialEmpresaName]);
 
@@ -130,8 +141,9 @@ export function LeadDadosClienteVinculado({
             <button
               type="button"
               onClick={() => setPedirDesvinculoCliente(true)}
-              className="shrink-0 rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
             >
+              <Unlink className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Remover
             </button>
           </div>
@@ -331,28 +343,30 @@ export function LeadDadosClienteVinculado({
                 <input
                   type="tel"
                   value={telefoneEmpresa}
-                  onChange={(e) => setTelefoneEmpresa(e.target.value)}
+                  onChange={(e) => setTelefoneEmpresa(formatBrazilianPhoneInput(e.target.value))}
                   placeholder="(00) 00000-0000"
                   className={`${comercialInputClass} pl-9`}
                 />
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={resetNovoForm}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Cancelar
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+            <button type="button" onClick={resetNovoForm} className={formModalCancelButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <X className="h-4 w-4" />
+                Cancelar
+              </span>
             </button>
             <button
               type="button"
               onClick={handleCadastrar}
               disabled={!empresa.trim() || cnpjRaw.replace(/\D/g, "").length !== 14}
-              className="rounded-lg bg-[#6D28D9] px-3 py-2 text-sm font-medium text-white hover:bg-[#5B21B6] disabled:opacity-50"
+              className={formModalSubmitButtonClass}
             >
-              Cadastrar e vincular
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Cadastrar e vincular
+              </span>
             </button>
           </div>
         </div>

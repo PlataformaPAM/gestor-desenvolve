@@ -45,6 +45,7 @@ export type DocumentoRichEditorProps = {
   onFocus?: () => void;
   placeholder?: string;
   minHeightClassName?: string;
+  contentLeadingIcon?: React.ComponentType<{ className?: string }>;
 };
 
 function Toolbar({ editor }: { editor: Editor | null }) {
@@ -190,7 +191,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
 
 export const DocumentoRichEditor = forwardRef<DocumentoRichEditorHandle, DocumentoRichEditorProps>(
   function DocumentoRichEditor(
-    { initialHtml, onChange, onFocus, placeholder, minHeightClassName = "min-h-[200px]" },
+    { initialHtml, onChange, onFocus, placeholder, minHeightClassName = "min-h-[200px]", contentLeadingIcon: ContentLeadingIcon },
     ref
   ) {
     const extensions = useMemo(
@@ -229,6 +230,7 @@ export const DocumentoRichEditor = forwardRef<DocumentoRichEditorHandle, Documen
         attributes: {
           class: clsx(
             "tiptap max-w-none px-3 py-2 text-sm text-slate-900 outline-none dark:text-slate-100",
+            ContentLeadingIcon && "pl-9",
             minHeightClassName
           ),
         },
@@ -260,7 +262,12 @@ export const DocumentoRichEditor = forwardRef<DocumentoRichEditorHandle, Documen
     return (
       <div className="documento-rich-editor rounded-b-lg border border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-900">
         <Toolbar editor={editor} />
-        <EditorContent editor={editor} className="documento-editor-content" />
+        <div className="relative">
+          {ContentLeadingIcon ? (
+            <ContentLeadingIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+          ) : null}
+          <EditorContent editor={editor} className="documento-editor-content" />
+        </div>
       </div>
     );
   }

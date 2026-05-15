@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { Search } from "lucide-react";
+import { formInputClass } from "@/components/ui/field-patterns";
 import { UsuariosTable } from "@/components/configuracoes/usuarios-table";
 import { NovoUsuarioForm, type UsuarioFormPayload } from "@/components/configuracoes/novo-usuario-form";
 import type { PerfilAcesso, UsuarioSistema, ModuloPermissao } from "@/lib/configuracoes/types";
 import { PerfisAcessoTable } from "@/components/configuracoes/perfis-acesso-table";
 import { PerfilForm, type PerfilFormPayload } from "@/components/configuracoes/perfil-form";
+import { PORTAL_CLIENTE_PERFIL_LABELS, PORTAL_CLIENTE_PERFIL_MODULOS } from "@/lib/portal/cliente-perfil-modulos";
 
 type PortalContextPayload = {
   user: { id: string; nome: string; isAdminCliente: boolean };
@@ -24,12 +26,6 @@ type UsuarioPortal = {
   perfilId?: string;
   perfilNome: string;
   isAdminCliente?: boolean;
-};
-
-const PORTAL_ALLOWED_MODULES: ModuloPermissao[] = ["helpdesk", "configuracoes"];
-const PORTAL_MODULE_LABELS: Partial<Record<ModuloPermissao, string>> = {
-  helpdesk: "Suporte",
-  configuracoes: "Usuários",
 };
 
 export default function PortalUsuariosPage() {
@@ -66,10 +62,18 @@ export default function PortalUsuariosPage() {
         financeiro: false,
         tarefas: false,
         clientes: false,
+        contratos: false,
         helpdesk: true,
         posVenda: false,
+        solucoes: false,
         rh: false,
         configuracoes: false,
+        relatorios: false,
+        configuracoes_construtor_documentos: false,
+        configuracoes_logs: false,
+        configuracoes_perfis: false,
+        configuracoes_usuarios: false,
+        portal_cliente: false,
       };
       return {
         id: perfilId,
@@ -132,6 +136,7 @@ export default function PortalUsuariosPage() {
     }
     setPrimaryAction({
       label: section === "usuarios" ? "Novo Usuário" : "Novo Perfil",
+      showPlusIcon: true,
       onClick: () => {
         if (section === "usuarios") setOpenNovoUsuario(true);
         if (section === "perfis") setOpenNovoPerfil(true);
@@ -236,7 +241,7 @@ export default function PortalUsuariosPage() {
 
   return (
     <section className="w-full min-w-0 space-y-6">
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
+      <div className="sticky top-0 z-10 flex w-full min-w-0 flex-wrap items-center gap-3 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-3 shadow-sm backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/90">
         <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto sm:max-w-lg sm:flex-row sm:items-center">
           <div className="relative min-w-0 w-full sm:w-[520px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -245,7 +250,7 @@ export default function PortalUsuariosPage() {
               value={filtroBusca}
               onChange={(e) => setFiltroBusca(e.target.value)}
               placeholder="Buscar..."
-              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className={`${formInputClass} h-10 min-w-0 pl-9`}
             />
           </div>
           <label className="inline-flex shrink-0 items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -305,8 +310,8 @@ export default function PortalUsuariosPage() {
         <PerfisAcessoTable
           perfis={perfis}
           readOnly
-          allowedModules={PORTAL_ALLOWED_MODULES}
-          moduleLabels={PORTAL_MODULE_LABELS}
+          allowedModules={PORTAL_CLIENTE_PERFIL_MODULOS}
+          moduleLabels={PORTAL_CLIENTE_PERFIL_LABELS}
           onEditar={
             context?.user.isAdminCliente
               ? (p) => {
@@ -325,8 +330,10 @@ export default function PortalUsuariosPage() {
           setUsuarioEmEdicao(null);
         }}
         title="Editar Usuário"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <NovoUsuarioForm
             perfis={perfisTabela}
             pessoasVinculo={[]}
@@ -354,8 +361,14 @@ export default function PortalUsuariosPage() {
         </div>
       </DrawerSheet>
 
-      <DrawerSheet open={openNovoUsuario} onClose={() => setOpenNovoUsuario(false)} title="Novo Usuário">
-        <div className="overflow-y-auto">
+      <DrawerSheet
+        open={openNovoUsuario}
+        onClose={() => setOpenNovoUsuario(false)}
+        title="Novo Usuário"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <NovoUsuarioForm
             perfis={perfisTabela}
             pessoasVinculo={[]}
@@ -368,11 +381,17 @@ export default function PortalUsuariosPage() {
         </div>
       </DrawerSheet>
 
-      <DrawerSheet open={openNovoPerfil} onClose={() => setOpenNovoPerfil(false)} title="Novo Perfil">
-        <div className="overflow-y-auto">
+      <DrawerSheet
+        open={openNovoPerfil}
+        onClose={() => setOpenNovoPerfil(false)}
+        title="Novo Perfil"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PerfilForm
-            allowedModules={PORTAL_ALLOWED_MODULES}
-            moduleLabels={PORTAL_MODULE_LABELS}
+            allowedModules={PORTAL_CLIENTE_PERFIL_MODULOS}
+            moduleLabels={PORTAL_CLIENTE_PERFIL_LABELS}
             onSave={(payload) => {
               void onCriarPerfil(payload);
             }}
@@ -388,12 +407,14 @@ export default function PortalUsuariosPage() {
           setPerfilEmEdicao(null);
         }}
         title="Editar Perfil"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PerfilForm
             initialPerfil={perfilEmEdicao}
-            allowedModules={PORTAL_ALLOWED_MODULES}
-            moduleLabels={PORTAL_MODULE_LABELS}
+            allowedModules={PORTAL_CLIENTE_PERFIL_MODULOS}
+            moduleLabels={PORTAL_CLIENTE_PERFIL_LABELS}
             onSave={(payload) => {
               void onSalvarPerfil(payload);
             }}

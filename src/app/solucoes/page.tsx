@@ -1,16 +1,67 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import type { ComponentType } from "react";
+import clsx from "clsx";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   type DropResult,
 } from "@hello-pangea/dnd";
-import { Plus, GripVertical, Package, Layers, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  GripVertical,
+  Package,
+  Layers,
+  ChevronRight,
+  Pencil,
+  Save,
+  FileText,
+  Link2,
+  Tag,
+  Wallet,
+  Briefcase,
+  GraduationCap,
+  Hash,
+  Cpu,
+  CheckCircle2,
+  CircleSlash2,
+  Settings2,
+  Handshake,
+  UserRoundCheck,
+  Wrench,
+  X,
+  Circle,
+  RefreshCw,
+  ListOrdered,
+  Flag,
+  ClipboardList,
+  Clock,
+  Target,
+} from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
+
+const formInputWithIconClass = `${formInputClass} pl-9`;
+
+function digitsOnly(s: string): string {
+  return s.replace(/\D/g, "");
+}
+
+/** Igual ao campo Valor (R$) do lançamento financeiro: centavos → texto com R$. */
+function formatCurrencyFromCents(cents: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
 
 // --- Types ---
 export type RecorrenciaSolucao = "mensal" | "unica" | "parcelado";
@@ -47,14 +98,82 @@ export type Solucao = {
 };
 
 const RECORRENCIA_LABELS: Record<RecorrenciaSolucao, string> = {
-  mensal: "Mensal",
   unica: "Única",
+  mensal: "Fixo mensal",
   parcelado: "Parcelado",
 };
 
+/** Mesmos ícones/cores do tipo de recorrência no Financeiro (Único / Fixo mensal / Parcelado). */
+const RECORRENCIA_ICON: Record<RecorrenciaSolucao, ComponentType<{ className?: string }>> = {
+  unica: Circle,
+  mensal: RefreshCw,
+  parcelado: ListOrdered,
+};
+
+const RECORRENCIA_ICON_COLOR: Record<RecorrenciaSolucao, string> = {
+  unica: "!text-emerald-600 dark:!text-emerald-400",
+  mensal: "!text-blue-600 dark:!text-blue-400",
+  parcelado: "!text-violet-600 dark:!text-violet-400",
+};
+
 /** Categorias fixas para o select na aba Dados Básicos */
-const CATEGORIAS_SOLUCAO = ["Software", "Consultoria", "Capacitação"] as const;
+const CATEGORIAS_SOLUCAO = [
+  "Assessoria",
+  "Capacitação",
+  "Consultoria",
+  "Mentoria",
+  "Serviço",
+  "Software",
+] as const;
 export type CategoriaSolucao = (typeof CATEGORIAS_SOLUCAO)[number];
+const CATEGORIA_OPTIONS: SearchableOption[] = [
+  {
+    value: "",
+    label: "Selecione a categoria",
+  },
+  {
+    value: "Assessoria",
+    label: "Assessoria",
+    icon: ({ className }) => <Handshake className={clsx(className, "!text-cyan-600 dark:!text-cyan-400")} />,
+  },
+  {
+    value: "Capacitação",
+    label: "Capacitação",
+    icon: ({ className }) => <GraduationCap className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />,
+  },
+  {
+    value: "Consultoria",
+    label: "Consultoria",
+    icon: ({ className }) => <Briefcase className={clsx(className, "!text-violet-600 dark:!text-violet-400")} />,
+  },
+  {
+    value: "Mentoria",
+    label: "Mentoria",
+    icon: ({ className }) => <UserRoundCheck className={clsx(className, "!text-amber-600 dark:!text-amber-400")} />,
+  },
+  {
+    value: "Serviço",
+    label: "Serviço",
+    icon: ({ className }) => <Wrench className={clsx(className, "!text-orange-600 dark:!text-orange-400")} />,
+  },
+  {
+    value: "Software",
+    label: "Software",
+    icon: ({ className }) => <Settings2 className={clsx(className, "!text-indigo-500 dark:!text-indigo-400")} />,
+  },
+];
+const STATUS_OPTIONS: SearchableOption[] = [
+  {
+    value: "ativo",
+    label: "Ativo",
+    icon: ({ className }) => <CheckCircle2 className={clsx(className, "!text-emerald-600 dark:!text-emerald-400")} />,
+  },
+  {
+    value: "inativo",
+    label: "Inativo",
+    icon: ({ className }) => <CircleSlash2 className={clsx(className, "!text-slate-500 dark:!text-slate-400")} />,
+  },
+];
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -78,6 +197,7 @@ export default function SolucoesPage() {
   useEffect(() => {
     setPrimaryAction({
       label: "Nova Solução",
+      showPlusIcon: true,
       onClick: () => {
         setEditingSolucao(null);
         setSheetOpen(true);
@@ -168,8 +288,10 @@ export default function SolucoesPage() {
     handleCloseSheet();
   };
 
-  const isEditing = editingSolucao !== null;
-  const sheetTitle = isEditing ? `Editar: ${editingSolucao.nome}` : "Nova Solução";
+  const sheetTitle =
+    editingSolucao === null
+      ? "Nova Solução"
+      : editingSolucao.nome.trim() || "Nova Solução";
   const currentFormData = editingSolucao ?? {
     id: "",
     nome: "",
@@ -203,47 +325,47 @@ export default function SolucoesPage() {
               }}
               className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:focus-visible:ring-offset-slate-950"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-slate-900 truncate dark:text-slate-100">{sol.nome}</h3>
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
                   {sol.logoUrl ? (
-                    <img src={sol.logoUrl} alt={`Logo ${sol.nome}`} className="mt-2 h-8 w-8 rounded object-contain" />
-                  ) : null}
-                  <p className="mt-1 text-lg font-bold text-[#6D28D9]">
-                    {formatCurrency(sol.valorVenda)}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Categoria: {sol.categoria || "Não informada"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {RECORRENCIA_LABELS[sol.recorrencia]}
-                    {sol.recorrencia === "parcelado"
-                      ? ` · ${sol.parcelasPadrao ?? 12} parcelas`
-                      : ""}
-                  </p>
+                    <img src={sol.logoUrl} alt={`Logo ${sol.nome}`} className="h-8 w-8 rounded object-contain" />
+                  ) : (
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                      <Cpu className="h-4 w-4" />
+                    </span>
+                  )}
+                  <h3 className="min-w-0 truncate font-semibold text-slate-900 dark:text-slate-100">{sol.nome}</h3>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAtivo(sol);
-                    }}
-                    className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors ${
-                      (sol.ativo ?? true)
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                        : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                    }`}
-                  >
-                    {(sol.ativo ?? true) ? "Ativo" : "Inativo"}
-                  </button>
-                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Valor prévio: {formatCurrency(sol.valorVenda)}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Categoria: {sol.categoria || "Não informada"}</p>
+                {countPlaybookSteps(sol.playbook) > 0 ? (
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Playbook: {countPlaybookSteps(sol.playbook)} etapa{countPlaybookSteps(sol.playbook) > 1 ? "s" : ""}
+                  </p>
+                ) : null}
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Status: {(sol.ativo ?? true) ? "Ativo" : "Inativo"}
+                </p>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="inline-flex shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {countPlaybookSteps(sol.playbook)} etapa{countPlaybookSteps(sol.playbook) !== 1 ? "s" : ""}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleAtivo(sol);
+                  }}
+                  className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors ${
+                    (sol.ativo ?? true)
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                      : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  }`}
+                >
+                  {(sol.ativo ?? true) ? "Ativo" : "Inativo"}
+                </button>
+                <span className="inline-flex items-center gap-1 text-slate-400" aria-hidden>
+                  <Pencil className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4" />
                 </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
               </div>
             </div>
         ))}
@@ -261,10 +383,12 @@ export default function SolucoesPage() {
         onClose={handleCloseSheet}
         title={sheetTitle}
         maxWidth="sm:max-w-3xl"
+        mobileContentPaddingClassName="px-0"
+        desktopContentPaddingClassName="px-0"
       >
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="sticky top-0 z-30 flex shrink-0 border-b border-slate-300 bg-slate-50/95 backdrop-blur-sm dark:border-slate-600 dark:bg-slate-800/95">
             {(
               [
                 { id: "dados" as const, label: "Dados Básicos" },
@@ -276,19 +400,21 @@ export default function SolucoesPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                className={clsx(
+                  "relative flex-1 px-4 py-3 text-sm font-medium transition-colors",
                   activeTab === tab.id
-                    ? "border-b-2 border-[#6D28D9] text-[#6D28D9]"
+                    ? "text-[#6D28D9] dark:text-violet-400"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                }`}
+                )}
               >
+                {activeTab === tab.id ? <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]" /> : null}
                 {tab.label}
               </button>
             ))}
           </div>
 
-          <div className="flex flex-1 flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6">
               {activeTab === "dados" && (
                 <SolucaoTabDados solucao={editingSolucao} onSolucaoChange={(s) => setEditingSolucao(s)} />
               )}
@@ -299,20 +425,26 @@ export default function SolucoesPage() {
                 <SolucaoTabPlaybook solucao={editingSolucao} onSolucaoChange={(s) => setEditingSolucao(s)} />
               )}
             </div>
-            <div className="flex gap-3 border-t border-slate-200 bg-white px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
               <button
                 type="button"
                 onClick={handleCloseSheet}
-                className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                className={formModalCancelButtonClass}
               >
-                Cancelar
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4 shrink-0" aria-hidden />
+                  Cancelar
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSalvarSheet(currentFormData)}
-                className="flex-1 rounded-lg bg-[#6D28D9] px-4 py-2.5 font-semibold text-white hover:bg-purple-700"
+                className={formModalSubmitButtonClass}
               >
-                Salvar
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4 shrink-0" aria-hidden />
+                  Salvar
+                </span>
               </button>
             </div>
           </div>
@@ -342,6 +474,7 @@ function SolucaoTabDados({
     parcelasPadrao: 12,
     regrasContrato: "",
     playbook: [],
+    ativo: true,
   };
 
   const update = (patch: Partial<Solucao>) => {
@@ -352,49 +485,69 @@ function SolucaoTabDados({
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Nome</label>
-        <input
-          type="text"
-          value={data.nome}
-          onChange={(e) => update({ nome: e.target.value })}
-          placeholder="Ex.: Consultoria Financeira"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-        />
+        <label className={formLabelClass}>Nome</label>
+        <div className="relative mt-1">
+          <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={data.nome}
+            onChange={(e) => update({ nome: e.target.value })}
+            placeholder="Ex.: Consultoria Financeira"
+            className={`${formInputClass} pl-9`}
+          />
+        </div>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Descrição Técnica</label>
-        <textarea
-          value={data.descricaoTecnica}
-          onChange={(e) => update({ descricaoTecnica: e.target.value })}
-          placeholder="Descreva a solução, escopo e entregas..."
-          rows={4}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-        />
+        <label className={formLabelClass}>Descrição Técnica</label>
+        <div className="relative mt-1">
+          <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+          <textarea
+            value={data.descricaoTecnica}
+            onChange={(e) => update({ descricaoTecnica: e.target.value })}
+            placeholder="Descreva a solução, escopo e entregas..."
+            rows={4}
+            className={`${formTextareaClass} pl-9`}
+          />
+        </div>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Logo (URL)</label>
-        <input
-          type="url"
-          value={data.logoUrl ?? ""}
-          onChange={(e) => update({ logoUrl: e.target.value })}
-          placeholder="https://..."
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-        />
+        <label className={formLabelClass}>Logo (URL)</label>
+        <div className="relative mt-1">
+          <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="url"
+            value={data.logoUrl ?? ""}
+            onChange={(e) => update({ logoUrl: e.target.value })}
+            placeholder="https://..."
+            className={`${formInputClass} pl-9`}
+          />
+        </div>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Categoria</label>
-        <select
-          value={data.categoria}
-          onChange={(e) => update({ categoria: e.target.value })}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-        >
-          <option value="">Selecione a categoria</option>
-          {CATEGORIAS_SOLUCAO.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
+        <label className={formLabelClass}>Categoria</label>
+        <div className="mt-1">
+          <SearchableSelect
+            options={CATEGORIA_OPTIONS}
+            value={data.categoria}
+            onChange={(v) => update({ categoria: v })}
+            searchable={false}
+            placeholder="Selecione a categoria..."
+            leadingIcon={Tag}
+          />
+        </div>
+      </div>
+      <div>
+        <label className={formLabelClass}>Status</label>
+        <div className="mt-1">
+          <SearchableSelect
+            options={STATUS_OPTIONS}
+            value={(data.ativo ?? true) ? "ativo" : "inativo"}
+            onChange={(v) => update({ ativo: v === "ativo" })}
+            searchable={false}
+            placeholder="Selecione o status"
+            leadingIcon={(data.ativo ?? true) ? CheckCircle2 : CircleSlash2}
+          />
+        </div>
       </div>
     </div>
   );
@@ -420,7 +573,17 @@ function SolucaoTabComercial({
     parcelasPadrao: 12,
     regrasContrato: "",
     playbook: [],
+    ativo: true,
   };
+
+  const syncKey = solucao?.id ?? "__novo__";
+  const [valorDigits, setValorDigits] = useState(() =>
+    String(Math.round((data.valorVenda || 0) * 100))
+  );
+
+  useEffect(() => {
+    setValorDigits(String(Math.round((data.valorVenda || 0) * 100)));
+  }, [syncKey]);
 
   const update = (patch: Partial<Solucao>) => {
     if (solucao) onSolucaoChange({ ...solucao, ...patch });
@@ -430,24 +593,35 @@ function SolucaoTabComercial({
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Valor de Venda (R$)</label>
-        <input
-          type="number"
-          min={0}
-          step={0.01}
-          value={data.valorVenda || ""}
-          onChange={(e) => update({ valorVenda: Number(e.target.value) || 0 })}
-          placeholder="0,00"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-        />
+        <label className={formLabelClass}>Valor de Venda (R$)</label>
+        <div className="relative mt-1">
+          <Wallet className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={formatCurrencyFromCents(Number.parseInt(valorDigits || "0", 10) || 0)}
+            onChange={(e) => {
+              const d = digitsOnly(e.target.value);
+              setValorDigits(d);
+              const cents = Number.parseInt(d || "0", 10) || 0;
+              update({ valorVenda: cents / 100 });
+            }}
+            className={formInputWithIconClass}
+            aria-label="Valor de venda em reais"
+          />
+        </div>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Forma de pagamento (referência comercial)</label>
+        <label className={formLabelClass}>Forma de pagamento (referência comercial)</label>
         <p className="mb-2 text-xs text-slate-500">
           Usado como sugestão na proposta; o Financeiro pode ajustar ao lançar no caixa.
         </p>
         <div className="flex flex-wrap gap-2">
-          {(["mensal", "unica", "parcelado"] as RecorrenciaSolucao[]).map((r) => (
+          {(["unica", "mensal", "parcelado"] as RecorrenciaSolucao[]).map((r) => {
+            const Icon = RECORRENCIA_ICON[r];
+            const selected = data.recorrencia === r;
+            return (
             <button
               key={r}
               type="button"
@@ -458,43 +632,55 @@ function SolucaoTabComercial({
                     r === "parcelado" ? Math.max(2, data.parcelasPadrao ?? 12) : data.parcelasPadrao,
                 })
               }
-              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                data.recorrencia === r
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                selected
                   ? "border-[#6D28D9] bg-[#6D28D9] text-white"
-                  : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
               }`}
             >
+              <Icon
+                className={clsx(
+                  "h-4 w-4 shrink-0",
+                  selected ? "!text-white" : RECORRENCIA_ICON_COLOR[r]
+                )}
+                aria-hidden
+              />
               {RECORRENCIA_LABELS[r]}
             </button>
-          ))}
+            );
+          })}
+          {data.recorrencia === "parcelado" && (
+            <div className="relative">
+              <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="number"
+                min={2}
+                max={60}
+                value={Math.max(2, data.parcelasPadrao ?? 12)}
+                onChange={(e) =>
+                  update({
+                    parcelasPadrao: Math.min(60, Math.max(2, parseInt(e.target.value, 10) || 2)),
+                  })
+                }
+                className={`w-36 ${formInputClass} pl-9`}
+                placeholder="Parcelas"
+              />
+            </div>
+          )}
         </div>
-        {data.recorrencia === "parcelado" && (
-          <div className="mt-3">
-            <label className="mb-1 block text-sm font-medium text-slate-700">Parcelas sugeridas (mín. 2)</label>
-            <input
-              type="number"
-              min={2}
-              max={60}
-              value={Math.max(2, data.parcelasPadrao ?? 12)}
-              onChange={(e) =>
-                update({
-                  parcelasPadrao: Math.min(60, Math.max(2, parseInt(e.target.value, 10) || 2)),
-                })
-              }
-              className="w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </div>
-        )}
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Regras de Contrato</label>
-        <textarea
-          value={data.regrasContrato}
-          onChange={(e) => update({ regrasContrato: e.target.value })}
-          placeholder="Condições de pagamento, reembolso, SLA..."
-          rows={4}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9]"
-        />
+        <label className={formLabelClass}>Regras de Contrato</label>
+        <div className="relative mt-1">
+          <Tag className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+          <textarea
+            value={data.regrasContrato}
+            onChange={(e) => update({ regrasContrato: e.target.value })}
+            placeholder="Condições de pagamento, reembolso, SLA..."
+            rows={4}
+            className={`${formTextareaClass} pl-9`}
+          />
+        </div>
       </div>
     </div>
   );
@@ -637,14 +823,14 @@ function SolucaoTabPlaybook({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-600">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <p className="min-w-0 text-sm leading-relaxed text-slate-600">
           Monte o checklist de entrega (Pós-Venda). Etapas pai agrupam sub-etapas com SLA e resultado esperado.
         </p>
         <button
           type="button"
           onClick={addEtapaPai}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
         >
           <Layers className="h-4 w-4" />
           Adicionar Etapa Pai
@@ -683,15 +869,18 @@ function SolucaoTabPlaybook({
                         >
                           <GripVertical className="h-4 w-4" />
                         </span>
-                        <input
-                          type="text"
-                          value={etapa.titulo}
-                          onChange={(e) =>
-                            updateEtapa(etapaIndex, { ...etapa, titulo: e.target.value })
-                          }
-                          placeholder="Ex.: Fase 1: Onboarding"
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-                        />
+                        <div className="relative min-w-0 flex-1">
+                          <Flag className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                          <input
+                            type="text"
+                            value={etapa.titulo}
+                            onChange={(e) =>
+                              updateEtapa(etapaIndex, { ...etapa, titulo: e.target.value })
+                            }
+                            placeholder="Ex.: Fase 1: Onboarding"
+                            className={`w-full ${formInputClass} pl-9 font-medium`}
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() =>
@@ -749,69 +938,83 @@ function SolucaoTabPlaybook({
                                         <GripVertical className="h-4 w-4" />
                                       </span>
                                       <div className="min-w-0 flex-1 space-y-3">
-                                        <input
-                                          type="text"
-                                          value={sub.tituloTarefa}
-                                          onChange={(e) =>
-                                            updateSubEtapa(etapaIndex, subIndex, {
-                                              ...sub,
-                                              tituloTarefa: e.target.value,
-                                            })
-                                          }
-                                          placeholder="Título da Tarefa"
-                                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-                                        />
-                                        <div>
-                                          <label className="mb-0.5 block text-xs font-medium text-slate-500">
-                                            Descrição / Como Fazer
-                                          </label>
-                                          <textarea
-                                            value={sub.descricaoComoFazer}
+                                        <div className="relative">
+                                          <ClipboardList className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                          <input
+                                            type="text"
+                                            value={sub.tituloTarefa}
                                             onChange={(e) =>
                                               updateSubEtapa(etapaIndex, subIndex, {
                                                 ...sub,
-                                                descricaoComoFazer: e.target.value,
+                                                tituloTarefa: e.target.value,
                                               })
                                             }
-                                            placeholder="Passo a passo ou orientação..."
-                                            rows={2}
-                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+                                            placeholder="Título da Tarefa"
+                                            className={`w-full ${formInputClass} pl-9 font-medium`}
                                           />
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-4">
-                                          <div className="w-24">
-                                            <label className="mb-0.5 block text-xs font-medium text-slate-500">
-                                              SLA (dias)
-                                            </label>
-                                            <input
-                                              type="number"
-                                              min={0}
-                                              value={sub.slaDias}
+                                        <div>
+                                          <label className={formLabelClass}>
+                                            Descrição / Como Fazer
+                                          </label>
+                                          <div className="relative mt-1">
+                                            <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" aria-hidden />
+                                            <textarea
+                                              value={sub.descricaoComoFazer}
                                               onChange={(e) =>
                                                 updateSubEtapa(etapaIndex, subIndex, {
                                                   ...sub,
-                                                  slaDias: Number(e.target.value) || 0,
+                                                  descricaoComoFazer: e.target.value,
                                                 })
                                               }
-                                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                              placeholder="Passo a passo ou orientação..."
+                                              rows={2}
+                                              className={`w-full ${formTextareaClass} pl-9`}
                                             />
                                           </div>
+                                        </div>
+                                        <div className="flex flex-wrap items-end gap-4">
+                                          <div className="w-28 sm:w-32">
+                                            <label className={formLabelClass} htmlFor={`sla-${etapa.id}-${sub.id}`}>
+                                              SLA (dias)
+                                            </label>
+                                            <div className="relative mt-1">
+                                              <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                              <input
+                                                id={`sla-${etapa.id}-${sub.id}`}
+                                                type="number"
+                                                min={0}
+                                                value={sub.slaDias}
+                                                onChange={(e) =>
+                                                  updateSubEtapa(etapaIndex, subIndex, {
+                                                    ...sub,
+                                                    slaDias: Number(e.target.value) || 0,
+                                                  })
+                                                }
+                                                className={`w-full ${formInputClass} pl-9 tabular-nums`}
+                                              />
+                                            </div>
+                                          </div>
                                           <div className="min-w-0 flex-1">
-                                            <label className="mb-0.5 block text-xs font-medium text-slate-500">
+                                            <label className={formLabelClass} htmlFor={`resultado-${etapa.id}-${sub.id}`}>
                                               Resultado Esperado
                                             </label>
-                                            <input
-                                              type="text"
-                                              value={sub.resultadoEsperado}
-                                              onChange={(e) =>
-                                                updateSubEtapa(etapaIndex, subIndex, {
-                                                  ...sub,
-                                                  resultadoEsperado: e.target.value,
-                                                })
-                                              }
-                                              placeholder="Entregável ou critério de conclusão"
-                                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-                                            />
+                                            <div className="relative mt-1">
+                                              <Target className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                              <input
+                                                id={`resultado-${etapa.id}-${sub.id}`}
+                                                type="text"
+                                                value={sub.resultadoEsperado}
+                                                onChange={(e) =>
+                                                  updateSubEtapa(etapaIndex, subIndex, {
+                                                    ...sub,
+                                                    resultadoEsperado: e.target.value,
+                                                  })
+                                                }
+                                                placeholder="Entregável ou critério de conclusão"
+                                                className={`w-full ${formInputClass} pl-9`}
+                                              />
+                                            </div>
                                           </div>
                                           <button
                                             type="button"

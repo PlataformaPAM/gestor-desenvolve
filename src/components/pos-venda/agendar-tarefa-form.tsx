@@ -2,12 +2,42 @@
 
 import { useEffect, useId, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { GripVertical, Layers, Plus } from "lucide-react";
+import {
+  GripVertical,
+  Layers,
+  Plus,
+  Building2,
+  Target,
+  MessageSquare,
+  Handshake,
+  CalendarCheck2,
+  CalendarSync,
+  FileSignature,
+  SmilePlus,
+  MessageCircleWarning,
+  CircleHelp,
+  FileText,
+  ClipboardList,
+  Clock,
+  Flag,
+  X,
+  Save,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import clsx from "clsx";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import type { PlaybookEtapa, PlaybookSubEtapa, TarefaRegua, TipoTarefaRégua } from "@/lib/pos-venda/types";
 import { TIPO_TAREFA_LABELS } from "@/lib/pos-venda/constants";
 import type { Cliente } from "@/lib/clientes/types";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { DateField } from "@/components/ui/date-field";
+import {
+  formInputClass,
+  formLabelClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+  formTextareaClass,
+} from "@/components/ui/field-patterns";
 
 type AgendarTarefaFormProps = {
   clientes: Cliente[];
@@ -17,6 +47,7 @@ type AgendarTarefaFormProps = {
 
 const TIPOS: TipoTarefaRégua[] = [
   "boas_vindas",
+  "agenda_reuniao",
   "checkup_30",
   "checkup_90",
   "renovacao_contrato",
@@ -24,6 +55,23 @@ const TIPOS: TipoTarefaRégua[] = [
   "feedback",
   "outro",
 ];
+
+const TASK_VISUALS: Record<TipoTarefaRégua, { icon: LucideIcon; iconClassName: string }> = {
+  boas_vindas: { icon: Handshake, iconClassName: "!text-emerald-600 dark:!text-emerald-400" },
+  agenda_reuniao: { icon: CalendarCheck2, iconClassName: "!text-sky-600 dark:!text-sky-400" },
+  checkup_30: { icon: CalendarSync, iconClassName: "!text-violet-600 dark:!text-violet-400" },
+  checkup_90: { icon: CalendarSync, iconClassName: "!text-indigo-600 dark:!text-indigo-400" },
+  renovacao_contrato: { icon: FileSignature, iconClassName: "!text-amber-600 dark:!text-amber-400" },
+  pesquisa_satisfacao: { icon: SmilePlus, iconClassName: "!text-lime-600 dark:!text-lime-400" },
+  feedback: { icon: MessageCircleWarning, iconClassName: "!text-rose-600 dark:!text-rose-400" },
+  outro: { icon: CircleHelp, iconClassName: "!text-slate-500 dark:!text-slate-300" },
+};
+
+function createColoredIcon(Icon: LucideIcon, iconClassName: string) {
+  return function ColoredIcon({ className }: { className?: string }) {
+    return <Icon className={clsx(className, iconClassName)} />;
+  };
+}
 
 function nextWeek(): string {
   const d = new Date();
@@ -50,6 +98,17 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
   >(null);
 
   const cliente = clientes.find((c) => c.id === clienteId);
+  const clienteOptions: SearchableOption[] = clientes.map((c) => ({
+    value: c.id,
+    label: c.nome,
+    subtitle: c.empresa,
+    icon: Building2,
+  }));
+  const tipoOptions: SearchableOption[] = TIPOS.map((tipoValue) => ({
+    value: tipoValue,
+    label: TIPO_TAREFA_LABELS[tipoValue],
+    icon: createColoredIcon(TASK_VISUALS[tipoValue].icon, TASK_VISUALS[tipoValue].iconClassName),
+  }));
 
   useEffect(() => {
     // Heurística inicial: "feedback" tende a ser ação prioritária.
@@ -130,12 +189,18 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
-      <div role="tablist" aria-label="Abas do agendamento" className="flex border-b border-slate-200 bg-slate-50/50">
-        {[
-          { id: "dados" as const, label: "Dados da ação" },
-          { id: "playbook" as const, label: "Playbook" },
-        ].map((tab) => (
+    <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div
+        role="tablist"
+        aria-label="Abas do agendamento"
+        className="sticky top-0 z-30 flex shrink-0 border-b border-slate-300 bg-slate-50/95 backdrop-blur-sm dark:border-slate-600 dark:bg-slate-800/95"
+      >
+        {(
+          [
+            { id: "dados" as const, label: "Dados da ação", Icon: FileText },
+            { id: "playbook" as const, label: "Playbook", Icon: Layers },
+          ] as const
+        ).map((tab) => (
           <button
             key={tab.id}
             role="tab"
@@ -145,55 +210,56 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={clsx(
-              "flex-1 px-4 py-3 text-sm font-medium transition-colors",
+              "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors",
               activeTab === tab.id
-                ? "border-b-2 border-[#6D28D9] text-[#6D28D9]"
-                : "text-slate-600 hover:bg-slate-100"
+                ? "text-[#6D28D9] dark:text-violet-400"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
             )}
           >
-            {tab.label}
+            {activeTab === tab.id ? <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]" /> : null}
+            <tab.Icon className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="truncate">{tab.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4 lg:p-6" id={`${tabId}-${activeTab}-panel`}>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-4 p-4 lg:p-6"
+        id={`${tabId}-${activeTab}-panel`}
+      >
       {activeTab === "dados" && (
       <>
       <div>
-        <label htmlFor="agendar-cliente" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-          Cliente
+        <label htmlFor="agendar-cliente" className={formLabelClass}>
+          Cliente <span className="text-rose-500">*</span>
         </label>
-        <select
-          id="agendar-cliente"
-          value={clienteId}
-          onChange={(e) => setClienteId(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          required
-        >
-          <option value="">Selecione um cliente</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nome} - {c.empresa}
-            </option>
-          ))}
-        </select>
+        <div id="agendar-cliente" className="mt-1">
+          <SearchableSelect
+            options={clienteOptions}
+            value={clienteId}
+            onChange={setClienteId}
+            placeholder="Selecione um cliente"
+            searchPlaceholder="Buscar cliente..."
+            emptyLabel="Nenhum cliente encontrado."
+            leadingIcon={Building2}
+          />
+        </div>
       </div>
       <div>
-        <label htmlFor="agendar-tipo" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+        <label htmlFor="agendar-tipo" className={formLabelClass}>
           Tipo de tarefa
         </label>
-        <select
-          id="agendar-tipo"
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as TipoTarefaRégua)}
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-        >
-          {TIPOS.map((t) => (
-            <option key={t} value={t}>
-              {TIPO_TAREFA_LABELS[t]}
-            </option>
-          ))}
-        </select>
+        <div id="agendar-tipo" className="mt-1">
+          <SearchableSelect
+            options={tipoOptions}
+            value={tipo}
+            onChange={(value) => setTipo(value as TipoTarefaRégua)}
+            placeholder="Selecione o tipo"
+            searchPlaceholder="Buscar tipo..."
+            emptyLabel="Nenhum tipo encontrado."
+            leadingIcon={TASK_VISUALS[tipo].icon}
+          />
+        </div>
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-900/30">
@@ -214,81 +280,88 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
       </div>
 
       <div>
-        <label htmlFor="agendar-data" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-          Data agendada
+        <label htmlFor="agendar-data" className={formLabelClass}>
+          Data agendada <span className="text-rose-500">*</span>
         </label>
-        <input
-          id="agendar-data"
-          type="date"
-          value={dataAgendada}
-          onChange={(e) => setDataAgendada(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          required
-        />
+        <DateField id="agendar-data" value={dataAgendada} onChange={setDataAgendada} placeholder="Selecione a data" />
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-900/50">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={recorrente}
-            onChange={(e) => setRecorrente(e.target.checked)}
-            className="rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
-          />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Régua recorrente</span>
-        </label>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          A cada X dias, gerar esta tarefa para o cliente.
-        </p>
-        {recorrente && (
-          <div className="mt-2">
-            <label htmlFor="intervalo-dias" className="block text-xs text-slate-600 dark:text-slate-300">
-              Intervalo (dias)
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className="space-y-1">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={recorrente}
+                onChange={(e) => setRecorrente(e.target.checked)}
+                className="rounded border-slate-300 text-[#6D28D9] focus:ring-[#6D28D9]"
+              />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Régua recorrente</span>
             </label>
-            <input
-              id="intervalo-dias"
-              type="number"
-              min={7}
-              max={365}
-              value={intervaloDias}
-              onChange={(e) => setIntervaloDias(Math.max(7, parseInt(e.target.value, 10) || 7))}
-              className="mt-1 w-24 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
+            <p className="ml-6 text-xs text-slate-500 dark:text-slate-400">
+              A cada X dias, gerar esta tarefa para o cliente.
+            </p>
           </div>
-        )}
+          {recorrente && (
+            <div className="ml-6 sm:ml-0">
+              <label htmlFor="intervalo-dias" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
+                Intervalo de dias:
+              </label>
+              <div className="relative w-36">
+                <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                <input
+                  id="intervalo-dias"
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={intervaloDias}
+                  onChange={(e) => setIntervaloDias(Math.max(7, parseInt(e.target.value, 10) || 7))}
+                  className={`${formInputClass} pl-9`}
+                  placeholder="Dias"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/30">
+      <div>
         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Roteiro de ação</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Defina objetivo e orientação para execução. Isso alimenta o fluxo de escalonamento do Pós-venda.
         </p>
         <div className="mt-3 space-y-3">
           <div>
-            <label htmlFor="agendar-objetivo" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label htmlFor="agendar-objetivo" className={formLabelClass}>
               Objetivo da ação
             </label>
-            <textarea
-              id="agendar-objetivo"
-              value={objetivo}
-              onChange={(e) => setObjetivo(e.target.value)}
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="Ex.: Reverter risco de baixa adoção e alinhar plano dos próximos 15 dias."
-            />
+            <div className="relative mt-1">
+              <Target className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+              <textarea
+                id="agendar-objetivo"
+                value={objetivo}
+                onChange={(e) => setObjetivo(e.target.value)}
+                rows={3}
+                className={`${formTextareaClass} pl-9`}
+                placeholder="Ex.: Reverter risco de baixa adoção e alinhar plano dos próximos 15 dias."
+              />
+            </div>
           </div>
           <div>
-            <label htmlFor="agendar-script" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+            <label htmlFor="agendar-script" className={formLabelClass}>
               Script sugerido de contato
             </label>
-            <textarea
-              id="agendar-script"
-              value={scriptSugerido}
-              onChange={(e) => setScriptSugerido(e.target.value)}
-              rows={4}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-1 focus:ring-[#6D28D9] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="Ex.: Olá, [Nome], vamos revisar os pontos críticos e fechar um plano de recuperação hoje."
-            />
+            <div className="relative mt-1">
+              <MessageSquare className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+              <textarea
+                id="agendar-script"
+                value={scriptSugerido}
+                onChange={(e) => setScriptSugerido(e.target.value)}
+                rows={4}
+                className={`${formTextareaClass} pl-9`}
+                placeholder="Ex.: Olá, [Nome], vamos revisar os pontos críticos e fechar um plano de recuperação hoje."
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -301,13 +374,11 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
             <p className="text-sm text-slate-600">
               Monte o playbook desta ação exatamente para este cliente.
             </p>
-            <button
-              type="button"
-              onClick={addEtapaPai}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
-            >
-              <Layers className="h-4 w-4" />
-              Adicionar Etapa Pai
+            <button type="button" onClick={addEtapaPai} className={formModalSubmitButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                Adicionar Etapa Pai
+              </span>
             </button>
           </div>
           {playbook.length > 0 && (
@@ -323,13 +394,16 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
                               <span {...parentProvided.dragHandleProps} className="cursor-grab text-slate-400">
                                 <GripVertical className="h-4 w-4" />
                               </span>
-                              <input
-                                type="text"
-                                value={etapa.titulo}
-                                onChange={(e) => updateEtapa(etapaIndex, { ...etapa, titulo: e.target.value })}
-                                placeholder="Ex.: Fase 1: Adoção inicial"
-                                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                              />
+                              <div className="relative min-w-0 flex-1">
+                                <Flag className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                <input
+                                  type="text"
+                                  value={etapa.titulo}
+                                  onChange={(e) => updateEtapa(etapaIndex, { ...etapa, titulo: e.target.value })}
+                                  placeholder="Ex.: Fase 1: Adoção inicial"
+                                  className={`${formInputClass} pl-9`}
+                                />
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => setPendingRemove({ kind: "etapa", index: etapaIndex, titulo: etapa.titulo || "esta etapa" })}
@@ -358,40 +432,52 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
                                               <GripVertical className="h-4 w-4" />
                                             </span>
                                             <div className="min-w-0 flex-1 space-y-3">
-                                              <input
-                                                type="text"
-                                                value={sub.tituloTarefa}
-                                                onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, tituloTarefa: e.target.value })}
-                                                placeholder="Título da tarefa"
-                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                              />
-                                              <textarea
-                                                value={sub.descricaoComoFazer}
-                                                onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, descricaoComoFazer: e.target.value })}
-                                                placeholder="Descrição / como fazer"
-                                                rows={2}
-                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                              />
+                                              <div className="relative">
+                                                <ClipboardList className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                                <input
+                                                  type="text"
+                                                  value={sub.tituloTarefa}
+                                                  onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, tituloTarefa: e.target.value })}
+                                                  placeholder="Título da tarefa"
+                                                  className={`${formInputClass} pl-9`}
+                                                />
+                                              </div>
+                                              <div className="relative">
+                                                <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" aria-hidden />
+                                                <textarea
+                                                  value={sub.descricaoComoFazer}
+                                                  onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, descricaoComoFazer: e.target.value })}
+                                                  placeholder="Descrição / como fazer"
+                                                  rows={2}
+                                                  className={`${formTextareaClass} pl-9`}
+                                                />
+                                              </div>
                                               <div className="flex flex-wrap gap-4">
-                                                <div className="w-24">
-                                                  <label className="mb-0.5 block text-xs font-medium text-slate-500">SLA (dias)</label>
-                                                  <input
-                                                    type="number"
-                                                    min={0}
-                                                    value={sub.slaDias}
-                                                    onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, slaDias: Number(e.target.value) || 0 })}
-                                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                                  />
+                                                <div className="w-28">
+                                                  <label className="mb-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">SLA (dias)</label>
+                                                  <div className="relative">
+                                                    <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                                    <input
+                                                      type="number"
+                                                      min={0}
+                                                      value={sub.slaDias}
+                                                      onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, slaDias: Number(e.target.value) || 0 })}
+                                                      className={`${formInputClass} pl-9`}
+                                                    />
+                                                  </div>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                  <label className="mb-0.5 block text-xs font-medium text-slate-500">Resultado esperado</label>
-                                                  <input
-                                                    type="text"
-                                                    value={sub.resultadoEsperado}
-                                                    onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, resultadoEsperado: e.target.value })}
-                                                    placeholder="Entregável ou critério de conclusão"
-                                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                                  />
+                                                  <label className="mb-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">Resultado esperado</label>
+                                                  <div className="relative">
+                                                    <Target className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                                                    <input
+                                                      type="text"
+                                                      value={sub.resultadoEsperado}
+                                                      onChange={(e) => updateSubEtapa(etapaIndex, subIndex, { ...sub, resultadoEsperado: e.target.value })}
+                                                      placeholder="Entregável ou critério de conclusão"
+                                                      className={`${formInputClass} pl-9`}
+                                                    />
+                                                  </div>
                                                 </div>
                                                 <button
                                                   type="button"
@@ -424,13 +510,11 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
           {playbook.length === 0 && (
             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
               <p className="text-sm text-slate-500">Nenhuma etapa de playbook ainda.</p>
-              <button
-                type="button"
-                onClick={addEtapaPai}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
-              >
-                <Layers className="h-4 w-4" />
-                Adicionar Etapa Pai
+              <button type="button" onClick={addEtapaPai} className={`${formModalSubmitButtonClass} mt-3`}>
+                <span className="inline-flex items-center gap-2">
+                  <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                  Adicionar Etapa Pai
+                </span>
               </button>
             </div>
           )}
@@ -438,19 +522,18 @@ export function AgendarTarefaForm({ clientes, onSave, onCancel }: AgendarTarefaF
       )}
       </div>
 
-      <div className="flex flex-col-reverse gap-2 border-t border-slate-200 p-4 sm:flex-row sm:justify-end sm:gap-3 lg:p-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-700"
-        >
-          Cancelar
+      <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
+        <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>
+          <span className="inline-flex items-center gap-2">
+            <X className="h-4 w-4 shrink-0" aria-hidden />
+            Cancelar
+          </span>
         </button>
-        <button
-          type="submit"
-          className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2"
-        >
-          Agendar
+        <button type="submit" className={formModalSubmitButtonClass}>
+          <span className="inline-flex items-center gap-2">
+            <Save className="h-4 w-4 shrink-0" aria-hidden />
+            Salvar
+          </span>
         </button>
       </div>
       <AlertDialog

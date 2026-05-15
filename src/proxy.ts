@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSessionFromCookieHeader, hasModuleAccess } from "@/lib/auth";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublicPath =
     pathname === "/login" ||
@@ -17,7 +17,33 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (session.isPortalCliente) {
+  let effectiveSession = session;
+  try {
+    const sessionRes = await fetch(new URL("/api/auth/session", request.url), {
+      method: "GET",
+      headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+      cache: "no-store",
+    });
+    if (sessionRes.ok) {
+      const payload = (await sessionRes.json()) as {
+        data?: {
+          isPortalCliente?: boolean;
+          isSystemAdmin?: boolean;
+          permissoes?: Record<string, boolean>;
+        };
+      };
+      effectiveSession = {
+        ...session,
+        isPortalCliente: payload?.data?.isPortalCliente ?? session.isPortalCliente,
+        isSystemAdmin: payload?.data?.isSystemAdmin ?? session.isSystemAdmin,
+        permissoes: payload?.data?.permissoes ?? session.permissoes,
+      };
+    }
+  } catch {
+    effectiveSession = session;
+  }
+
+  if (effectiveSession.isPortalCliente) {
     const rotaPermitidaCliente =
       pathname.startsWith("/portal") ||
       pathname === "/alertas" ||
@@ -26,10 +52,14 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/portal", request.url));
     }
   } else if (pathname.startsWith("/portal")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const allowInternalPortal =
+      effectiveSession.isSystemAdmin === true || effectiveSession.permissoes?.portal_cliente === true;
+    if (!allowInternalPortal) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
   }
 
-  if (!hasModuleAccess(session, pathname)) {
+  if (!hasModuleAccess(effectiveSession, pathname)) {
     return NextResponse.redirect(new URL("/acesso-negado", request.url));
   }
 
@@ -39,4 +69,3 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/((?!login|forgot-password|reset-password|redefinir-senha|_next/static|_next/image|api|favicon|desenvolve_).*)"],
 };
-

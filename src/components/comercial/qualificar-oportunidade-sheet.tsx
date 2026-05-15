@@ -1,13 +1,20 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Search, Plus, User } from "lucide-react";
+import { Save, Search, Plus, Undo2, User, X } from "lucide-react";
 import { DrawerSheet } from "./drawer-sheet";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import type { Lead } from "@/lib/comercial/types";
 import type { Cliente, Contato, ContatoPapel, ClienteEndereco } from "@/lib/clientes/types";
 import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
-import { comercialInputClass, comercialLabelClass, comercialSelectClass } from "./field-styles";
+import {
+  comercialInputClass,
+  comercialLabelClass,
+  comercialSelectClass,
+  formModalCancelButtonClass,
+  formModalSubmitButtonClass,
+} from "./field-styles";
+import { formatBrazilianPhoneInput } from "@/lib/comercial/phone-input";
 
 const CONTATO_PAPEL_OPTIONS: { value: ContatoPapel; label: string }[] = [
   { value: "gestor_empresa", label: "Gestor da Empresa" },
@@ -81,7 +88,9 @@ export function QualificarOportunidadeSheet({
     const digits = cnpjRaw.replace(/\D/g, "");
     if (digits.length !== 14) return;
     let cancelled = false;
-    setLoadingCnpj(true);
+    queueMicrotask(() => {
+      if (!cancelled) setLoadingCnpj(true);
+    });
     fetchCnpjBrasilApi(digits)
       .then((res) => {
         if (cancelled || !res) return;
@@ -89,7 +98,7 @@ export function QualificarOportunidadeSheet({
         setNomeFantasia(res.nomeFantasia);
         setEndereco((prev) => ({ ...prev, ...res.endereco }));
         if (res.email) setEmailEmpresa(res.email);
-        if (res.telefone) setWhatsappEmpresa(res.telefone);
+        if (res.telefone) setWhatsappEmpresa(formatBrazilianPhoneInput(res.telefone));
       })
       .finally(() => setLoadingCnpj(false));
     return () => { cancelled = true; };
@@ -240,20 +249,22 @@ export function QualificarOportunidadeSheet({
               <p className="mt-1 font-semibold text-slate-900">{selectedCliente.empresa}</p>
               <p className="text-sm text-slate-500">{selectedCliente.nome} · {selectedCliente.cpfCnpj}</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 type="button"
                 onClick={() => { setSelectedCliente(null); setModo("busca"); }}
-                className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 font-medium text-slate-600 hover:bg-slate-100"
+                className={formModalCancelButtonClass}
               >
-                Trocar
+                <span className="inline-flex items-center gap-2">
+                  <Undo2 className="h-4 w-4" />
+                  Trocar
+                </span>
               </button>
-              <button
-                type="button"
-                onClick={handleVincularExistente}
-                className="flex-1 rounded-lg bg-[#6D28D9] px-4 py-2.5 font-semibold text-white hover:bg-purple-700"
-              >
-                Vincular e mover para Qualificação
+              <button type="button" onClick={handleVincularExistente} className={formModalSubmitButtonClass}>
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4" />
+                  Vincular e mover para Qualificação
+                </span>
               </button>
             </div>
           </div>
@@ -419,10 +430,10 @@ export function QualificarOportunidadeSheet({
                         <button
                           type="button"
                           onClick={() => setContatoIdParaRemover(c.id)}
-                          className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                           aria-label="Remover contato"
                         >
-                          ×
+                          <X className="h-4 w-4" aria-hidden />
                         </button>
                       )}
                     </div>
@@ -450,7 +461,9 @@ export function QualificarOportunidadeSheet({
                         <input
                           type="tel"
                           value={c.telefone}
-                          onChange={(e) => updateContato(c.id, { telefone: e.target.value })}
+                          onChange={(e) =>
+                            updateContato(c.id, { telefone: formatBrazilianPhoneInput(e.target.value) })
+                          }
                           placeholder="(00) 00000-0000"
                           className={comercialInputClass}
                         />
@@ -465,16 +478,22 @@ export function QualificarOportunidadeSheet({
               <button
                 type="button"
                 onClick={() => { resetForm(); setModo("busca"); }}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9]"
+                className={formModalCancelButtonClass}
               >
-                Cancelar
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </span>
               </button>
               <button
                 type="submit"
                 disabled={!gestorEmpresaValid || !empresa.trim() || cnpjRaw.replace(/\D/g, "").length !== 14}
-                className="rounded-lg bg-[#6D28D9] px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2"
+                className={formModalSubmitButtonClass}
               >
-                Cadastrar cliente e mover para Qualificação
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4" />
+                  Cadastrar cliente e mover para Qualificação
+                </span>
               </button>
             </div>
           </form>

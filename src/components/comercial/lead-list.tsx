@@ -1,13 +1,13 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import clsx from "clsx";
 import { Building2, ChevronRight, MapPin } from "lucide-react";
 import type { Lead, LeadPriority, PipelineStage } from "@/lib/comercial/types";
 import type { Cliente } from "@/lib/clientes/types";
 import { PRIORIDADE_LABELS } from "@/lib/comercial/constants";
 import { formatCurrency } from "@/lib/comercial/utils";
-import { STAGE_COLORS } from "@/lib/comercial/stage-colors";
+import { STAGE_COLORS, STAGE_HIGHLIGHT_HEX } from "@/lib/comercial/stage-colors";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 
 function prioridadeBadgeClass(priority: LeadPriority): string {
@@ -42,6 +42,10 @@ function formatUltimaAlteracao(iso: string | undefined): string {
   });
 }
 
+function leadUltimaAlteracaoIso(lead: Lead): string | undefined {
+  return lead.registroAtualizadoEm ?? lead.enteredStageAt;
+}
+
 function formatVencimento(value: string | undefined): string {
   if (!value?.trim()) return "—";
   return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
@@ -54,6 +58,7 @@ type LeadListProps = {
   selectedLeadId: string | null;
   onSelectLead: (lead: Lead) => void;
   isLoading?: boolean;
+  pulsingLeadIds?: Record<string, boolean>;
 };
 
 const stageLabelMap = (stages: PipelineStage[]) =>
@@ -95,6 +100,7 @@ export const LeadList = memo(function LeadList({
   selectedLeadId,
   onSelectLead,
   isLoading,
+  pulsingLeadIds = {},
 }: LeadListProps) {
   const stageLabels = stageLabelMap(stages);
   const clienteMap = useMemo(() => new Map(clientes.map((c) => [c.id, c])), [clientes]);
@@ -146,9 +152,17 @@ export const LeadList = memo(function LeadList({
                       <tr
                         key={lead.id}
                         onClick={() => onSelectLead(lead)}
+                        style={
+                          pulsingLeadIds[String(lead.id)]
+                            ? ({
+                                ["--pam-stage-outline" as string]: STAGE_HIGHLIGHT_HEX[lead.stageId],
+                              } as CSSProperties)
+                            : undefined
+                        }
                         className={clsx(
                           "cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60",
-                          selectedLeadId === lead.id && "bg-violet-50/80 dark:bg-violet-950/40"
+                          selectedLeadId === lead.id && "bg-violet-50/80 dark:bg-violet-950/40",
+                          pulsingLeadIds[String(lead.id)] && "pam-comercial-edge-pulse-row"
                         )}
                       >
                         <td className="px-6 py-4">
@@ -176,7 +190,7 @@ export const LeadList = memo(function LeadList({
                             Responsável: {ownership.responsavelNome ?? "—"}
                           </p>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Última alteração: {formatUltimaAlteracao(lead.registroAtualizadoEm)}
+                            Última alteração: {formatUltimaAlteracao(leadUltimaAlteracaoIso(lead))}
                           </p>
                           {(["proposta", "contratacao", "fechado", "perdido"] as Lead["stageId"][]).includes(lead.stageId) && (
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -270,61 +284,74 @@ export const LeadList = memo(function LeadList({
                     onSelectLead(lead);
                   }
                 }}
+                style={
+                  pulsingLeadIds[String(lead.id)]
+                    ? ({
+                        ["--pam-stage-outline"]: STAGE_HIGHLIGHT_HEX[lead.stageId],
+                      } as CSSProperties)
+                    : undefined
+                }
                 className={clsx(
-                  "flex cursor-pointer flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-all hover:bg-slate-50/50 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800/50",
-                  selectedLeadId === lead.id && "ring-2 ring-[#6D28D9]/30"
+                  "relative flex cursor-pointer flex-col gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50/50 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800/50",
+                  !pulsingLeadIds[String(lead.id)] && "hover:shadow-md",
+                  selectedLeadId === lead.id && "ring-2 ring-[#6D28D9]/30",
+                  pulsingLeadIds[String(lead.id)] && "pam-comercial-edge-pulse"
                 )}
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-[#6D28D9] dark:bg-violet-950/60 dark:text-violet-300">
-                    {iniciaisLead(lead.name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{lead.name}</p>
-                    {cliente ? (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                        <Building2 className="h-3 w-3 shrink-0" />
-                        {cliente.empresa || cliente.nome}
+                <div className="relative flex min-h-0 flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-[#6D28D9] dark:bg-violet-950/60 dark:text-violet-300">
+                      {iniciaisLead(lead.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{lead.name}</p>
+                      {cliente ? (
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                          <Building2 className="h-3 w-3 shrink-0" />
+                          {cliente.empresa || cliente.nome}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-xs text-slate-400">Sem cliente vinculado</p>
+                      )}
+                      <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                        Responsável: {ownership.responsavelNome ?? "—"}
                       </p>
-                    ) : (
-                      <p className="mt-0.5 text-xs text-slate-400">Sem cliente vinculado</p>
-                    )}
-                    <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                      Responsável: {ownership.responsavelNome ?? "—"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      Última alteração: {formatUltimaAlteracao(lead.registroAtualizadoEm)}
-                    </p>
-                    {(["proposta", "contratacao", "fechado", "perdido"] as Lead["stageId"][]).includes(lead.stageId) && (
                       <p className="mt-0.5 text-xs text-slate-500">
-                        Vencimento: {formatVencimento(lead.previsaoFechamento)}
+                        Última alteração: {formatUltimaAlteracao(leadUltimaAlteracaoIso(lead))}
                       </p>
-                    )}
-                    <p className="mt-2 text-sm font-bold text-[#6D28D9]">
-                      {formatCurrency(lead.valorTotal > 0 ? lead.valorTotal : lead.value)}
-                    </p>
+                      {(["proposta", "contratacao", "fechado", "perdido"] as Lead["stageId"][]).includes(
+                        lead.stageId
+                      ) && (
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Vencimento: {formatVencimento(lead.previsaoFechamento)}
+                        </p>
+                      )}
+                      <p className="mt-2 text-sm font-bold text-[#6D28D9]">
+                        {formatCurrency(lead.valorTotal > 0 ? lead.valorTotal : lead.value)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={clsx(
-                      "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
-                      prioridadeBadgeClass(lead.priority)
-                    )}
-                  >
-                    {PRIORIDADE_LABELS[lead.priority]}
-                  </span>
-                  <span
-                    className={clsx(
-                      "inline-flex rounded-md px-2 py-0.5 text-xs font-medium",
-                      stageColors.badge
-                    )}
-                  >
-                    {stageLabels[lead.stageId] ?? lead.stageId}
-                  </span>
-                </div>
-                <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={clsx(
+                        "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
+                        prioridadeBadgeClass(lead.priority)
+                      )}
+                    >
+                      {PRIORIDADE_LABELS[lead.priority]}
+                    </span>
+                    <span
+                      className={clsx(
+                        "inline-flex rounded-md px-2 py-0.5 text-xs font-medium",
+                        stageColors.badge
+                      )}
+                    >
+                      {stageLabels[lead.stageId] ?? lead.stageId}
+                    </span>
+                  </div>
+                  <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
                 </div>
               </div>
             );

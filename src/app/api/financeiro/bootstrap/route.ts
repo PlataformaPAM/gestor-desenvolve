@@ -9,6 +9,7 @@ import {
 import { fail, ok } from "@/lib/server/api-response";
 import { ensureFinanceiroCadastros } from "../seed-defaults";
 import type { FinanceiroCategoria, FinanceiroConta, FinanceiroMeioPagamento } from "@/lib/financeiro/types";
+import { colaboradorRhWhereParaComissao } from "@/lib/server/comissoes-ownership-resolve";
 
 async function querySafe<T>(run: () => Promise<T>, fallback: T): Promise<T> {
   try {
@@ -60,7 +61,7 @@ export async function GET() {
   try {
     await ensureFinanceiroCadastros().catch(() => undefined);
 
-    const [lancamentos, clientes, fornecedoresRh, leadsPendentes, leadsUnlock, contas, categorias, meios] =
+    const [lancamentos, clientes, fornecedoresRh, leadsPendentes, leadsUnlock, contas, categorias, meios, consultoresComissaoRh] =
       await Promise.all([
       querySafe(
         () =>
@@ -79,6 +80,7 @@ export async function GET() {
       querySafe(() => prisma.lead.findMany({
         where: {
           stageId: "fechado",
+          registroLead: "oportunidade",
           clienteId: { not: null },
           financeiroFluxo: { is: { status: "pendente_aprovacao" } },
         },
@@ -93,6 +95,7 @@ export async function GET() {
       }), []),
       querySafe(() => prisma.lead.findMany({
         where: {
+          registroLead: "oportunidade",
           financeiroFluxo: {
             is: {
               bloqueadoEdicao: true,
@@ -106,6 +109,13 @@ export async function GET() {
       querySafe(() => prisma.financeiroConta.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }), []),
       querySafe(() => prisma.financeiroCategoria.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }), []),
       querySafe(() => prisma.financeiroMeioPagamento.findMany({ orderBy: [{ ordem: "asc" }, { nome: "asc" }] }), []),
+      querySafe(() =>
+        prisma.colaboradorRH.findMany({
+          where: colaboradorRhWhereParaComissao(),
+          select: { id: true, nome: true },
+          orderBy: { nome: "asc" },
+        })
+      , []),
     ]);
 
   const aprovacoesPendentes: AprovacaoPendente[] = leadsPendentes
@@ -148,6 +158,7 @@ export async function GET() {
     const mappedContas = contas.map(mapConta);
     const mappedCategorias = categorias.map(mapCategoria);
     const mappedMeios = meios.map(mapMeio);
+    const mappedConsultoresComissao = consultoresComissaoRh.map((c) => ({ id: c.id, nome: c.nome }));
     return ok({
       lancamentos: mappedLancamentos,
       clientes: mappedClientes,
@@ -155,6 +166,7 @@ export async function GET() {
       contas: mappedContas,
       categorias: mappedCategorias,
       meiosPagamento: mappedMeios,
+      consultoresComissaoRh: mappedConsultoresComissao,
       aprovacoesPendentes,
       unlockRequests,
       data: {
@@ -164,6 +176,7 @@ export async function GET() {
         contas: mappedContas,
         categorias: mappedCategorias,
         meiosPagamento: mappedMeios,
+        consultoresComissaoRh: mappedConsultoresComissao,
         aprovacoesPendentes,
         unlockRequests,
       },

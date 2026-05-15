@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { User, Users, CreditCard, FileText, TrendingUp, Upload, Link2, FolderOpen } from "lucide-react";
+import { useState, type ComponentType } from "react";
+import { User, Users, CreditCard, FileText, Upload, Link2, FolderOpen, BadgePercent, TrendingUp } from "lucide-react";
 import type { ColaboradorParceiro } from "@/lib/rh/types";
 import { TIPO_CONTRATO_LABELS, STATUS_LABELS, iniciais } from "@/lib/rh/constants";
 import { formatCurrency } from "@/lib/clientes/utils";
 import { PAPEIS_CONTATO_CLIENTE } from "@/lib/clientes/constants";
 import clsx from "clsx";
+import { ConsultorComissoesPanel } from "@/components/rh/consultor-comissoes-panel";
 
 /** Normaliza CPF/CNPJ para comparação (apenas dígitos). */
 function cpfNormalizado(val: string | undefined): string {
@@ -29,7 +30,7 @@ type PerfilColaboradorDrawerProps = {
   onEditarDados?: () => void;
 };
 
-type TabDrawer = "dados" | "vinculo" | "arquivos";
+type TabDrawer = "dados" | "comissoes" | "vinculo" | "arquivos";
 
 export function PerfilColaboradorDrawer({
   colaborador,
@@ -40,21 +41,25 @@ export function PerfilColaboradorDrawer({
 
   if (!colaborador) return null;
 
+  const podeComissoesRh = colaborador.tipo === "vendedor_externo" || colaborador.tipo === "equipe_interna";
+  const isVendedorExterno = colaborador.tipo === "vendedor_externo";
+  /** Evita exibir Comissões quando o tipo não participa de comissão no RH, sem `setState` em effect. */
+  const tabAtiva: TabDrawer = !podeComissoesRh && tab === "comissoes" ? "dados" : tab;
+
   const cpfCol = cpfNormalizado(colaborador.cpfCnpj);
   const usuarioVinculado = cpfCol
     ? usuarios.find((u) => cpfNormalizado(u.cpf) === cpfCol)
     : undefined;
 
-  const isVendedor = colaborador.tipo === "vendedor_externo";
-
-  const tabs: { id: TabDrawer; label: string }[] = [
+  const tabs: { id: TabDrawer; label: string; icon?: ComponentType<{ className?: string }> }[] = [
     { id: "dados", label: "Dados" },
+    ...(podeComissoesRh ? [{ id: "comissoes" as const, label: "Comissões", icon: BadgePercent }] : []),
     { id: "vinculo", label: "Vínculo de Acesso" },
     { id: "arquivos", label: "Arquivos" },
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Cabeçalho fixo */}
       <div className="flex items-start gap-4 border-b border-slate-200 p-4 lg:p-6 shrink-0 dark:border-slate-700">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#6D28D9]/10 text-xl font-semibold text-[#6D28D9]">
@@ -82,26 +87,34 @@ export function PerfilColaboradorDrawer({
       </div>
 
       {/* Abas */}
-      <nav className="flex gap-1 border-b border-slate-200 px-4 lg:px-6 shrink-0 dark:border-slate-700" aria-label="Abas do perfil">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={clsx(
-              "rounded-t-lg border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
-              tab === t.id
-                ? "border-[#6D28D9] text-[#6D28D9] dark:border-violet-400/60 dark:text-violet-200"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+      <nav
+        className="sticky top-0 z-30 flex shrink-0 border-b border-slate-300 bg-slate-50/95 backdrop-blur-sm dark:border-slate-600 dark:bg-slate-800/95"
+        aria-label="Abas do perfil"
+      >
+        {tabs.map((t) => {
+          const TabIcon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={clsx(
+                "relative flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors",
+                tabAtiva === t.id
+                  ? "text-[#6D28D9] dark:text-violet-400"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              )}
+            >
+              {tabAtiva === t.id ? <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#6D28D9]" /> : null}
+              {TabIcon ? <TabIcon className="h-4 w-4 shrink-0 opacity-90" aria-hidden /> : null}
+              <span className="truncate">{t.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6">
-        {tab === "dados" && (
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6">
+        {tabAtiva === "dados" && (
           <div className="space-y-6">
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
               <div className="flex items-center justify-between gap-2 text-slate-700 dark:text-slate-200">
@@ -241,7 +254,7 @@ export function PerfilColaboradorDrawer({
               </div>
             )}
 
-            {isVendedor && (
+            {isVendedorExterno && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-500/40 dark:bg-emerald-950/50">
                 <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
                   <TrendingUp className="h-5 w-5" />
@@ -258,7 +271,9 @@ export function PerfilColaboradorDrawer({
           </div>
         )}
 
-        {tab === "vinculo" && (
+        {tabAtiva === "comissoes" && podeComissoesRh && <ConsultorComissoesPanel consultorId={colaborador.id} />}
+
+        {tabAtiva === "vinculo" && (
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
             <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
               <Link2 className="h-5 w-5 text-[#6D28D9]" />
@@ -291,7 +306,7 @@ export function PerfilColaboradorDrawer({
           </div>
         )}
 
-        {tab === "arquivos" && (
+        {tabAtiva === "arquivos" && (
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
             <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
               <FileText className="h-5 w-5 text-[#6D28D9]" />

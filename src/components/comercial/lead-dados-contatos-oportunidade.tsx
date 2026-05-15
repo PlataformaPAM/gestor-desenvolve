@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
-  Contact,
   Plus,
   Trash2,
   User,
@@ -18,16 +17,13 @@ import { SearchableMultiSelect } from "@/components/ui/searchable-select";
 import type { Lead, ContatoOportunidade, PapelContatoOportunidade } from "@/lib/comercial/types";
 import type { Contato } from "@/lib/clientes/types";
 import { PAPEIS_CONTATO_OPORTUNIDADE } from "@/lib/comercial/constants";
-import { comercialInputClass, comercialLabelClass } from "./field-styles";
-
-function formatPhoneInput(v: string): string {
-  const digits = v.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 2) return digits.replace(/(\d{0,2})/, "($1");
-  return digits
-    .replace(/(\d{2})(\d)/, "($1) $2")
-    .replace(/(\d{5})(\d)/, "$1-$2")
-    .slice(0, 15);
-}
+import { formatBrazilianPhoneInput } from "@/lib/comercial/phone-input";
+import {
+  comercialInputClass,
+  comercialLabelClass,
+  comercialReadOnlyClass,
+  FormTextInput,
+} from "./field-styles";
 
 type LeadDadosContatosOportunidadeProps = {
   lead: Lead;
@@ -139,17 +135,15 @@ export function LeadDadosContatosOportunidade({
   return (
     <>
       <div className="space-y-4">
-        <p className={comercialLabelClass}>Contatos da oportunidade</p>
-
         {contatosClienteDisponiveis.length > 0 && (
           <div className="space-y-1">
-            <label className={comercialLabelClass}>Contatos já cadastrados no cliente</label>
+            <label className={comercialLabelClass}>Contatos vinculados no cadastro do Cliente</label>
             <SearchableMultiSelect
               options={contatosClienteDisponiveis.map((c) => ({
                 value: c.id,
                 label: c.nome,
                 subtitle: [c.email, c.telefone].filter(Boolean).join(" · ") || "Sem e-mail/telefone",
-                icon: Contact,
+                icon: User,
               }))}
               values={contatos
                 .map((c) => c.id)
@@ -172,17 +166,43 @@ export function LeadDadosContatosOportunidade({
               placeholder="Selecionar contatos..."
               searchPlaceholder="Buscar contato..."
               selectedLabel="Selecionados"
-              showSelectedBadges={false}
-              leadingIcon={Contact}
+              leadingIcon={User}
             />
           </div>
         )}
 
-        {precisaContato && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
-            Pelo menos um contato deve ser cadastrado para avançar de etapa.
-          </div>
-        )}
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Contato original da prospecção</p>
+          <FormTextInput
+            id="lead-co-contact"
+            label="Contato"
+            icon={User}
+            value={lead.contact ?? ""}
+            readOnly
+            disabled
+            inputClassName={comercialReadOnlyClass}
+          />
+          <FormTextInput
+            id="lead-co-phone"
+            label="Telefone"
+            icon={Phone}
+            type="tel"
+            value={lead.phone ? formatBrazilianPhoneInput(lead.phone) : ""}
+            readOnly
+            disabled
+            inputClassName={comercialReadOnlyClass}
+          />
+          <FormTextInput
+            id="lead-co-email"
+            label="E-mail"
+            icon={Mail}
+            type="email"
+            value={lead.email ?? ""}
+            readOnly
+            disabled
+            inputClassName={comercialReadOnlyClass}
+          />
+        </div>
 
         <button
           type="button"
@@ -192,13 +212,26 @@ export function LeadDadosContatosOportunidade({
           <Plus className="h-4 w-4" /> Adicionar Contato
         </button>
 
+        {precisaContato && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+            Pelo menos um contato deve ser cadastrado para avançar de etapa.
+          </div>
+        )}
+
+        {contatos.length > 0 && (
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Contatos vinculados no lead</p>
+        )}
         <ul className="space-y-4">
-        {contatos.map((c) => {
+        {contatos.map((c, index) => {
           const isExpanded = expandedId === c.id;
           return (
             <li
               key={c.id}
-              className="border-t border-slate-200 pt-3 dark:border-slate-700"
+              className={
+                index === 0
+                  ? "pt-0"
+                  : "border-t border-slate-200 pt-3 dark:border-slate-700"
+              }
             >
               <div
                 onClick={() => setExpandedId(isExpanded ? null : c.id)}
@@ -213,7 +246,8 @@ export function LeadDadosContatosOportunidade({
                 className="flex w-full items-center justify-between py-1 text-left"
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-slate-800">
+                  <User className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
                     {c.nome.trim() || "Novo contato"}
                   </span>
                   {isExpanded ? (
@@ -286,7 +320,7 @@ export function LeadDadosContatosOportunidade({
                           type="text"
                           value={c.telefone}
                           onChange={(e) =>
-                            updateContato(c.id, { telefone: formatPhoneInput(e.target.value) })
+                            updateContato(c.id, { telefone: formatBrazilianPhoneInput(e.target.value) })
                           }
                           placeholder="(00) 00000-0000"
                           className={`${comercialInputClass} pl-9`}

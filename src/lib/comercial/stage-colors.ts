@@ -56,3 +56,13 @@ export const STAGE_COLORS: Record<PipelineStageId, StageColorConfig> = {
     text: "text-red-600 dark:text-red-300",
   },
 };
+
+/** Cor da borda ao destacar card (pulso ~3s) — alinhada à etapa do funil. */
+export const STAGE_HIGHLIGHT_HEX: Record<PipelineStageId, string> = {
+  prospecao: "#94a3b8",
+  qualificacao: "#06b6d4",
+  proposta: "#6d28d9",
+  contratacao: "#3b82f6",
+  fechado: "#10b981",
+  perdido: "#ef4444",
+};

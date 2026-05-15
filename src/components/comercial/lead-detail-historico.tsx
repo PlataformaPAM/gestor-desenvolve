@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Eye, FileText, Phone, Trophy } from "lucide-react";
+import { Clock, Eye, FileText, Phone, Plus, Trophy, MessageSquare } from "lucide-react";
 import type { LeadInteraction } from "@/lib/comercial/types";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 
@@ -188,26 +188,32 @@ export function LeadDetailHistorico({
   return (
     <div className="space-y-6 p-4 lg:p-6">
       <div className="space-y-3">
-        <textarea
-          value={novaAtualizacao}
-          onChange={(e) => setNovaAtualizacao(e.target.value)}
-          placeholder="Descreva a ação realizada, resposta ao cliente ou nota interna..."
-          rows={3}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20"
-        />
+        <div className="relative">
+          <MessageSquare className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+          <textarea
+            value={novaAtualizacao}
+            onChange={(e) => setNovaAtualizacao(e.target.value)}
+            placeholder="Descreva a ação realizada, resposta ao cliente ou nota interna..."
+            rows={3}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20"
+          />
+        </div>
         <MultiFileAttachment
           existingFiles={[]}
           newFiles={arquivosAtualizacao}
           onNewFilesChange={setArquivosAtualizacao}
         />
-        <div className="flex items-center gap-3">
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={handleAdicionarAtualizacao}
             disabled={!novaAtualizacao.trim() && arquivosAtualizacao.length === 0}
             className="rounded-lg bg-[#6D28D9] px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:pointer-events-none disabled:opacity-50"
           >
-            Adicionar Atualização
+            <span className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4 shrink-0" aria-hidden />
+              Adicionar
+            </span>
           </button>
         </div>
       </div>
