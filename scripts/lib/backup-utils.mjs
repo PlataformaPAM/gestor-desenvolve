@@ -13,6 +13,25 @@ export function getRepoRoot() {
   return path.resolve(path.dirname(here), "..", "..");
 }
 
+/** URL sem parâmetros que pg_dump/pg_restore rejeitam (ex.: ?schema= do Prisma). */
+export function normalizeDatabaseUrlForPgTools(url) {
+  if (!url?.trim()) return url;
+  try {
+    const u = new URL(url);
+    for (const key of ["schema", "connection_limit", "pool_timeout", "connect_timeout"]) {
+      u.searchParams.delete(key);
+    }
+    const out = u.toString();
+    return out.endsWith("?") ? out.slice(0, -1) : out;
+  } catch {
+    return url
+      .replace(/[?&]schema=[^&]*/gi, "")
+      .replace(/[?&]connection_limit=[^&]*/gi, "")
+      .replace(/\?&/, "?")
+      .replace(/[?&]$/, "");
+  }
+}
+
 export function loadDatabaseUrl(root) {
   const envPath = path.join(root, ".env");
   if (!fs.existsSync(envPath)) return null;

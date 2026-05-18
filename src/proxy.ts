@@ -29,6 +29,7 @@ export async function proxy(request: NextRequest) {
         data?: {
           isPortalCliente?: boolean;
           isSystemAdmin?: boolean;
+          perfilNome?: string;
           permissoes?: Record<string, boolean>;
         };
       };
@@ -36,6 +37,7 @@ export async function proxy(request: NextRequest) {
         ...session,
         isPortalCliente: payload?.data?.isPortalCliente ?? session.isPortalCliente,
         isSystemAdmin: payload?.data?.isSystemAdmin ?? session.isSystemAdmin,
+        perfilNome: payload?.data?.perfilNome ?? session.perfilNome,
         permissoes: payload?.data?.permissoes ?? session.permissoes,
       };
     }

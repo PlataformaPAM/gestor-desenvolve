@@ -12,7 +12,10 @@ Na raiz do repositório:
    - PostgreSQL: ferramentas de cliente no PATH (pg_dump / pg_restore).
      No Windows, instale o PostgreSQL ou o "Command Line Tools" e confirme
      no PowerShell: pg_dump --version
+     Exemplo se não estiver no PATH:
+       $env:Path = "C:\Program Files\PostgreSQL\18\bin;" + $env:Path
    - Ficheiro .env com DATABASE_URL (para exportar a base).
+     URLs Prisma com ?schema=public são normalizadas automaticamente no script.
 
    Opcional: BACKUP_SKIP_DATABASE=1 — só ficheiros, Prisma e .env (sem dump).
 

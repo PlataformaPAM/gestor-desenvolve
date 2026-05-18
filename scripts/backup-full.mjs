@@ -13,6 +13,7 @@ import os from "node:os";
 import {
   getRepoRoot,
   loadDatabaseUrl,
+  normalizeDatabaseUrlForPgTools,
   sha256File,
   copyDirIfExists,
   copyEnvTemplates,
@@ -47,7 +48,8 @@ const manifest = {
 const warnings = [];
 
 // --- PostgreSQL (formato custom: pg_restore) ---
-const dbUrl = skipDatabase ? null : loadDatabaseUrl(root);
+const dbUrlRaw = skipDatabase ? null : loadDatabaseUrl(root);
+const dbUrl = dbUrlRaw ? normalizeDatabaseUrlForPgTools(dbUrlRaw) : null;
 const dumpPath = path.join(outDir, "database.dump");
 const pgDump = skipDatabase ? null : findPgTool("pg_dump");
 

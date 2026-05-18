@@ -85,8 +85,10 @@ function isItemActive(pathname: string, href: string): boolean {
 
 function filterNavByPerfil(
   items: NavItem[],
-  permissoes: Partial<Record<ModuloPermissao, boolean>>
+  permissoes: Partial<Record<ModuloPermissao, boolean>>,
+  isSystemAdmin: boolean
 ): NavItem[] {
+  if (isSystemAdmin) return items;
   if (!permissoes || Object.keys(permissoes).length === 0) return items;
   return items.filter((item) => !item.modulo || permissoes[item.modulo] === true);
 }
@@ -95,6 +97,7 @@ function buildNavItems(
   permissoes: Partial<Record<ModuloPermissao, boolean>>,
   isPortalCliente: boolean,
   isAdminCliente: boolean,
+  isSystemAdmin: boolean,
   pathname: string
 ): NavItem[] {
   const preferPortalNav = pathname.startsWith("/portal");
@@ -103,9 +106,9 @@ function buildNavItems(
     if (preferPortalNav && !isPortalCliente && permissoes.portal_cliente === true) {
       return base;
     }
-    return filterNavByPerfil(base, permissoes);
+    return filterNavByPerfil(base, permissoes, isSystemAdmin);
   }
-  return filterNavByPerfil(NAV_ITEMS, permissoes);
+  return filterNavByPerfil(NAV_ITEMS, permissoes, isSystemAdmin);
 }
 
 function DesktopSidebar({
@@ -119,6 +122,7 @@ function DesktopSidebar({
   unreadByHref,
   isPortalCliente,
   isAdminCliente,
+  isSystemAdmin,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -130,10 +134,11 @@ function DesktopSidebar({
   unreadByHref: Record<string, number>;
   isPortalCliente: boolean;
   isAdminCliente: boolean;
+  isSystemAdmin: boolean;
 }) {
   const pathname = usePathname();
   const [collapsedMenuOpen, setCollapsedMenuOpen] = useState(false);
-  const navItems = buildNavItems(permissoes, isPortalCliente, isAdminCliente, pathname);
+  const navItems = buildNavItems(permissoes, isPortalCliente, isAdminCliente, isSystemAdmin, pathname);
   const nomeExibicao = userName || "Usuário";
   const cpfExibicao = userCpf || "—";
 
@@ -219,7 +224,7 @@ function DesktopSidebar({
           })}
         </div>
       </nav>
-      {!isPortalCliente && (Object.keys(permissoes).length === 0 || permissoes.configuracoes === true) && (
+      {!isPortalCliente && (isSystemAdmin || Object.keys(permissoes).length === 0 || permissoes.configuracoes === true) && (
         <div className="shrink-0 border-t border-slate-200 px-3 py-2 dark:border-slate-700">
           <Link
             href="/configuracoes"
@@ -313,16 +318,18 @@ function MobileMenuDrawerContent({
   unreadByHref,
   isPortalCliente,
   isAdminCliente,
+  isSystemAdmin,
 }: {
   onClose: () => void;
   permissoes: Partial<Record<ModuloPermissao, boolean>>;
   unreadByHref: Record<string, number>;
   isPortalCliente: boolean;
   isAdminCliente: boolean;
+  isSystemAdmin: boolean;
 }) {
   const pathname = usePathname();
-  const navItemsBase = buildNavItems(permissoes, isPortalCliente, isAdminCliente, pathname);
-  const navItems = !isPortalCliente && (Object.keys(permissoes).length === 0 || permissoes.configuracoes === true)
+  const navItemsBase = buildNavItems(permissoes, isPortalCliente, isAdminCliente, isSystemAdmin, pathname);
+  const navItems = !isPortalCliente && (isSystemAdmin || Object.keys(permissoes).length === 0 || permissoes.configuracoes === true)
     ? [...navItemsBase, { label: "Configurações", href: "/configuracoes", icon: Settings, modulo: "configuracoes" as ModuloPermissao }]
     : navItemsBase;
 
@@ -371,11 +378,13 @@ function MobileBottomNav({
   unreadByHref,
   isPortalCliente,
   isAdminCliente,
+  isSystemAdmin,
 }: {
   permissoes: Partial<Record<ModuloPermissao, boolean>>;
   unreadByHref: Record<string, number>;
   isPortalCliente: boolean;
   isAdminCliente: boolean;
+  isSystemAdmin: boolean;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -487,6 +496,7 @@ function MobileBottomNav({
           unreadByHref={unreadByHref}
           isPortalCliente={isPortalCliente}
           isAdminCliente={isAdminCliente}
+          isSystemAdmin={isSystemAdmin}
         />
       </DrawerLeft>
 
@@ -662,6 +672,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         unreadByHref={unreadByHref}
         isPortalCliente={session.isPortalCliente}
         isAdminCliente={session.isAdminCliente}
+        isSystemAdmin={session.isSystemAdmin}
       />
       <ProfileDrawer
         open={profileDrawerOpen}
@@ -683,6 +694,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         unreadByHref={unreadByHref}
         isPortalCliente={session.isPortalCliente}
         isAdminCliente={session.isAdminCliente}
+        isSystemAdmin={session.isSystemAdmin}
       />
     </div>
   );

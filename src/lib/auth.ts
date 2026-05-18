@@ -4,6 +4,7 @@
  */
 
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
+import { isAdminProfileName, withAdminOverride } from "@/lib/configuracoes/permission-utils";
 
 export const COOKIE_NAME = "gestor_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 dias
@@ -19,6 +20,7 @@ export type SessionPayload = {
   isPortalCliente?: boolean;
   isAdminCliente?: boolean;
   isSystemAdmin?: boolean;
+  perfilNome?: string;
   permissoes?: Partial<Record<ModuloPermissao, boolean>>;
 };
 
@@ -76,8 +78,17 @@ function getModuleForPath(pathname: string): ModuloPermissao | null {
  * Verifica se o perfil do usuário tem permissão para acessar a rota.
  * Usado no middleware (Edge) e no client. Não depende de getPerfilById para evitar imports pesados no Edge.
  */
+function effectivePermissoes(session: SessionPayload): Partial<Record<ModuloPermissao, boolean>> | undefined {
+  if (session?.isSystemAdmin) return undefined;
+  if (session?.perfilNome && isAdminProfileName(session.perfilNome)) {
+    return withAdminOverride(session.permissoes ?? {}, session.perfilNome);
+  }
+  return session?.permissoes;
+}
+
 export function hasModuleAccess(session: SessionPayload, pathname: string): boolean {
-  if (session?.isSystemAdmin) return true;
+  if (session?.isSystemAdmin === true) return true;
+  if (session?.perfilNome && isAdminProfileName(session.perfilNome)) return true;
   if (pathname === "/portal" || pathname.startsWith("/portal/")) {
     if (session?.isPortalCliente === true) return true;
     return session?.permissoes?.portal_cliente === true;
@@ -85,8 +96,9 @@ export function hasModuleAccess(session: SessionPayload, pathname: string): bool
   const moduleRequired = getModuleForPath(pathname);
   if (moduleRequired === null) return true; // rota sem módulo (ex: /, /login, /acesso-negado)
   if (!session?.perfilId) return false;
-  if (!session.permissoes) return true;
-  return session.permissoes[moduleRequired] === true;
+  const permissoes = effectivePermissoes(session);
+  if (!permissoes) return true;
+  return permissoes[moduleRequired] === true;
 }
 
 /** Retorna o perfilId da sessão a partir do header Cookie (string). Útil no middleware. */

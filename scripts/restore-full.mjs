@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import {
   getRepoRoot,
   loadDatabaseUrl,
+  normalizeDatabaseUrlForPgTools,
   copyDirIfExists,
   findPgTool,
 } from "./lib/backup-utils.mjs";
@@ -39,7 +40,8 @@ if (!fs.existsSync(manifestPath)) {
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const root = getRepoRoot();
-const dbUrl = process.env.DATABASE_URL || loadDatabaseUrl(root);
+const dbUrlRaw = process.env.DATABASE_URL || loadDatabaseUrl(root);
+const dbUrl = dbUrlRaw ? normalizeDatabaseUrlForPgTools(dbUrlRaw) : null;
 
 if (!dbUrl) {
   console.error("Defina DATABASE_URL no ambiente ou em .env na raiz do repositório.");

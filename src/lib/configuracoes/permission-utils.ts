@@ -56,8 +56,10 @@ export function withDerivedConfiguracoes(
 }
 
 export function isAdminProfileName(perfilNome: string): boolean {
-  const nome = perfilNome.toLowerCase();
-  return nome.includes("administrador") || nome.includes("admin");
+  const nome = perfilNome.trim().toLowerCase();
+  if (!nome) return false;
+  if (nome === "administrador" || nome === "admin") return true;
+  return nome.includes("administrador") || /\badmin\b/.test(nome);
 }
 
 export function withAdminOverride(

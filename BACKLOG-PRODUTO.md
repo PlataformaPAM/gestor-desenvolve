@@ -8,13 +8,32 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - Cada item deve ter: prioridade, status, impacto e critério de aceite.
 - Status permitidos: `pendente`, `em_analise`, `planejado`, `em_execucao`, `concluido`.
 
-## Priorização atual (visão executiva)
+## Priorização atual (visão executiva) — atualizado 2026-05-15
 
-1. Refinamento final do Construtor de Documentos com identidade visual (papel timbrado/fundo).
-2. Evolução do uso de documentos nos módulos (geração, preview, PDF e envio).
-3. Estabilização técnica pós-incidente (lint crítico e observabilidade).
-4. Governança operacional de produção (runbook e validações pós-deploy).
-5. **Futuro:** módulo Extrator / GovRadar (ver BL-017) — após estabilização de release em produção.
+**Decisão de produto (alinhamento com gestão):**
+
+| Ordem | Foco | Item principal |
+|-------|------|----------------|
+| **1** | **Segurança e governança de acesso** | **BL-018** — RBAC granular + escopo “só o que é meu” (consultor não vê dados de outros) |
+| **2** | Estabilidade e confiança | BL-006, BL-007, BL-008 (lint, observabilidade, rotação de credenciais) |
+| **3** | Documentos e comunicação | BL-001, BL-009 (fechar), BL-002–004 |
+| **4** | Gestão comercial ampliada | **BL-019** — módulo Marketing (planejamento → MVP) |
+| **5** | Relatórios e decisão | BL-011–014, BL-013 (financeiro gerencial) |
+| **6** | UX plataforma | BL-016 (sidebar) |
+| **7** | IA assistente completa | **BL-020** — leitura + ação no sistema (faseada; após RBAC) |
+| **8** | GovRadar / prospecção pública | **BL-017** — importante, **não é prioridade agora** |
+
+**Regra de execução:** nenhuma feature de IA com escrita automática em produção antes do BL-018 (piloto) estar validado em API e UI.
+
+---
+
+## Concluído recentemente (produção — registrar para não reabrir)
+
+- [2026-05] Módulo **Comissões** (core, vínculo a lançamentos, painéis RH/Financeiro).
+- [2026-05] **Venda direta** no Financeiro (`registroLead`, fluxo e bloqueio no Comercial).
+- [2026-05] **Sincronização de alertas** com resolução de pendências (badges sidebar, reconciliação).
+- [2026-05] Correções Financeiro: dedupe de lançamentos, aba Comissões na edição, urgência.
+- [2026-05] Release em produção (Railway) validada pelo time.
 
 ---
 
@@ -198,7 +217,7 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 
 ## BL-017 - Módulo Extrator Inteligente (codinome GovRadar)
 - `status`: `planejado`
-- `prioridade`: `P2` (grande iniciativa; iniciar após release e critérios de produção)
+- `prioridade`: `P2` (importante para o negócio; **adiado** até RBAC + Marketing/relatórios maduros)
 - `impacto`: Muito alto (inteligência comercial e prospecção em entidades públicas)
 - `contexto`:
   - Agente para mapear ecossistema municipalista (prefeituras, consórcios, associações/federações de municípios, conselhos municipais/setoriais, entidades paraestatais com estrutura de conselho).
@@ -230,11 +249,12 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 ---
 
 ## BL-018 - Perfis de acesso: permissões granulares (Ver / Criar / Editar / Excluir) por módulo e escopo
-- `status`: `planejado`
-- `prioridade`: `P1` (grande melhoria de governança; execução em fases após estabilização do fluxo atual)
-- `impacto`: Muito alto (segurança, LGPD operacional, experiência por papel — ex.: consultor externo sem ver financeiro global; Configurações só em subáreas como Comissões)
+- `status`: `planejado` → **próximo a iniciar (`em_execucao` quando abrir sprint)**
+- `prioridade`: **`P0` — prioridade máxima do produto**
+- `impacto`: Muito alto (segurança, credibilidade, LGPD operacional; **problema atual:** consultor vê dados de outros sem limite)
 - `contexto`:
-  - Hoje o perfil habilita/desabilita **módulos inteiros**, sem controle fino de ações, subpáginas nem escopo de dados (ex.: contratos só vinculados à pessoa).
+  - Hoje o perfil habilita/desabilita **módulos inteiros**, sem controle fino de ações, subpáginas nem **escopo de dados**.
+  - **Meta explícita:** perfil “Consultor” (e similares) enxerga **apenas registros vinculados ao usuário** (leads, contratos, lançamentos, comissões, tarefas, etc.), salvo exceções definidas para gestores.
 - `modelo alvo (resumo)`:
   - **Recurso**: hierarquia estável (`configuracoes.comissoes`, `financeiro.lancamentos`, `contratos`…).
   - **Ações**: Ver, Criar, Editar, Excluir (variantes de negócio mapeadas para uma delas).
@@ -250,12 +270,85 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
   - Consultor externo sem acesso a financeiro global e/ou contratos fora do escopo definido.
   - Registro ou log mínimo de negações para suporte.
 
+### Escopo mínimo por módulo (piloto RBAC + escopo)
+
+| Módulo | Escopo consultor (exemplo) |
+|--------|----------------------------|
+| Comercial | Leads onde é responsável ou na equipe definida |
+| Contratos | Contratos do lead/cliente vinculado |
+| Financeiro | Lançamentos/comissões ligados ao consultor (sem visão global) |
+| Pós-venda / Tarefas | Tarefas atribuídas ou do cliente vinculado |
+| Helpdesk | Tickets do cliente vinculado (se aplicável) |
+| Configurações | Sem acesso ou só “meu perfil” |
+
+---
+
+## BL-019 - Módulo Marketing (planejamento e MVP)
+- `status`: `em_analise`
+- `prioridade`: `P1` (após piloto RBAC ou em paralelo na fase de descoberta)
+- `impacto`: Muito alto (origem de leads, campanhas, ROI, apoio direto às vendas)
+- `contexto`:
+  - Ainda **não existe módulo Marketing** no sistema; Comercial cobre pipeline, mas não campanhas, canais, nutrição nem métricas de aquisição.
+- `fase 0 — descoberta (antes de codar)`:
+  - Definir: o que é “Marketing” para a PAM (campanhas, landing, e-mail, redes, eventos, UTMs, orçamento por canal).
+  - Personas: quem usa (gestor comercial, marketing, diretoria).
+  - Integração com Comercial: lead nasce de qual origem/campanha; atribuição multi-touch (futuro).
+- `MVP sugerido (proposta)`:
+  - Cadastro de **campanhas** e **canais** (origem).
+  - Vínculo obrigatório/opcional campanha → lead no Comercial.
+  - Dashboard: leads por campanha, custo estimado (manual), conversão até Fechado.
+- `critério de aceite` (MVP):
+  - Criar campanha, registrar leads com origem, relatório simples de conversão por campanha.
+  - Consultor vê apenas campanhas/leads do seu escopo (alinhado ao BL-018).
+
+---
+
+## BL-020 - Assistente IA operacional (leitura + ação no sistema)
+- `status`: `planejado`
+- `prioridade`: `P1` (execução **faseada**; início após BL-018 piloto)
+- `impacto`: Muito alto (produtividade, gestão proativa, diferencial competitivo)
+- `visão`:
+  - Assistente que **conhece o estado do sistema** (leads, financeiro, contratos, tarefas, alertas) e **ajuda o usuário a decidir e executar** — não chat genérico.
+  - Exemplos: “o que fazer hoje”, próximos passos por lead, importar planilha/PDF com **preview e confirmação** antes de gravar.
+- `pré-requisitos`:
+  - BL-018 (permissões: IA só acessa o que o usuário pode ver).
+  - BL-007 (logs e rastreio de ações sugeridas/aceitas).
+  - APIs internas estáveis por domínio (read + write com auditoria).
+- `fases`:
+  1. **Copiloto leitura** — resumo do dia, pendências, explicação de telas (sem escrita).
+  2. **Copiloto com confirmação** — sugere criar/editar registro; usuário aprova em um clique.
+  3. **Ingestão de ficheiros** — “coloque este CSV nestes lançamentos” com mapeamento revisável.
+  4. **Proativo** — alertas de melhoria, metas, riscos (integração com BL-010/015).
+- `critério de aceite` (fase 2 fechável):
+  - Pelo menos 3 ações executáveis com confirmação (ex.: criar tarefa, registrar interação, sugerir lançamento).
+  - Log de auditoria: quem pediu, o que a IA sugeriu, o que foi aceito/rejeitado.
+- `nota`:
+  - IN-001 (IA em documentos) permanece como subcaso da fase 2/3.
+
+---
+
+## Roadmap sugerido (sem datas rígidas)
+
+### Onda A — Confiança (agora)
+- BL-018 fases 1–3 (catálogo + API + piloto Comercial/Contratos/Financeiro escopo)
+- BL-007, BL-006
+
+### Onda B — Operação e vendas
+- BL-019 fase 0 + MVP
+- BL-001, BL-009 (concluir), BL-016
+
+### Onda C — Inteligência e escala
+- BL-011–014, BL-013
+- BL-020 fases 1–2
+- BL-017 (GovRadar) quando Onda A–B estiverem estáveis
+
 ---
 
 ## Ideias novas para ganho de valor (avaliar)
 
 ## IN-001 - Assistente de composição de documento (IA guiada)
 - Sugestão automática de texto por tipo de documento, setor e perfil do cliente.
+- **Encaixe:** subitem de **BL-020** (fase 2/3), não projeto isolado.
 
 ## IN-002 - Biblioteca de blocos institucionais reutilizáveis
 - Blocos prontos (cláusulas, termos, apresentação, escopo, condições comerciais).
@@ -292,3 +385,4 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - [2026-05-11] Planejamento do módulo **Extrator Inteligente (GovRadar)** consolidado no backlog como **BL-017** (apenas planejamento; execução adiada até após ajustes pontuais de release em produção no Railway).
 - [2026-05-11] Registrado **IN-006**: verificação/indicador de uso de WhatsApp por número — depende de API comercial Meta e políticas; sem validação mágica em campo genérico (ver item no backlog).
 - [2026-05-12] Planejamento de **RBAC granular** consolidado como item de backlog **BL-018** (detalhe de entregas e critérios de aceite); decisão de 2026-05-08 permanece como contexto histórico.
+- [2026-05-15] **Prioridade P0:** BL-018 (consultor só vê vínculos próprios). GovRadar (BL-017) confirmado como importante mas adiado. **BL-019** Marketing entra em descoberta. **BL-020** IA assistente completa (ler + agir) planejada em fases após RBAC. Backup completo verificado em `backups/archive/2026-05-15T18-00-31`.

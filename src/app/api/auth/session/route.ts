@@ -1,9 +1,9 @@
 import { fail, ok } from "@/lib/server/api-response";
-import { COOKIE_NAME, decodeSession } from "@/lib/auth";
+import { COOKIE_NAME, decodeSession, encodeSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { ModuloPermissao } from "@/lib/configuracoes/types";
-import { loadPerfilPermissoesExtras } from "@/lib/server/perfil-permissoes-extras";
-import { withAdminOverride } from "@/lib/configuracoes/permission-utils";
+import { loadSessionPermissions } from "@/lib/server/session-permissions";
+
+const IS_PROD = process.env.NODE_ENV === "production";
 
 export async function GET(req: Request) {
   const cookieHeader = req.headers.get("cookie") || "";
@@ -13,25 +13,16 @@ export async function GET(req: Request) {
   if (!session?.perfilId) {
     return fail("UNAUTHORIZED", "Sessão inválida.", 401);
   }
-  let permissoes = (session.permissoes ?? {}) as Partial<Record<ModuloPermissao, boolean>>;
-  let perfilNome = "";
+
+  let permissoes = session.permissoes ?? {};
+  let perfilNome = session.perfilNome ?? "";
+  let isSystemAdmin = session.isSystemAdmin === true;
+
   try {
-    const perfil = await prisma.perfilAcesso.findUnique({
-      where: { id: session.perfilId },
-      include: { permissoes: true },
-    });
-    const permissoesBase = Object.fromEntries(
-      (perfil?.permissoes ?? []).map((p) => [p.modulo, p.permitido])
-    ) as Partial<Record<ModuloPermissao, boolean>>;
-    const extrasByPerfil = await loadPerfilPermissoesExtras(prisma, [session.perfilId]);
-    permissoes = withAdminOverride(
-      {
-        ...permissoesBase,
-        ...(extrasByPerfil[session.perfilId] ?? {}),
-      },
-      perfil?.nome ?? ""
-    );
-    perfilNome = (perfil?.nome ?? "").toLowerCase();
+    const resolved = await loadSessionPermissions(prisma, session.perfilId);
+    permissoes = resolved.permissoes;
+    perfilNome = resolved.perfilNome;
+    isSystemAdmin = resolved.isSystemAdmin;
   } catch (error) {
     console.error("[auth/session] falha ao carregar perfil/permissões:", error);
   }
@@ -88,14 +79,10 @@ export async function GET(req: Request) {
   const isPortalCliente = (clienteIds?.length ?? 0) > 0 || session.isPortalCliente === true;
   const isAdminCliente =
     isPortalCliente &&
-    (
-      permissoes.configuracoes === true ||
-      perfilNome.includes("admin") ||
-      perfilNome.includes("administrador") ||
-      session.isAdminCliente === true
-    );
-  const isSystemAdmin = perfilNome.includes("admin") || perfilNome.includes("administrador");
-  return ok({
+    (permissoes.configuracoes === true ||
+      isSystemAdmin ||
+      session.isAdminCliente === true);
+  const response = ok({
     perfilId: session.perfilId,
     userId,
     userName,
@@ -106,7 +93,32 @@ export async function GET(req: Request) {
     isPortalCliente,
     isAdminCliente,
     isSystemAdmin,
+    perfilNome,
     permissoes,
   });
-}
 
+  response.cookies.set({
+    name: COOKIE_NAME,
+    value: encodeSession({
+      perfilId: session.perfilId,
+      userId: userId ?? undefined,
+      userName: userName ?? undefined,
+      userCpf: userCpf ?? undefined,
+      userEmail: userEmail ?? undefined,
+      userPhone: userPhone ?? undefined,
+      clienteIds,
+      isPortalCliente,
+      isAdminCliente,
+      isSystemAdmin,
+      perfilNome,
+      permissoes,
+    }),
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+
+  return response;
+}

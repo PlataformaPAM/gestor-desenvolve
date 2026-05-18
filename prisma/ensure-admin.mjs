@@ -71,6 +71,22 @@ async function ensureAdmin() {
     });
   }
 
+  const extras = {
+    relatorios: true,
+    contratos: true,
+    solucoes: true,
+    configuracoes_construtor_documentos: true,
+    configuracoes_logs: true,
+    configuracoes_perfis: true,
+    configuracoes_usuarios: true,
+    portal_cliente: true,
+  };
+  await prisma.configuracaoSistema.upsert({
+    where: { chave: `perfil_permissoes_extras:${perfil.id}` },
+    create: { chave: `perfil_permissoes_extras:${perfil.id}`, valor: JSON.stringify(extras) },
+    update: { valor: JSON.stringify(extras) },
+  });
+
   const senhaHash = hashPassword(password);
   await prisma.usuario.upsert({
     where: { cpf },

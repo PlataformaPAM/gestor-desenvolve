@@ -2,6 +2,7 @@ import type { Alerta } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/server/api-response";
 import { getSessionFromCookieHeader } from "@/lib/auth";
+import { isAdminProfileName } from "@/lib/configuracoes/permission-utils";
 import { Prisma } from "@prisma/client";
 import { reconcileStaleModuleAlerts } from "@/lib/server/alerts-resolve";
 
@@ -10,7 +11,7 @@ const MODULE_TO_PERMISSION: Record<string, string | null> = {
   comercial: "comercial",
   financeiro: "financeiro",
   clientes: "clientes",
-  contratos: "clientes",
+  contratos: "contratos",
   helpdesk: "helpdesk",
   posVenda: "posVenda",
   tarefas: "tarefas",
@@ -45,14 +46,19 @@ function inferSlaLabel(texto: string): string | null {
 
 export async function GET(req: Request) {
   const session = getSessionFromCookieHeader(req.headers.get("cookie"));
+  const isSystemAdmin =
+    session?.isSystemAdmin === true ||
+    (!!session?.perfilNome && isAdminProfileName(session.perfilNome));
   const allowed = new Set<string>(
-    Object.entries(MODULE_TO_PERMISSION)
-      .filter(([, permission]) => {
-        if (!permission) return true;
-        if (!session?.permissoes) return true;
-        return session.permissoes[permission as keyof typeof session.permissoes] === true;
-      })
-      .map(([modulo]) => modulo)
+    isSystemAdmin
+      ? Object.keys(MODULE_TO_PERMISSION)
+      : Object.entries(MODULE_TO_PERMISSION)
+          .filter(([, permission]) => {
+            if (!permission) return true;
+            if (!session?.permissoes) return true;
+            return session.permissoes[permission as keyof typeof session.permissoes] === true;
+          })
+          .map(([modulo]) => modulo)
   );
 
   const whereUsuario = session?.userId
