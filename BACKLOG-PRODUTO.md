@@ -8,13 +8,13 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - Cada item deve ter: prioridade, status, impacto e critério de aceite.
 - Status permitidos: `pendente`, `em_analise`, `planejado`, `em_execucao`, `concluido`.
 
-## Priorização atual (visão executiva) — atualizado 2026-05-15
+## Priorização atual (visão executiva) — atualizado 2026-05-18
 
 **Decisão de produto (alinhamento com gestão):**
 
 | Ordem | Foco | Item principal |
 |-------|------|----------------|
-| **1** | **Segurança e governança de acesso** | **BL-018** — RBAC granular + escopo “só o que é meu” (consultor não vê dados de outros) |
+| **1** | **Segurança e governança de acesso** | **BL-018** — ✅ MVP concluído; evoluções BL-021 / BL-022 |
 | **2** | Estabilidade e confiança | BL-006, BL-007, BL-008 (lint, observabilidade, rotação de credenciais) |
 | **3** | Documentos e comunicação | BL-001, BL-009 (fechar), BL-002–004 |
 | **4** | Gestão comercial ampliada | **BL-019** — módulo Marketing (planejamento → MVP) |
@@ -23,7 +23,25 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 | **7** | IA assistente completa | **BL-020** — leitura + ação no sistema (faseada; após RBAC) |
 | **8** | GovRadar / prospecção pública | **BL-017** — importante, **não é prioridade agora** |
 
-**Regra de execução:** nenhuma feature de IA com escrita automática em produção antes do BL-018 (piloto) estar validado em API e UI.
+**Regra de execução:** nenhuma feature de IA com escrita automática em produção sem respeitar o RBAC do BL-018 (MVP validado em API e UI, maio/2026).
+
+### Próximo ciclo — o que fazer agora? (escolha de produto)
+
+| # | Item | Status | Prioridade | Por que considerar agora |
+|---|------|--------|------------|---------------------------|
+| A | **BL-006** — lint/hooks | pendente | P2 técnico | Base saudável antes de features grandes |
+| B | **BL-007** — observabilidade BD | pendente | P2 técnico | Menos surpresa em produção (Railway) |
+| C | **BL-001 / BL-009** — documentos | em_analise / em_execucao | P0/P1 | Impacto direto no dia a dia (timbrado, variáveis relatório) |
+| D | **BL-019** — Marketing | em_analise | P1 negócio | Origem de leads, campanhas (descoberta antes de codar) |
+| E | **BL-011–014** — relatórios avançados | planejado | P1 | Decisão e BI sobre o que já existe |
+| F | **BL-016** — sidebar sem rolagem | planejado | P2 UX | Melhoria rápida de navegação |
+| G | **BL-020** — IA assistente | planejado | P1 | Só após RBAC estável ✅ — pode iniciar fase leitura |
+| H | **BL-021** — Calendário + Arquivos | planejado | P2 | Produto ainda mock; RBAC quando MVP existir |
+| I | **BL-022** — escopo equipe/gerente | planejado | P2 | Depende cadastro de equipe no RH |
+| — | **BL-018** — RBAC | **concluido** | — | Manutenção apenas; evoluções em BL-021/022 |
+| — | **BL-017** — GovRadar | planejado | adiado | Importante, não é foco imediato |
+
+**Sugestão de sequência (se não houver outra prioridade de gestão):** (1) publicar RBAC no GitHub + backup ✅ → (2) BL-001/009 ou BL-019 descoberta → (3) BL-006/007 em paralelo técnico.
 
 ---
 
@@ -34,6 +52,8 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - [2026-05] **Sincronização de alertas** com resolução de pendências (badges sidebar, reconciliação).
 - [2026-05] Correções Financeiro: dedupe de lançamentos, aba Comissões na edição, urgência.
 - [2026-05] Release em produção (Railway) validada pelo time.
+- [2026-05-18] **RBAC granular (BL-018) — MVP concluído** — matriz, proxy, APIs, escopo «Ver de todos», relatórios, Central com KPIs filtrados (Suporte/Tarefas/Clientes). Validação manual OK. Resíduos: Calendário/Arquivos → BL-021; escopo equipe → BL-022.
+- [2026-05-22] **Backup completo** verificado em `backups/archive/2026-05-22T17-51-01` (BD + uploads + Prisma + `.env`). Próximo passo: publicar RBAC no GitHub.
 
 ---
 
@@ -249,7 +269,7 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 ---
 
 ## BL-018 - Perfis de acesso: permissões granulares (Ver / Criar / Editar / Excluir) por módulo e escopo
-- `status`: `planejado` → **próximo a iniciar (`em_execucao` quando abrir sprint)**
+- `status`: `concluido` (MVP em produção — evoluções futuras em BL-021 e BL-022)
 - `prioridade`: **`P0` — prioridade máxima do produto**
 - `impacto`: Muito alto (segurança, credibilidade, LGPD operacional; **problema atual:** consultor vê dados de outros sem limite)
 - `contexto`:
@@ -280,6 +300,233 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 | Pós-venda / Tarefas | Tarefas atribuídas ou do cliente vinculado |
 | Helpdesk | Tickets do cliente vinculado (se aplicável) |
 | Configurações | Sem acesso ou só “meu perfil” |
+
+### Onde estamos hoje (diagnóstico — atualizado 2026-05-18)
+
+| Camada | Situação atual | Observação |
+|--------|----------------|------------|
+| **UI Perfis** | Matriz granular por subárea (`perfil-permission-matrix.tsx`) | Ver / Criar / Editar / Excluir / Ver de todos |
+| **Persistência** | `permissoesGranulares` (JSON no perfil) + legado `PerfilPermissao` em paralelo | Migração automática de toggles antigos |
+| **Menu / rotas** | `proxy.ts` → `canAccessPageRoute` (granular) | Sem `hasModuleAccess` duplicado |
+| **Sidebar / Central** | `resourceId` + `authorize`; KPIs filtrados por escopo | Alinhado às APIs |
+| **APIs** | Gates (`rbac-gate`) nos módulos de operação | Escopo vinculados em listas, detalhe e relatórios |
+| **Admin** | `isSessionAdmin` / perfil Administrador | Bypass total documentado |
+
+**Conclusão (MVP):** permissões na UI **refletem** bloqueio em API e URL direta nos módulos em produção. Evoluções fora do MVP: **BL-021** (Calendário/Arquivos), **BL-022** (escopo equipe), tela de auditoria de negações RBAC.
+
+### Plano de execução (fases — histórico)
+
+| Fase | Escopo | Estado |
+|------|--------|--------|
+| 0 | Especificação com gestão | ✅ |
+| 1 | Catálogo + `authorize` + matriz UI + migração JSON | ✅ |
+| 2 | Comercial + Central | ✅ |
+| 3 | Financeiro + Contratos | ✅ |
+| 4 | Clientes, Suporte, Pós-venda, Tarefas, RH, Relatórios, Config | ✅ |
+| 5 | Escopo equipe + log negações + desligar legado | ➡️ BL-022 / nice-to-have |
+
+### Catálogo de recursos (proposta v1)
+
+```
+comercial.leads          → ver | criar | editar | excluir | escopo: todos | vinculados
+comercial.relatorios     → ver (subárea comercial)
+financeiro.lancamentos   → ver | criar | editar | excluir | dar_baixa | escopo: todos | vinculados
+financeiro.comissoes     → ver | editar | escopo: todos | proprias
+financeiro.aprovacoes    → ver | aprovar | recusar | escopo: todos
+contratos.contratos      → ver | editar | escopo: todos | vinculados
+clientes.cadastro        → ver | criar | editar | escopo: todos | vinculados
+helpdesk.tickets         → ver | criar | editar | escopo: todos | vinculados
+posvenda.tarefas         → ver | editar | escopo: todos | atribuidas
+tarefas.internas         → ver | criar | editar | escopo: todos | atribuidas
+rh.colaboradores         → ver | criar | editar | escopo: todos (gestão)
+configuracoes.*          → sub-recursos já existentes (perfis, usuarios, logs, construtor)
+relatorios.*             → ver por área
+```
+
+### Decisões fechadas com gestão (2026-05-15)
+
+| # | Tema | Decisão |
+|---|------|---------|
+| 1 | Comercial — quem vê o lead | **Sim:** responsável **ou** colaborador vinculado ao lead pode **visualizar** (quando escopo = “só vinculados”). |
+| 2 | Financeiro — comissões | Perfil Consultor: **apenas comissões próprias**, nunca de outros consultores. (Gestores/equipe: fase futura.) |
+| 3 | Clientes | **Ver e editar todos** os clientes; **criar** novos; **nunca excluir** — apenas **inativar** (ação separada de Excluir). |
+| 4 | Ordem de entrega | **Módulo a módulo**, etapa por etapa; piloto = **Comercial**. |
+| 5 | Matriz por perfil (exceto Admin) | Para **cada módulo/recurso**: marcar **Ver, Criar, Editar, Excluir** independentemente. |
+| 6 | Ver conteúdo de outros | Por módulo: checkbox **“Ver conteúdo de outros usuários”** — se desligado, só vinculados; se ligado, tudo daquele módulo (ex.: todos os leads). |
+| 7 | Gerente Comercial (futuro) | Ver **toda a equipe** no Comercial, **sem** outros módulos — requer cadastro de equipe (RH); escopo `equipe` na Fase 4+. |
+| 8 | Administrador | Continua com **acesso total** (override); não usa matriz restritiva na prática. |
+
+### Modelo de permissão (especificação v1 — sem ambiguidade)
+
+Cada perfil (exceto Administrador) guarda, **por recurso do catálogo**:
+
+| Campo | Significado |
+|-------|-------------|
+| `ver` | Pode abrir listas/detalhes permitidos pelo escopo |
+| `criar` | Pode criar registros novos naquele recurso |
+| `editar` | Pode alterar registros existentes (inclui **inativar** cliente quando aplicável) |
+| `excluir` | Pode apagar permanentemente (Clientes: **sempre false** no sistema; UI não oferece) |
+| `verConteudoDeOutros` | **false** = só registros vinculados ao usuário; **true** = todos os registros **daquele módulo** |
+
+**Escopos de dados (como o sistema filtra quando `verConteudoDeOutros = false`):**
+
+| Módulo | “Só meu / vinculado” |
+|--------|----------------------|
+| Comercial (leads) | Responsável principal **ou** colaborador no `ownership` do lead |
+| Financeiro (comissões) | Sempre **só do próprio usuário/consultor** (regra fixa; checkbox de “outros” não amplia comissões) |
+| Financeiro (lançamentos) | Conforme matriz + escopo (Fase 3) |
+| Clientes | **Todos** podem ver/editar (decisão #3); escopo “vinculados” **não** se aplica a clientes |
+| Contratos | Lead/cliente vinculado ao usuário (quando escopo restrito) |
+| Demais | Definido por recurso em cada fase |
+
+**Exemplos validados:**
+
+| Perfil | Comercial | `verConteudoDeOutros` | Resultado |
+|--------|-----------|------------------------|-----------|
+| Consultor A | Ver+Editar vinculados | ❌ | Só leads onde é responsável ou colaborador |
+| Consultor B | Ver+Editar | ✅ | Vê **todos** os leads do Comercial; sem Financeiro |
+| Gerente Comercial (futuro) | Ver+Editar equipe | escopo `equipe` | Todos os leads dos consultores da equipe; sem outros módulos |
+
+### Regras de negócio fixas (não configuráveis no perfil)
+
+- **Cliente:** não existe permissão de Excluir; apenas inativar (requer `editar`).
+- **Comissões:** consultor nunca vê comissão de outro consultor (filtro obrigatório na API).
+- **Administrador:** bypass total (nome do perfil / flag sistema).
+
+### UI do perfil (modernização planejada)
+
+- **Não criar perfis automaticamente** — no sistema existe apenas **Administrador** (já criado); demais perfis são **criados e configurados manualmente** pela gestão.
+- Melhorar somente o **módulo Perfis de Acesso** para marcar exatamente o desejado.
+- **Matriz completa** em cada **módulo e subárea**, com 5 colunas independentes:
+
+| Ver | Criar | Editar | Excluir | Ver de todos |
+|-----|-------|--------|---------|--------------|
+
+- **“Ver de todos”** em **cada linha** (módulo e subárea) — autonomia total; sem atalhos que forcem pacote de permissões.
+- **Modelos sugeridos** (opcional na UI): botão “Aplicar modelo…” que **preenche** a matriz sem criar perfil no banco — usuário salva quando quiser.
+- Texto de ajuda curto por linha (o que “Ver de todos” faz naquela subárea).
+
+### Central (Home) — adaptativa ao perfil
+
+- Cards, KPIs, gráficos e “próximos vencimentos” só aparecem se o usuário tiver **`ver`** no recurso correspondente.
+- Números e listas respeitam o **mesmo filtro de dados** das APIs (ex.: sem Financeiro → sem cards de receita/a pagar; Comercial só vinculados → pipeline e contagens só dos leads do usuário).
+- Implementação: `GET /api/dashboard/bootstrap` passa a receber sessão, chamar `authorize` e aplicar escopo antes de agregar (Fase 2, junto ou logo após Comercial).
+
+### Catálogo completo — módulos e subáreas (v1)
+
+Cada linha = uma linha na matriz do perfil.
+
+| Área | Recurso (id técnico) |
+|------|----------------------|
+| **Central** | `central.dashboard` |
+| **Comercial** | `comercial.pipeline` |
+| **Financeiro** | `financeiro.lancamentos`, `financeiro.comissoes`, `financeiro.extrato`, `financeiro.aprovacoes`, `financeiro.venda_direta` |
+| **Clientes** | `clientes.cadastro` |
+| **Contratos** | `contratos.lista` |
+| **Soluções** | `solucoes.catalogo` |
+| **Suporte** | `helpdesk.tickets` |
+| **Pós-venda** | `posvenda.tarefas` |
+| **Tarefas** | `tarefas.internas` |
+| **RH** | `rh.colaboradores` |
+| **Relatórios** | `relatorios.comercial`, `relatorios.financeiro`, `relatorios.operacional`, `relatorios.saude_empresa`, `relatorios.prestacao_contas` |
+| **Configurações** | `configuracoes.dados_empresa`, `configuracoes.papeis_timbrados`, `configuracoes.construtor_documentos`, `configuracoes.logs`, `configuracoes.perfis`, `configuracoes.usuarios` |
+| **Portal cliente** | `portal.acesso` |
+| **Minha Caixa** | `alertas.caixa` |
+
+Regras fixas já acordadas continuam valendo (ex.: clientes sem Excluir; comissões nunca de outros consultores).
+
+### Princípios de entrega (cuidado, sem quebrar produção)
+
+1. **Uma etapa por vez** — merge e teste em produção só após validação local.
+2. **Compatibilidade** — perfis antigos (só toggles de módulo) migram para matriz com defaults seguros até você reconfigurar manualmente.
+3. **API antes da UI decorativa** — bloqueio real na rota; home e menus seguem depois.
+4. **Administrador intocado** — bypass; único perfil pré-existente.
+5. **Checklist por fase** — login, URL direta, API com outro usuário, home, menu.
+
+### Ordem de implementação (atualizada)
+
+| Fase | Escopo | Entregável testável |
+|------|--------|---------------------|
+| **1** | Fundação | Catálogo TS + JSON no perfil + tela matriz (subáreas) + `authorize()` + migração leve |
+| **2** | Comercial + Central | Filtro leads + dashboard KPIs comercial filtrados |
+| **3** | Financeiro + Contratos | Comissões só próprias; lançamentos; contratos vinculados |
+| **4** | Clientes, Suporte, Pós-venda, Tarefas, RH, Relatórios, Config (subáreas) | Cada bloco: API → menu → home (se aplicável) |
+| **5** | Escopo equipe (Gerente) + log de negações | RH equipe + filtro `equipe` no Comercial |
+
+### Status atual do BL-018
+
+| Item | Estado |
+|------|--------|
+| Decisões de negócio | ✅ Fechadas |
+| Catálogo módulos/subáreas | ✅ Definido (v1); Calendário/Arquivos fora do catálogo até BL-021 |
+| Código matriz / `authorize` | ✅ Em produção (UI perfis + `permission-client` + `authorize` nas APIs) |
+| Proxy + rotas (`canAccessPageRoute`) | ✅ Única barreira de rota (granular + fallback legado) |
+| Sidebar (`canViewNavItem`) | ✅ Por `resourceId` / agregados Financeiro·Relatórios·Config |
+| Guards de página (Ver/Criar/Editar) | ✅ Módulos principais |
+| APIs críticas sem gate | ✅ Corrigido (DELETE lançamento, POST histórico pós-venda) |
+| Busca global (`global-search`) | ✅ Usa `canViewResourceClient` por recurso |
+| Piloto Comercial + escopo leads | ✅ |
+| Financeiro (subáreas) + escopo lançamentos | ✅ |
+| Central adaptativa + bootstrap vazio sem `central.dashboard` | ✅ |
+| Central — KPIs Suporte / Tarefas / Clientes com mesmo escopo dos módulos | ✅ (2026-05-18) |
+| Perfis pré-criados no código | ❌ Não faremos (só Administrador) |
+| **Validação formal com perfis de teste** | ✅ Manual (gestão, 2026-05-18) |
+| **Log de negações de permissão (suporte)** | ⏳ Auditoria `RBAC negado` em `rbac-gate`; sem tela dedicada (nice-to-have) |
+| **Escopo “Ver de todos”** | ✅ Módulos de operação + relatórios |
+| **Escopo equipe / Gerente Comercial** | ➡️ **BL-022** (depende cadastro de equipe/departamento) |
+| **Desligar `hasModuleAccess` no proxy** | ✅ Removido; só `canAccessPageRoute` |
+
+**Resíduos fora do MVP (documentados):** `/calendario` e `/arquivos` sem RBAC até produto maduro → **BL-021**; portal cliente com fluxo próprio (`resolvePortalContext`); Config logs/usuários sem filtro por criador (baixa prioridade).
+
+---
+
+## BL-021 - Calendário da equipe e Drive interno (evolução de produto)
+- `status`: `planejado`
+- `prioridade`: `P2` (após BL-018 MVP — RBAC desses módulos **só quando o produto estiver pronto**)
+- `impacto`: Médio (produtividade da operação; hoje são protótipos locais)
+- `decisão de UX (2026-05-18)`:
+  - **Não** incluir Calendário nem Arquivos na sidebar nem na matriz de perfis neste ciclo.
+  - Reintroduzir `calendario.equipe` / `arquivos.drive` no catálogo quando o MVP estiver pronto.
+- `decisão RBAC (2026-05-18 — gestão)`:
+  - Rotas `/calendario` e `/arquivos` permanecem **sem gate** por enquanto: usuários não conhecem os links, telas vazias/mock, risco aceito.
+  - **Não implementar RBAC** nestas rotas até o módulo ter dados reais e entrar no menu.
+  - Na entrega do MVP do módulo: catálogo + matriz + `canAccessPageRoute` + gates em APIs + escopo de dados (se aplicável).
+- `situação atual`:
+  - `/calendario` — eventos em memória; preparação para Google Calendar.
+  - `/arquivos` — drive mock em memória; preparação para Google Drive.
+  - Sem APIs de persistência; sem entrada no menu principal; proxy deixa URL passar para qualquer usuário logado.
+- `escopo futuro (MVP de módulo)`:
+  1. Modelo de dados + APIs (eventos, pastas/arquivos, permissões por pasta).
+  2. Integração ou stub documentado (Google Calendar / Drive).
+  3. Entrada na sidebar **somente** quando o MVP estiver utilizável (alinhado ao BL-016 se aplicável).
+  4. **RBAC completo** (recursos no catálogo, proxy, APIs, escopo).
+  5. Revisar matriz de perfis (desacoplar de “Tarefas” se fizer sentido de negócio).
+- `critério de aceite`:
+  - Usuário com permissão vê o módulo no menu, persiste dados no servidor e respeita Ver/Criar/Editar/Excluir na API.
+  - Usuário sem permissão: bloqueio em URL direta, API e UI.
+
+---
+
+## BL-022 - RBAC: escopo por equipe / departamento (Gerente Comercial e similares)
+- `status`: `planejado`
+- `prioridade`: `P2` (após existir modelo de negócio para “quem pertence a qual equipe”)
+- `impacto`: Alto para gestores que precisam ver a operação do time sem ver a empresa inteira
+- `contexto (2026-05-18)`:
+  - BL-018 entrega apenas `todos` vs `vinculados` (registros do próprio usuário / colaborador no lead).
+  - **Não há hoje** cadastro de departamento, equipe comercial, equipe de suporte ou financeiro vinculado ao usuário — impossível definir “pessoas do comercial” no sistema.
+  - Decisão: **planejar agora, implementar depois** do cadastro organizacional.
+- `pré-requisitos de produto/dados`:
+  1. Modelo de **equipe** ou **departamento** (ex.: Comercial, Suporte, Financeiro) e vínculo `Usuario` ↔ equipe (e opcionalmente líder/gerente).
+  2. Regras com gestão: gerente vê todos os leads/tickets/tarefas dos membros da equipe; consultor continua só vinculados.
+  3. Novo valor de escopo no catálogo (ex.: `equipe`) além de `todos` / `vinculados`, ou flag “Ver equipe” por módulo.
+- `entregas sugeridas (quando houver cadastro)`:
+  1. CRUD ou config em RH/Config para equipes e membros.
+  2. `authorize` + filtros em Comercial (piloto), depois Suporte, Tarefas, Relatórios.
+  3. Perfil tipo “Gerente Comercial” documentado na matriz (sem seed automático de perfil).
+- `critério de aceite`:
+  - Gerente com escopo equipe vê apenas registros dos usuários listados na equipe dele; não vê outras equipes.
+  - Consultor sem “Ver de todos” continua restrito aos vinculados próprios.
+- `referência`: decisão #7 e Fase 5 do BL-018 (escopo `equipe`).
 
 ---
 
@@ -386,3 +633,8 @@ Objetivo: centralizar pendências, melhorias e novidades para evitar perda de co
 - [2026-05-11] Registrado **IN-006**: verificação/indicador de uso de WhatsApp por número — depende de API comercial Meta e políticas; sem validação mágica em campo genérico (ver item no backlog).
 - [2026-05-12] Planejamento de **RBAC granular** consolidado como item de backlog **BL-018** (detalhe de entregas e critérios de aceite); decisão de 2026-05-08 permanece como contexto histórico.
 - [2026-05-15] **Prioridade P0:** BL-018 (consultor só vê vínculos próprios). GovRadar (BL-017) confirmado como importante mas adiado. **BL-019** Marketing entra em descoberta. **BL-020** IA assistente completa (ler + agir) planejada em fases após RBAC. Backup completo verificado em `backups/archive/2026-05-15T18-00-31`.
+- [2026-05-15] **BL-018** em análise: diagnóstico “UI ≠ segurança”; plano em 5 fases com piloto Comercial; catálogo de recursos e presets documentados no backlog.
+- [2026-05-15] BL-018 refinado: **sem criar perfis** no código; matriz **Ver/Criar/Editar/Excluir/Ver de todos** em **cada subárea**; **Central adaptativa** ao perfil; entrega **etapa a etapa** com testes.
+- [2026-05-15] Hotfix produção: admin/sessão (`session-permissions`, cookie renovado em `/api/auth/session`) — **não** substitui BL-018.
+- [2026-05-18] BL-018 **MVP concluído** — validação manual OK; Central com escopo Suporte/Tarefas/Clientes; resíduos BL-021/BL-022 documentados.
+- [2026-05-18] Decisão: Calendário/Arquivos sem RBAC até produto maduro (**BL-021**). Escopo gerente/equipe adiado até cadastro organizacional (**BL-022**).

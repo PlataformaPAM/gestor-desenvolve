@@ -3,8 +3,12 @@ import { documentoModeloToDto } from "@/lib/configuracoes/documentos-modelos";
 import { getDocumentoTimbresConfig, saveDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { fail, ok } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.construtorDocumentos, "criar");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
 
   const orig = await prisma.documentoModelo.findUnique({ where: { id } });

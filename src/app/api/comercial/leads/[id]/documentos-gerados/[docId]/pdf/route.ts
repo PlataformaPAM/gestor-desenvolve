@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 import { fail } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto, type DocumentoSnapshot } from "@/lib/documentos/documento-html";
 import { renderHtmlToPdfBuffer } from "@/lib/server/html-to-pdf";
@@ -94,6 +95,8 @@ function parseSnapshot(newValue: unknown): { modeloId: string; modeloNome: strin
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; docId: string }> }) {
   const { id: leadId, docId } = await ctx.params;
+  const gate = await comercialAccessGate(req, "ver", leadId);
+  if (!gate.ok) return gate.response;
   const row = await prisma.leadInteraction.findFirst({
     where: {
       id: docId,

@@ -1,5 +1,5 @@
-import { CommandCenter } from "@/components/dashboard/command-center";
+import { HomeGuard } from "@/components/dashboard/home-guard";
 
 export default function Home() {
-  return <CommandCenter />;
+  return <HomeGuard />;
 }

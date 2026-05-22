@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { mapParticipacao } from "@/app/api/comissoes/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_COMISSOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 type PayloadParticipacao = {
   leadId?: string;
@@ -13,6 +17,9 @@ type PayloadParticipacao = {
 };
 
 export async function GET(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId") ?? undefined;
   const leadSolucaoId = searchParams.get("leadSolucaoId");
@@ -28,6 +35,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ participacao?: PayloadParticipacao }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const p = body.value.participacao;

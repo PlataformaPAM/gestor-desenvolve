@@ -9,6 +9,7 @@ import {
 } from "@/lib/contratos/codigo-personalizado";
 import type { ContratoStatus } from "@prisma/client";
 import { markContratoAlertsResolvedIfApplicable } from "@/lib/server/alerts-resolve";
+import { contratosAccessGate } from "@/lib/server/contratos-access";
 
 function formatContratoCode(year: number, seq: number): string {
   return `CTT-${year}-${String(seq).padStart(4, "0")}`;
@@ -113,8 +114,11 @@ function mapContratoDetalhe(c: any, codigo: string, codigoPersonalizado?: string
   };
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await contratosAccessGate(req, "ver", id);
+  if (!gate.ok) return gate.response;
+
   try {
     let c = await prisma.contrato.findUnique({
       where: { id },
@@ -217,7 +221,10 @@ function parseYmdOrThrow(v: string | null | undefined, allowNullish: boolean): D
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const sessionUserId = getSessionUserId(req);
+  const gate = await contratosAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
+
+  const sessionUserId = gate.userId ?? getSessionUserId(req);
   const parsed = await parseJsonSafe<PatchBody>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const b = parsed.value;

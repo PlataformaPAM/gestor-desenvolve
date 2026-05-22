@@ -80,7 +80,8 @@ function prazoDiasLabel(dataFim: string, status: Tarefa["status"]): string {
 type TarefasKanbanProps = {
   tarefas: Tarefa[];
   onAbrirTarefa: (t: Tarefa) => void;
-  onDragEnd: (result: DropResult) => void;
+  /** Omitir para desabilitar arrastar colunas (sem permissão Editar). */
+  onDragEnd?: (result: DropResult) => void;
 };
 
 export function TarefasKanban({
@@ -88,6 +89,7 @@ export function TarefasKanban({
   onAbrirTarefa,
   onDragEnd,
 }: TarefasKanbanProps) {
+  const dragEnabled = Boolean(onDragEnd);
   const [buscasColunas, setBuscasColunas] = useState<Record<string, string>>({});
 
   const porColuna = COLUNAS_ORDER.map((status) => ({
@@ -107,7 +109,7 @@ export function TarefasKanban({
   }));
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext onDragEnd={onDragEnd ?? (() => {})}>
       <div className="overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2">
       <div className="flex gap-3 lg:gap-4 min-w-max lg:min-w-0 lg:grid lg:grid-cols-4">
         {porColuna.map((col) => (
@@ -148,7 +150,12 @@ export function TarefasKanban({
                   </div>
                   <div ref={provided.innerRef} {...provided.droppableProps} className="mt-2 min-h-[60px] space-y-2">
                     {col.tarefas.map((t, index) => (
-                      <Draggable key={t.id} draggableId={String(t.id)} index={index}>
+                      <Draggable
+                        key={t.id}
+                        draggableId={String(t.id)}
+                        index={index}
+                        isDragDisabled={!dragEnabled}
+                      >
                         {(dragProvided, dragSnapshot) => (
                           <div
                             ref={dragProvided.innerRef}

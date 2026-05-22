@@ -9,6 +9,10 @@ import {
   resolveEquipeVendaParaComissao,
   validarParticipacoesNoEscopo,
 } from "@/lib/server/comissoes-ownership-resolve";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_APROVACOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 type Payload = {
   userName?: string;
@@ -16,6 +20,11 @@ type Payload = {
 
 export async function POST(req: Request, ctx: { params: Promise<{ leadId: string }> }) {
   const { leadId } = await ctx.params;
+  const gate = await financeiroAccessGate(req, FINANCEIRO_APROVACOES_RESOURCE, "editar", {
+    leadId,
+  });
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<Payload>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const body = parsed.value;

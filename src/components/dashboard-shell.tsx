@@ -36,28 +36,33 @@ import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ProfileDrawer } from "./profile-drawer";
 import { subscribeAlertsUpdated } from "@/lib/alerts/live-sync";
+import { canViewResourceClient, type ClientAuthSession } from "@/lib/configuracoes/permission-client";
+import { getFinanceiroDefaultHref } from "@/lib/financeiro/financeiro-nav";
+import { canViewConfiguracoesNav, canViewNavItem } from "@/lib/nav-access";
 
 type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   modulo?: ModuloPermissao;
+  /** Recurso granular (Ver) quando não há `modulo` legado ou para itens especiais. */
+  resourceId?: string;
   requireAdminCliente?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Central", href: "/", icon: LayoutDashboard },
-  { label: "Comercial", href: "/comercial", icon: Handshake, modulo: "comercial" },
+  { label: "Central", href: "/", icon: LayoutDashboard, resourceId: "central.dashboard" },
+  { label: "Comercial", href: "/comercial", icon: Handshake, resourceId: "comercial.pipeline" },
   { label: "Financeiro", href: "/financeiro", icon: Wallet, modulo: "financeiro" },
-  { label: "Clientes", href: "/clientes", icon: Users, modulo: "clientes" },
-  { label: "Contratos", href: "/contratos", icon: FileText, modulo: "contratos" },
-  { label: "Soluções", href: "/solucoes", icon: Package, modulo: "solucoes" },
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, modulo: "helpdesk" },
-  { label: "Pós-venda", href: "/pos-venda", icon: CheckCircle2, modulo: "posVenda" },
-  { label: "Minha Caixa", href: "/alertas", icon: Bell },
-  { label: "Tarefas Internas", href: "/tarefas", icon: ListTodo, modulo: "tarefas" },
+  { label: "Clientes", href: "/clientes", icon: Users, resourceId: "clientes.cadastro" },
+  { label: "Contratos", href: "/contratos", icon: FileText, resourceId: "contratos.lista" },
+  { label: "Soluções", href: "/solucoes", icon: Package, resourceId: "solucoes.catalogo" },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, resourceId: "helpdesk.tickets" },
+  { label: "Pós-venda", href: "/pos-venda", icon: CheckCircle2, resourceId: "posvenda.tarefas" },
+  { label: "Minha Caixa", href: "/alertas", icon: Bell, resourceId: "alertas.caixa" },
+  { label: "Tarefas Internas", href: "/tarefas", icon: ListTodo, resourceId: "tarefas.internas" },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3, modulo: "relatorios" },
-  { label: "RH e Parceiros", href: "/rh", icon: UserCog, modulo: "rh" },
+  { label: "RH e Parceiros", href: "/rh", icon: UserCog, resourceId: "rh.colaboradores" },
 ];
 
 type BootstrapAlerta = {
@@ -77,44 +82,57 @@ const CLIENT_PORTAL_NAV_ITEMS: NavItem[] = [
   { label: "Minha Caixa", href: "/alertas", icon: Bell },
 ];
 
-function isItemActive(pathname: string, href: string): boolean {
+function isItemActive(pathname: string, href: string, modulo?: ModuloPermissao): boolean {
   if (href === "/") return pathname === "/";
   if (href === "/portal") return pathname === "/portal";
+  if (modulo === "financeiro") {
+    return pathname === "/financeiro" || pathname.startsWith("/financeiro/");
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function filterNavByPerfil(
-  items: NavItem[],
-  permissoes: Partial<Record<ModuloPermissao, boolean>>,
-  isSystemAdmin: boolean
-): NavItem[] {
+function applyNavHrefs(items: NavItem[], auth: ClientAuthSession): NavItem[] {
+  return items.map((item) =>
+    item.modulo === "financeiro" ? { ...item, href: getFinanceiroDefaultHref(auth) } : item
+  );
+}
+
+function filterNavByPerfil(items: NavItem[], auth: ClientAuthSession, isSystemAdmin: boolean): NavItem[] {
   if (isSystemAdmin) return items;
-  if (!permissoes || Object.keys(permissoes).length === 0) return items;
-  return items.filter((item) => !item.modulo || permissoes[item.modulo] === true);
+  return items.filter((item) => canViewNavItem(auth, item, isSystemAdmin));
 }
 
 function buildNavItems(
-  permissoes: Partial<Record<ModuloPermissao, boolean>>,
+  auth: ClientAuthSession,
   isPortalCliente: boolean,
   isAdminCliente: boolean,
   isSystemAdmin: boolean,
   pathname: string
 ): NavItem[] {
+  const permissoes = auth.permissoes ?? {};
   const preferPortalNav = pathname.startsWith("/portal");
+  let items: NavItem[];
   if (isPortalCliente || preferPortalNav) {
     const base = CLIENT_PORTAL_NAV_ITEMS.filter((item) => !item.requireAdminCliente || isAdminCliente);
-    if (preferPortalNav && !isPortalCliente && permissoes.portal_cliente === true) {
-      return base;
+    if (
+      preferPortalNav &&
+      !isPortalCliente &&
+      (permissoes.portal_cliente === true || canViewResourceClient(auth, "portal.acesso"))
+    ) {
+      items = base;
+    } else {
+      items = filterNavByPerfil(base, auth, isSystemAdmin);
     }
-    return filterNavByPerfil(base, permissoes, isSystemAdmin);
+  } else {
+    items = filterNavByPerfil(NAV_ITEMS, auth, isSystemAdmin);
   }
-  return filterNavByPerfil(NAV_ITEMS, permissoes, isSystemAdmin);
+  return applyNavHrefs(items, auth);
 }
 
 function DesktopSidebar({
   collapsed,
   onToggleCollapse,
-  permissoes,
+  auth,
   userName,
   userCpf,
   onOpenProfile,
@@ -126,7 +144,7 @@ function DesktopSidebar({
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
-  permissoes: Partial<Record<ModuloPermissao, boolean>>;
+  auth: ClientAuthSession;
   userName: string;
   userCpf: string;
   onOpenProfile: () => void;
@@ -138,7 +156,8 @@ function DesktopSidebar({
 }) {
   const pathname = usePathname();
   const [collapsedMenuOpen, setCollapsedMenuOpen] = useState(false);
-  const navItems = buildNavItems(permissoes, isPortalCliente, isAdminCliente, isSystemAdmin, pathname);
+  const permissoes = auth.permissoes ?? {};
+  const navItems = buildNavItems(auth, isPortalCliente, isAdminCliente, isSystemAdmin, pathname);
   const nomeExibicao = userName || "Usuário";
   const cpfExibicao = userCpf || "—";
 
@@ -185,7 +204,7 @@ function DesktopSidebar({
         <div className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = isItemActive(pathname, item.href);
+            const active = isItemActive(pathname, item.href, item.modulo);
 
             return (
               <Link
@@ -224,7 +243,7 @@ function DesktopSidebar({
           })}
         </div>
       </nav>
-      {!isPortalCliente && (isSystemAdmin || Object.keys(permissoes).length === 0 || permissoes.configuracoes === true) && (
+      {!isPortalCliente && canViewConfiguracoesNav(auth, isSystemAdmin) && (
         <div className="shrink-0 border-t border-slate-200 px-3 py-2 dark:border-slate-700">
           <Link
             href="/configuracoes"
@@ -314,30 +333,39 @@ function DesktopSidebar({
 
 function MobileMenuDrawerContent({
   onClose,
-  permissoes,
+  auth,
   unreadByHref,
   isPortalCliente,
   isAdminCliente,
   isSystemAdmin,
 }: {
   onClose: () => void;
-  permissoes: Partial<Record<ModuloPermissao, boolean>>;
+  auth: ClientAuthSession;
   unreadByHref: Record<string, number>;
   isPortalCliente: boolean;
   isAdminCliente: boolean;
   isSystemAdmin: boolean;
 }) {
   const pathname = usePathname();
-  const navItemsBase = buildNavItems(permissoes, isPortalCliente, isAdminCliente, isSystemAdmin, pathname);
-  const navItems = !isPortalCliente && (isSystemAdmin || Object.keys(permissoes).length === 0 || permissoes.configuracoes === true)
-    ? [...navItemsBase, { label: "Configurações", href: "/configuracoes", icon: Settings, modulo: "configuracoes" as ModuloPermissao }]
+  const permissoes = auth.permissoes ?? {};
+  const navItemsBase = buildNavItems(auth, isPortalCliente, isAdminCliente, isSystemAdmin, pathname);
+  const navItems = !isPortalCliente && canViewConfiguracoesNav(auth, isSystemAdmin)
+    ? [
+        ...navItemsBase,
+        {
+          label: "Configurações",
+          href: "/configuracoes",
+          icon: Settings,
+          modulo: "configuracoes" as ModuloPermissao,
+        },
+      ]
     : navItemsBase;
 
   return (
     <nav className="flex flex-1 flex-col space-y-1 px-3 py-4">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const active = isItemActive(pathname, item.href);
+        const active = isItemActive(pathname, item.href, item.modulo);
 
         return (
           <Link
@@ -374,13 +402,13 @@ function MobileMenuDrawerContent({
 }
 
 function MobileBottomNav({
-  permissoes,
+  auth,
   unreadByHref,
   isPortalCliente,
   isAdminCliente,
   isSystemAdmin,
 }: {
-  permissoes: Partial<Record<ModuloPermissao, boolean>>;
+  auth: ClientAuthSession;
   unreadByHref: Record<string, number>;
   isPortalCliente: boolean;
   isAdminCliente: boolean;
@@ -492,7 +520,7 @@ function MobileBottomNav({
       >
         <MobileMenuDrawerContent
           onClose={() => setMenuOpen(false)}
-          permissoes={permissoes}
+          auth={auth}
           unreadByHref={unreadByHref}
           isPortalCliente={isPortalCliente}
           isAdminCliente={isAdminCliente}
@@ -602,9 +630,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    const financeiroHref = getFinanceiroDefaultHref(session);
     const moduleToHref: Record<string, string> = {
       tarefas: "/tarefas",
-      financeiro: "/financeiro",
+      financeiro: financeiroHref,
       comercial: "/comercial",
       contratos: "/contratos",
       helpdesk: "/suporte",
@@ -633,8 +662,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           const href = moduleToHref[a.modulo] ?? null;
           if (href) next[href] = (next[href] ?? 0) + 1;
         }
-        const finFromAlerts = next["/financeiro"] ?? 0;
-        next["/financeiro"] = Math.max(finFromAlerts, financeiroCount);
+        const finFromAlerts = next[financeiroHref] ?? next["/financeiro"] ?? 0;
+        next[financeiroHref] = Math.max(finFromAlerts, financeiroCount);
         setUnreadByHref(next);
       } catch {
         // noop
@@ -652,7 +681,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       unsubscribe();
       window.clearInterval(timer);
     };
-  }, []);
+  }, [session]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -664,7 +693,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <DesktopSidebar
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
-        permissoes={session.permissoes}
+        auth={session}
         userName={session.userName ?? "Usuário"}
         userCpf={session.userCpf ?? "—"}
         onOpenProfile={() => setProfileDrawerOpen(true)}
@@ -690,7 +719,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <MobileBottomNav
-        permissoes={session.permissoes}
+        auth={session}
         unreadByHref={unreadByHref}
         isPortalCliente={session.isPortalCliente}
         isAdminCliente={session.isAdminCliente}

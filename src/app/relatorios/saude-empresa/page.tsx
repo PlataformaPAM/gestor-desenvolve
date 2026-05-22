@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useRelatorioRbac } from "@/hooks/use-rbac-resource";
 
 type DashboardPayload = {
   resumo: {
@@ -36,6 +37,7 @@ function money(v: number): string {
 }
 
 export default function RelatoriosSaudeEmpresaPage() {
+  const podeVer = useRelatorioRbac("relatorios.saude_empresa");
   const router = useRouter();
   const { setPrimaryAction } = usePageHeader();
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -62,6 +64,8 @@ export default function RelatoriosSaudeEmpresaPage() {
       active = false;
     };
   }, []);
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full min-w-0 space-y-6">

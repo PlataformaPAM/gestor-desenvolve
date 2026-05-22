@@ -4,9 +4,12 @@ import { Prisma } from "@prisma/client";
 import { mapClienteFromDb, toDateOrUndefined } from "@/app/api/comercial/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { clientesAccessGate } from "@/lib/server/clientes-access";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await clientesAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
   const parsed = await parseJsonSafe<{ cliente?: Cliente }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const cliente = parsed.value.cliente;
@@ -114,8 +117,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return ok({ cliente: mapClienteFromDb(saved) });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await clientesAccessGate(req, "excluir", id);
+  if (!gate.ok) return gate.response;
   const existing = await prisma.cliente.findUnique({ where: { id }, select: { id: true, nome: true } });
   if (!existing) return fail("NOT_FOUND", "Cliente não encontrado.", 404);
   try {

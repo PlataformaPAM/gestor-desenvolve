@@ -1,8 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/server/api-response";
 import { categoriaEfetivaSolucaoCatalogo } from "@/app/api/solucoes/_shared";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_COMISSOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
   const [consultores, rows] = await Promise.all([
     prisma.colaboradorRH.findMany({
       where: {

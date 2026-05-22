@@ -33,6 +33,48 @@ import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
 import clsx from "clsx";
 import { formatDateDMY } from "@/lib/format/dates";
+import {
+  canViewResourceClient,
+  isFullAccessSession,
+} from "@/lib/configuracoes/permission-client";
+import { getFinanceiroDefaultHref } from "@/lib/financeiro/financeiro-nav";
+
+const ADMIN_DEFAULT_KPIS: Array<{
+  id: string;
+  label: string;
+  value: number;
+  trend: number;
+  trendLabel: string;
+}> = [
+  { id: "receita", label: "A receber (aberto)", value: 0, trend: 0, trendLabel: "base real" },
+  { id: "pagar", label: "A pagar (aberto)", value: 0, trend: 0, trendLabel: "base real" },
+  { id: "pipeline", label: "Oportunidades ativas", value: 0, trend: 0, trendLabel: "funil" },
+  { id: "risco", label: "Itens de atenção", value: 0, trend: 0, trendLabel: "soma críticos" },
+];
+
+const ADMIN_DEFAULT_RADAR = [
+  { modulo: "Comercial", valor: 0 },
+  { modulo: "Financeiro", valor: 0 },
+  { modulo: "Clientes", valor: 0 },
+  { modulo: "Suporte", valor: 0 },
+  { modulo: "Tarefas", valor: 0 },
+  { modulo: "Operação", valor: 0 },
+];
+
+const ADMIN_MODULE_TILES: Array<{
+  id: string;
+  title: string;
+  href: string;
+  stat: string;
+  sub: string;
+}> = [
+  { id: "comercial", title: "Comercial", href: "/comercial", stat: "Pipeline", sub: "Funil e oportunidades" },
+  { id: "financeiro", title: "Financeiro", href: "/financeiro", stat: "Fluxo", sub: "Lançamentos e caixa" },
+  { id: "clientes", title: "Clientes", href: "/clientes", stat: "Cadastro", sub: "Base de clientes" },
+  { id: "helpdesk", title: "Suporte", href: "/suporte", stat: "Chamados", sub: "Tickets e SLA" },
+  { id: "tarefas", title: "Tarefas", href: "/tarefas", stat: "Operação", sub: "Tarefas internas" },
+  { id: "pos-venda", title: "Pós-venda", href: "/pos-venda", stat: "Régua", sub: "Ações e health" },
+];
 
 const PRIMARY = "#6D28D9";
 const CYAN = "#06b6d4";
@@ -64,50 +106,17 @@ type BootstrapPayload = {
   pipelineBars?: Array<{ id: string; label: string; count: number }>;
   upcoming?: UpcomingRow[];
   radarModulos?: Array<{ modulo: string; valor: number }>;
-  moduleTiles?: Array<{
-    id: string;
-    title: string;
-    href: string;
-    stat: string;
-    sub: string;
-    cardClass: string;
-  }>;
+  moduleTiles?: ModuleTile[];
 };
 
-const FALLBACK_KPIS: KpiRow[] = [
-  {
-    id: "receita",
-    label: "A receber (aberto)",
-    value: "R$ 0",
-    trend: "—",
-    trendLabel: "carregando",
-    positive: true,
-  },
-  {
-    id: "pagar",
-    label: "A pagar (aberto)",
-    value: "R$ 0",
-    trend: "—",
-    trendLabel: "carregando",
-    positive: true,
-  },
-  {
-    id: "pipeline",
-    label: "Oportunidades ativas",
-    value: "0",
-    trend: "—",
-    trendLabel: "funil",
-    positive: true,
-  },
-  {
-    id: "risco",
-    label: "Itens de atenção",
-    value: "0",
-    trend: "—",
-    trendLabel: "críticos + atrasos",
-    positive: false,
-  },
-];
+type ModuleTile = {
+  id: string;
+  title: string;
+  href: string;
+  stat: string;
+  sub: string;
+  cardClass: string;
+};
 
 const MODULE_CARD_STYLES: Record<string, string> = {
   comercial:
@@ -124,57 +133,6 @@ const MODULE_CARD_STYLES: Record<string, string> = {
     "bg-gradient-to-br from-rose-500/12 to-transparent border-rose-400/25 hover:border-rose-400/50 dark:from-rose-950/40 dark:to-slate-900/90 dark:border-rose-500/30 dark:hover:border-rose-400/45",
 };
 
-const FALLBACK_MODULE_TILES: NonNullable<BootstrapPayload["moduleTiles"]> = [
-  {
-    id: "comercial",
-    title: "Comercial",
-    href: "/comercial",
-    stat: "Funil de vendas",
-    sub: "Oportunidades e etapas",
-    cardClass: MODULE_CARD_STYLES.comercial,
-  },
-  {
-    id: "financeiro",
-    title: "Financeiro",
-    href: "/financeiro",
-    stat: "Caixa e lançamentos",
-    sub: "Entradas, saídas e previsão",
-    cardClass: MODULE_CARD_STYLES.financeiro,
-  },
-  {
-    id: "clientes",
-    title: "Clientes",
-    href: "/clientes",
-    stat: "Base e relacionamento",
-    sub: "360° do cliente",
-    cardClass: MODULE_CARD_STYLES.clientes,
-  },
-  {
-    id: "helpdesk",
-    title: "Suporte",
-    href: "/suporte",
-    stat: "Tickets e SLA",
-    sub: "Suporte centralizado",
-    cardClass: MODULE_CARD_STYLES.helpdesk,
-  },
-  {
-    id: "tarefas",
-    title: "Tarefas",
-    href: "/tarefas",
-    stat: "Execução interna",
-    sub: "Kanban e prazos",
-    cardClass: MODULE_CARD_STYLES.tarefas,
-  },
-  {
-    id: "pos-venda",
-    title: "Pós-venda",
-    href: "/pos-venda",
-    stat: "Regua e sucesso",
-    sub: "Saúde do cliente",
-    cardClass: MODULE_CARD_STYLES["pos-venda"],
-  },
-];
-
 function formatKpiValue(id: string, raw: number): string {
   if (id === "receita" || id === "pagar") {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(raw);
@@ -184,10 +142,69 @@ function formatKpiValue(id: string, raw: number): string {
 
 function parseBootstrap(json: unknown): BootstrapPayload | null {
   if (!json || typeof json !== "object") return null;
-  const root = json as { data?: BootstrapPayload; success?: boolean };
-  const d = root.data ?? (json as BootstrapPayload);
-  if (!d?.kpis) return null;
+  const root = json as { data?: BootstrapPayload & { data?: BootstrapPayload }; success?: boolean };
+  const outer = root.data ?? (json as BootstrapPayload);
+  if (!outer || typeof outer !== "object") return null;
+  const nested = (outer as BootstrapPayload & { data?: BootstrapPayload }).data;
+  const d =
+    Array.isArray((outer as BootstrapPayload).kpis)
+      ? (outer as BootstrapPayload)
+      : nested && Array.isArray(nested.kpis)
+        ? nested
+        : null;
+  if (!d || !Array.isArray(d.kpis)) return null;
   return d;
+}
+
+function applyBootstrapPayload(
+  d: BootstrapPayload,
+  fullAccess: boolean,
+  session: Parameters<typeof getFinanceiroDefaultHref>[0]
+) {
+  const kpisRaw = d.kpis.length > 0 || !fullAccess ? d.kpis : ADMIN_DEFAULT_KPIS;
+  const kpisRows = kpisRaw.map((k) => ({
+    id: k.id,
+    label: k.label,
+    value: formatKpiValue(k.id, k.value),
+    trend: k.trend ? `${k.trend >= 0 ? "+" : ""}${k.trend}%` : "—",
+    trendLabel: k.trendLabel,
+    positive: k.id !== "risco" ? true : k.value <= 5,
+  }));
+
+  const tilesFromApi = (d.moduleTiles ?? []).map((t) => ({
+    ...t,
+    cardClass: MODULE_CARD_STYLES[t.id] ?? MODULE_CARD_STYLES.clientes,
+  }));
+  const finHref = getFinanceiroDefaultHref(session);
+  const moduleTilesResolved =
+    fullAccess && tilesFromApi.length === 0
+      ? ADMIN_MODULE_TILES.map((t) => ({
+          ...t,
+          href: t.id === "financeiro" ? finHref : t.href,
+          cardClass: MODULE_CARD_STYLES[t.id] ?? MODULE_CARD_STYLES.clientes,
+        }))
+      : tilesFromApi;
+
+  const radarResolved =
+    (d.radarModulos?.length ?? 0) > 0
+      ? (d.radarModulos ?? [])
+      : fullAccess
+        ? ADMIN_DEFAULT_RADAR
+        : [];
+
+  return {
+    kpisRows,
+    fluxoData: Array.isArray(d.fluxoData) ? d.fluxoData : [],
+    statusClientes: d.statusClientes ?? [],
+    atividades: (d.atividades || []).map((a) => ({
+      ...a,
+      tempo: formatDateDMY(a.tempo),
+    })),
+    pipelineBars: d.pipelineBars ?? [],
+    upcoming: d.upcoming ?? [],
+    radarModulos: radarResolved,
+    moduleTiles: moduleTilesResolved,
+  };
 }
 
 const container = {
@@ -285,7 +302,29 @@ export function CommandCenter() {
     [tooltipStyle, mode]
   );
   const nome = session.userName?.split(" ")[0] ?? "líder";
-  const [kpis, setKpis] = useState<KpiRow[]>(FALLBACK_KPIS);
+
+  const dashVis = useMemo(() => {
+    if (isFullAccessSession(session)) {
+      return {
+        comercial: true,
+        financeiro: true,
+        clientes: true,
+        helpdesk: true,
+        tarefas: true,
+        posVenda: true,
+      };
+    }
+    return {
+      comercial: canViewResourceClient(session, "comercial.pipeline"),
+      financeiro: canViewResourceClient(session, "financeiro.lancamentos"),
+      clientes: canViewResourceClient(session, "clientes.cadastro"),
+      helpdesk: canViewResourceClient(session, "helpdesk.tickets"),
+      tarefas: canViewResourceClient(session, "tarefas.internas"),
+      posVenda: canViewResourceClient(session, "posvenda.tarefas"),
+    };
+  }, [session]);
+
+  const [kpis, setKpis] = useState<KpiRow[]>([]);
   const [fluxoData, setFluxoData] = useState<Array<{ semana: string; receita: number; fluxo: number }>>([]);
   const [statusClientes, setStatusClientes] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [atividades, setAtividades] = useState<
@@ -294,53 +333,56 @@ export function CommandCenter() {
   const [pipelineBars, setPipelineBars] = useState<Array<{ id: string; label: string; count: number }>>([]);
   const [upcoming, setUpcoming] = useState<UpcomingRow[]>([]);
   const [radarModulos, setRadarModulos] = useState<Array<{ modulo: string; valor: number }>>([]);
-  const [moduleTiles, setModuleTiles] = useState<BootstrapPayload["moduleTiles"]>([]);
+  const [moduleTiles, setModuleTiles] = useState<ModuleTile[]>([]);
+  const [bootstrapLoading, setBootstrapLoading] = useState(true);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+
+  const fullAccess = isFullAccessSession(session);
 
   useEffect(() => {
+    if (!session.perfilId) return;
     let active = true;
+    setBootstrapLoading(true);
+    setBootstrapError(null);
     void (async () => {
       try {
         const res = await fetch("/api/dashboard/bootstrap", { cache: "no-store" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (active) {
+            setBootstrapError(
+              res.status === 401
+                ? "Sessão expirada. Faça login novamente."
+                : "Não foi possível carregar os dados da Central."
+            );
+          }
+          return;
+        }
         const json = await res.json();
         const d = parseBootstrap(json);
-        if (!active || !d) return;
+        if (!active || !d) {
+          if (active) setBootstrapError("Resposta inválida da Central.");
+          return;
+        }
 
-        setKpis(
-          d.kpis.map((k) => ({
-            id: k.id,
-            label: k.label,
-            value: formatKpiValue(k.id, k.value),
-            trend: k.trend ? `${k.trend >= 0 ? "+" : ""}${k.trend}%` : "—",
-            trendLabel: k.trendLabel,
-            positive: k.id !== "risco" ? true : k.value <= 5,
-          }))
-        );
-        setFluxoData(Array.isArray(d.fluxoData) ? d.fluxoData : []);
-        setStatusClientes(d.statusClientes ?? []);
-        setAtividades(
-          (d.atividades || []).map((a) => ({
-            ...a,
-            tempo: formatDateDMY(a.tempo),
-          }))
-        );
-        setPipelineBars(d.pipelineBars ?? []);
-        setUpcoming(d.upcoming ?? []);
-        setRadarModulos(d.radarModulos ?? []);
-        setModuleTiles(
-          (d.moduleTiles ?? []).map((t) => ({
-            ...t,
-            cardClass: MODULE_CARD_STYLES[t.id] ?? MODULE_CARD_STYLES.clientes,
-          }))
-        );
+        const applied = applyBootstrapPayload(d, fullAccess, session);
+        setKpis(applied.kpisRows);
+        setFluxoData(applied.fluxoData);
+        setStatusClientes(applied.statusClientes);
+        setAtividades(applied.atividades);
+        setPipelineBars(applied.pipelineBars);
+        setUpcoming(applied.upcoming);
+        setRadarModulos(applied.radarModulos);
+        setModuleTiles(applied.moduleTiles);
       } catch {
-        /* noop */
+        if (active) setBootstrapError("Falha de rede ao carregar a Central.");
+      } finally {
+        if (active) setBootstrapLoading(false);
       }
     })();
     return () => {
       active = false;
     };
-  }, []);
+  }, [session, fullAccess]);
 
   const barColors = useMemo(
     () => ["#a855f7", "#d946ef", "#6366f1", "#8b5cf6", "#22d3ee", "#34d399"],
@@ -395,7 +437,18 @@ export function CommandCenter() {
           </div>
         </motion.section>
 
-        {/* KPIs — glass bento */}
+        {bootstrapError && (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            {bootstrapError}
+          </p>
+        )}
+
+        {bootstrapLoading && kpis.length === 0 && moduleTiles.length === 0 && (
+          <p className="text-center text-sm text-slate-500 dark:text-slate-400">Carregando indicadores…</p>
+        )}
+
+        {/* KPIs — somente recursos com permissão (API + perfil) */}
+        {(kpis.length > 0 || (fullAccess && !bootstrapLoading && !bootstrapError)) && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((kpi, i) => (
             <motion.article
@@ -442,12 +495,22 @@ export function CommandCenter() {
             </motion.article>
           ))}
         </section>
+        )}
 
-        {/* Pipeline + Radar + Area */}
+        {/* Pipeline + Radar + Area — só módulos permitidos */}
+        {(dashVis.comercial || dashVis.financeiro || radarModulos.length > 0 || fullAccess) && (
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          {dashVis.comercial && (
           <motion.article
             variants={item}
-            className="xl:col-span-5 rounded-3xl border border-slate-200/90 bg-white/90 dark:border-slate-700/90 dark:bg-slate-900/80 p-6 shadow-lg backdrop-blur-sm"
+            className={clsx(
+              "rounded-3xl border border-slate-200/90 bg-white/90 dark:border-slate-700/90 dark:bg-slate-900/80 p-6 shadow-lg backdrop-blur-sm",
+              dashVis.financeiro && radarModulos.length > 0
+                ? "xl:col-span-5"
+                : dashVis.financeiro || radarModulos.length > 0
+                  ? "xl:col-span-6"
+                  : "xl:col-span-12"
+            )}
           >
             <div className="mb-4 flex items-center justify-between gap-2">
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Funil em movimento</h2>
@@ -495,16 +558,25 @@ export function CommandCenter() {
               )}
             </div>
           </motion.article>
+          )}
 
+          {(radarModulos.length > 0 || fullAccess) && (
           <motion.article
             variants={item}
-            className="xl:col-span-3 rounded-3xl border border-slate-200/90 bg-gradient-to-b from-violet-950/[0.03] to-cyan-950/[0.04] p-5 shadow-lg backdrop-blur-sm dark:border-slate-700/90 dark:from-slate-900/80 dark:to-slate-900/90"
+            className={clsx(
+              "rounded-3xl border border-slate-200/90 bg-gradient-to-b from-violet-950/[0.03] to-cyan-950/[0.04] p-5 shadow-lg backdrop-blur-sm dark:border-slate-700/90 dark:from-slate-900/80 dark:to-slate-900/90",
+              dashVis.comercial && dashVis.financeiro
+                ? "xl:col-span-3"
+                : dashVis.comercial || dashVis.financeiro
+                  ? "xl:col-span-6"
+                  : "xl:col-span-12"
+            )}
           >
             <h2 className="mb-1 text-lg font-bold text-slate-900 dark:text-slate-100">Pulse dos módulos</h2>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Índice resumido para decisão (0–100)</p>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarModulos.length ? radarModulos : [{ modulo: "—", valor: 0 }]}>
+                <RadarChart data={radarModulos}>
                   <PolarGrid stroke={chartGrid} />
                   <PolarAngleAxis dataKey="modulo" tick={{ fontSize: 10, fill: chartTick }} />
                   <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
@@ -520,10 +592,19 @@ export function CommandCenter() {
               </ResponsiveContainer>
             </div>
           </motion.article>
+          )}
 
+          {dashVis.financeiro && (
           <motion.article
             variants={item}
-            className="xl:col-span-4 rounded-3xl border border-slate-200/90 bg-white/90 dark:border-slate-700/90 dark:bg-slate-900/80 p-6 shadow-lg backdrop-blur-sm"
+            className={clsx(
+              "rounded-3xl border border-slate-200/90 bg-white/90 dark:border-slate-700/90 dark:bg-slate-900/80 p-6 shadow-lg backdrop-blur-sm",
+              dashVis.comercial && radarModulos.length > 0
+                ? "xl:col-span-4"
+                : dashVis.comercial || radarModulos.length > 0
+                  ? "xl:col-span-6"
+                  : "xl:col-span-12"
+            )}
           >
             <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-slate-100">Entradas × movimento</h2>
             <div className="h-72">
@@ -569,14 +650,30 @@ export function CommandCenter() {
               {fluxoData.length ? "Últimos lançamentos no eixo temporal (valores em R$)" : "Dados reais do Financeiro"}
             </p>
           </motion.article>
+          )}
         </section>
+        )}
 
-        {/* Module tiles + Donut + Upcoming */}
+        {/* Cards de módulos + clientes — admin vê todos os módulos via dashVis */}
+        {(moduleTiles.length > 0 || dashVis.clientes || fullAccess) && (
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <motion.div variants={item} className="space-y-4 lg:col-span-7">
+          {(moduleTiles.length > 0 || fullAccess) && (
+          <motion.div
+            variants={item}
+            className={clsx("space-y-4", dashVis.clientes ? "lg:col-span-7" : "lg:col-span-12")}
+          >
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Módulos — ir direto ao que importa</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {(moduleTiles?.length ? moduleTiles : FALLBACK_MODULE_TILES).map((m, idx) => (
+              {(moduleTiles.length > 0
+                ? moduleTiles
+                : fullAccess
+                  ? ADMIN_MODULE_TILES.map((t) => ({
+                      ...t,
+                      href: t.id === "financeiro" ? getFinanceiroDefaultHref(session) : t.href,
+                      cardClass: MODULE_CARD_STYLES[t.id] ?? MODULE_CARD_STYLES.clientes,
+                    }))
+                  : []
+              ).map((m, idx) => (
                 <motion.div key={m.id} variants={item} custom={idx}>
                   <Link
                     href={m.href}
@@ -596,10 +693,15 @@ export function CommandCenter() {
               ))}
             </div>
           </motion.div>
+          )}
 
+          {dashVis.clientes && (
           <motion.article
             variants={item}
-            className="rounded-3xl border border-slate-200/90 bg-white/90 dark:border-slate-700/90 dark:bg-slate-900/80 p-6 shadow-lg backdrop-blur-sm lg:col-span-5"
+            className={clsx(
+              "rounded-3xl border border-slate-200/90 bg-white/90 dark:border-slate-700/90 dark:bg-slate-900/80 p-6 shadow-lg backdrop-blur-sm",
+              moduleTiles.length > 0 ? "lg:col-span-5" : "lg:col-span-12"
+            )}
           >
             <h2 className="mb-2 text-lg font-bold text-slate-900 dark:text-slate-100">Base de clientes</h2>
             <div className="h-56">
@@ -632,7 +734,9 @@ export function CommandCenter() {
               )}
             </div>
           </motion.article>
+          )}
         </section>
+        )}
 
         {/* Próximos 7 dias + Feed */}
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">

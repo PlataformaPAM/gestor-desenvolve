@@ -20,6 +20,11 @@ import { DateField } from "@/components/ui/date-field";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { usePageHeader } from "@/contexts/page-header-context";
 import {
+  CONTRATOS_RESOURCE,
+  useContratosRbac,
+  useResourcePageGuard,
+} from "@/hooks/use-rbac-resource";
+import {
   formInputClass,
   formLabelClass,
   formModalCancelButtonClass,
@@ -96,6 +101,8 @@ type ClienteOpt = { id: string; nome: string; empresa: string };
 
 export default function ContratosPage() {
   const { setPrimaryAction, setSecondaryAction } = usePageHeader();
+  const podeVer = useResourcePageGuard(CONTRATOS_RESOURCE);
+  const { podeCriar } = useContratosRbac();
   const [contratos, setContratos] = useState<ContratoRow[]>([]);
   const [clientesOpts, setClientesOpts] = useState<ClienteOpt[]>([]);
   const [busca, setBusca] = useState("");
@@ -133,6 +140,7 @@ export default function ContratosPage() {
   }, []);
 
   const rodarBackfill = useCallback(async () => {
+    if (!podeCriar) return;
     setBackfillLoading(true);
     setBackfillMsg(null);
     try {
@@ -155,9 +163,14 @@ export default function ContratosPage() {
     } finally {
       setBackfillLoading(false);
     }
-  }, [recarregarLista, recarregarPendentes]);
+  }, [recarregarLista, recarregarPendentes, podeCriar]);
 
   useEffect(() => {
+    if (!podeCriar) {
+      setPrimaryAction(null);
+      setSecondaryAction(null);
+      return;
+    }
     setPrimaryAction({
       label: "Novo contrato",
       onClick: () => setNovoOpen(true),
@@ -168,7 +181,7 @@ export default function ContratosPage() {
       setPrimaryAction(null);
       setSecondaryAction(null);
     };
-  }, [setPrimaryAction, setSecondaryAction]);
+  }, [setPrimaryAction, setSecondaryAction, podeCriar]);
 
   useEffect(() => {
     if (!novoOpen) return;
@@ -195,12 +208,14 @@ export default function ContratosPage() {
   useEffect(() => {
     void (async () => {
       try {
-        await Promise.all([recarregarLista(), recarregarPendentes()]);
+        await recarregarLista();
+        if (podeCriar) await recarregarPendentes();
+        else setPendentesBackfill(null);
       } catch {
         // noop
       }
     })();
-  }, [recarregarLista, recarregarPendentes]);
+  }, [recarregarLista, recarregarPendentes, podeCriar]);
 
   const filtrados = useMemo(() => {
     const t = normalize(busca);
@@ -233,9 +248,11 @@ export default function ContratosPage() {
     [clientesOpts]
   );
 
+  if (!podeVer) return null;
+
   return (
     <section className="w-full min-w-0 space-y-6">
-      {pendentesBackfill !== null && pendentesBackfill > 0 && (
+      {podeCriar && pendentesBackfill !== null && pendentesBackfill > 0 && (
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -691,6 +708,7 @@ export default function ContratosPage() {
               type="button"
               disabled={novoSaving}
               onClick={() => void (async () => {
+                if (!podeCriar) return;
                 setNovoErr(null);
                 if (!novoClienteId.trim()) {
                   setNovoErr("Selecione o cliente.");

@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { getSessionUserId } from "@/lib/server/request-session";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_VENDA_DIRETA_RESOURCE,
+} from "@/lib/server/financeiro-access";
 import { resolveUsuarioIdForPrismaFk } from "@/app/api/comercial/_shared";
 import {
   createVendaDiretaFinanceiro,
@@ -17,6 +21,9 @@ type Body = {
 };
 
 export async function POST(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_VENDA_DIRETA_RESOURCE, "criar");
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<Body>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const body = parsed.value;

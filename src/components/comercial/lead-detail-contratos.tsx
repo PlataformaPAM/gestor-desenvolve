@@ -9,6 +9,7 @@ import { comercialLabelClass } from "./field-styles";
 type LeadDetailContratosProps = {
   lead: Lead;
   onUpdateLead: (updates: Partial<Lead>) => void;
+  readOnly?: boolean;
 };
 
 function createLogId(): string {
@@ -42,7 +43,7 @@ function formatAnexoData(iso: string): string {
   });
 }
 
-export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosProps) {
+export function LeadDetailContratos({ lead, onUpdateLead, readOnly = false }: LeadDetailContratosProps) {
   const { session } = useAuth();
   const currentUserName = session.userName ?? "Usuário";
   const currentUserId = session.userId ?? null;
@@ -68,9 +69,12 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Conclua o checklist da etapa de contratação e anexe os documentos do cliente conforme o processo.
+        {readOnly
+          ? "Visualização do checklist e dos anexos da etapa de contratação (somente leitura)."
+          : "Conclua o checklist da etapa de contratação e anexe os documentos do cliente conforme o processo."}
       </p>
 
+      <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
       <div className="space-y-2">
         <p className={comercialLabelClass}>Checklist da etapa</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -89,6 +93,7 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
                   id={`contrato-${key}`}
                   checked={done}
                   onChange={() => {
+                    if (readOnly) return;
                     const next = !checklist[key];
                     onUpdateLead({
                       contratoChecklist: { ...checklist, [key]: next },
@@ -129,8 +134,11 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
           Anexar arquivos do Cliente
         </h3>
         <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-          Inclua minutas, assinaturas e qualquer documento necessário. Cada envio registra data e nome do arquivo.
+          {readOnly
+            ? "Arquivos enviados nesta etapa."
+            : "Inclua minutas, assinaturas e qualquer documento necessário. Cada envio registra data e nome do arquivo."}
         </p>
+        {!readOnly ? (
         <MultiFileAttachment
           existingFiles={[]}
           newFiles={[]}
@@ -159,6 +167,7 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
             });
           }}
         />
+        ) : null}
         {anexosOrdenados.length > 0 && (
           <ul className="mt-4 space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
             {anexosOrdenados.map((a, idx) => (
@@ -172,6 +181,7 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
                     {formatAnexoData(a.anexadoEm)}
                   </span>
                 </div>
+                {!readOnly ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -197,11 +207,13 @@ export function LeadDetailContratos({ lead, onUpdateLead }: LeadDetailContratosP
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </div>
+      </fieldset>
     </div>
   );
 }

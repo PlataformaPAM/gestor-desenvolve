@@ -1,3 +1,5 @@
+import type { GrantsMap } from "@/lib/configuracoes/permission-grants";
+
 /** Módulos que podem ser permitidos por perfil (e exibidos na sidebar). */
 export type ModuloPermissao =
   | "comercial"
@@ -48,6 +50,8 @@ export type PerfilAcesso = {
   descricao?: string;
   /** Chave = ModuloPermissao, valor = se pode acessar. Perfil 'Cliente' é filtrado pelo próprio CPF/CNPJ no portal. */
   permissoes: Record<ModuloPermissao, boolean>;
+  /** Matriz granular Ver/Criar/Editar/Excluir/Ver de todos por recurso. */
+  permissoesGranulares?: GrantsMap;
 };
 
 /** Entrada de log do sistema (auditoria). */

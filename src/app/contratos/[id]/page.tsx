@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { CONTRATOS_RESOURCE, useContratosRbac, useResourcePageGuard } from "@/hooks/use-rbac-resource";
 import { emitAlertsUpdated } from "@/lib/alerts/live-sync";
 import { CONTRATO_STATUS_LABEL } from "@/lib/contratos/constants";
 import { ADITIVO_TIPO_OPTIONS, getAditivoTipoMeta } from "@/lib/contratos/aditivo-tipos";
@@ -148,6 +149,7 @@ type ContratoDetalheViewProps = {
 export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheViewProps) {
   const router = useRouter();
   const { setPrimaryAction, setSecondaryAction, setTitle } = usePageHeader();
+  const { podeEditar } = useContratosRbac();
   const tabListId = useId();
   const [activeTab, setActiveTab] = useState<ContratoTab>("dados");
   const [contrato, setContrato] = useState<ContratoDetalhe | null>(null);
@@ -227,7 +229,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
   }, [contrato, embedded, setTitle]);
 
   const salvarDados = async () => {
-    if (!contrato || !id) return;
+    if (!podeEditar || !contrato || !id) return;
     const valorTotal = parseCurrencyInput(editValor);
     if (Number.isNaN(valorTotal)) return;
     setSaving(true);
@@ -256,7 +258,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
   };
 
   const alterarStatusRapido = async (novoStatus: string) => {
-    if (!contrato || !id || contrato.status === novoStatus) return;
+    if (!podeEditar || !contrato || !id || contrato.status === novoStatus) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/contratos/${encodeURIComponent(id)}`, {
@@ -279,7 +281,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
     valorAnterior?: number | null;
     valorNovo?: number | null;
   }) => {
-    if (!contrato || !id || !aditivo.titulo.trim()) return false;
+    if (!podeEditar || !contrato || !id || !aditivo.titulo.trim()) return false;
     setSaving(true);
     try {
       const res = await fetch(`/api/contratos/${encodeURIComponent(id)}`, {
@@ -412,7 +414,8 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
     );
   }, [editStatus]);
   const hasHistoricoInput = histComentario.trim().length > 0 || histArquivos.length > 0;
-  const hasFooterActions = embedded && (activeTab === "gestao" || activeTab === "aditivo");
+  const hasFooterActions =
+    podeEditar && embedded && (activeTab === "gestao" || activeTab === "aditivo");
 
   const resetCurrentTab = () => {
     if (!contrato) return;
@@ -443,6 +446,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
   };
 
   const runFooterPrimaryAction = () => {
+    if (!podeEditar) return;
     if (activeTab === "gestao") {
       void salvarDados();
       return;
@@ -475,6 +479,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
   }
 
   const fluxo = contrato.lead?.financeiroFluxo;
+  const camposSomenteLeitura = saving || !podeEditar;
   const tabs: Array<{ id: ContratoTab; label: string; icon: React.ElementType }> = [
     { id: "dados", label: "Dados Gerais", icon: FileText },
     { id: "gestao", label: "Gestão", icon: Settings2 },
@@ -564,7 +569,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                       void alterarStatusRapido(v);
                     }}
                     searchable={false}
-                    disabled={saving}
+                    disabled={saving || !podeEditar}
                     leadingIcon={statusLeadingIcon}
                     placeholder="Selecione o status"
                   />
@@ -684,6 +689,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 onChange={(e) => setEditTitulo(e.target.value)}
                 placeholder="Ex.: Contrato de serviços ou projeto"
                 className={`${formInputClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -694,6 +700,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
               value={editStatus}
               onChange={setEditStatus}
               searchable={false}
+              disabled={camposSomenteLeitura}
               leadingIcon={statusLeadingIcon}
               placeholder="Selecione o status"
             />
@@ -707,6 +714,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 onChange={(e) => setEditCodigoPersonalizado(e.target.value)}
                 placeholder="Ex.: OFÍCIO-0001/2025"
                 className={`${formInputClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -724,6 +732,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 placeholder="R$ 0,00"
                 className={`${formInputClass} pl-9`}
                 inputMode="decimal"
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -736,6 +745,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 checked={editPosVenda}
                 onChange={(e) => setEditPosVenda(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-[#6D28D9]"
+                disabled={camposSomenteLeitura}
               />
               Gera alertas no Pós-venda
             </label>
@@ -743,13 +753,23 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
           <div className="space-y-1">
             <label className={formLabelClass}>Início</label>
             <div className="mt-1">
-              <DateField value={editInicio} onChange={setEditInicio} placeholder="Selecione a data" />
+              <DateField
+                value={editInicio}
+                onChange={setEditInicio}
+                placeholder="Selecione a data"
+                disabled={camposSomenteLeitura}
+              />
             </div>
           </div>
           <div className="space-y-1">
             <label className={formLabelClass}>Fim</label>
             <div className="mt-1">
-              <DateField value={editFim} onChange={setEditFim} placeholder="Selecione a data" />
+              <DateField
+                value={editFim}
+                onChange={setEditFim}
+                placeholder="Selecione a data"
+                disabled={camposSomenteLeitura}
+              />
             </div>
           </div>
           <div className="space-y-1 md:col-span-2">
@@ -762,6 +782,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 rows={3}
                 placeholder="SLA, multas, renovação automática, forma de pagamento…"
                 className={`${formTextareaClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -775,6 +796,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 rows={3}
                 placeholder="Notas internas sobre negociação, follow-up ou alertas…"
                 className={`${formTextareaClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -802,6 +824,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 searchable
                 searchPlaceholder="Buscar tipo de aditivo…"
                 placeholder="Selecione o tipo"
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -814,6 +837,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 onChange={(e) => setAdTitulo(e.target.value)}
                 placeholder="Ex.: Prorrogação de vigência ou reajuste"
                 className={`${formInputClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -827,6 +851,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 rows={2}
                 placeholder="Descreva o que foi acordado neste aditivo…"
                 className={`${formTextareaClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -845,6 +870,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 onChange={(e) => setAdValAntDigits(digitsOnly(e.target.value))}
                 className={formInputWithIconClass}
                 aria-label="Valor original em reais"
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -863,6 +889,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 onChange={(e) => setAdValNovoDigits(digitsOnly(e.target.value))}
                 className={formInputWithIconClass}
                 aria-label="Novo valor em reais"
+                disabled={camposSomenteLeitura}
               />
             </div>
           </div>
@@ -920,6 +947,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
                 placeholder="Registre atualização, decisão ou observação deste contrato..."
                 rows={3}
                 className={`${formTextareaClass} pl-9`}
+                disabled={camposSomenteLeitura}
               />
             </div>
             <div className="mt-3">
@@ -929,7 +957,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
               <button
                 type="button"
                 onClick={() => void salvarHistorico()}
-                disabled={saving || !hasHistoricoInput}
+                disabled={camposSomenteLeitura || saving || !hasHistoricoInput}
                 className={formModalSubmitButtonClass}
               >
                 <span className="inline-flex items-center gap-2">
@@ -996,5 +1024,7 @@ export function ContratoDetalheView({ id, embedded = false }: ContratoDetalheVie
 export default function ContratoDetalhePage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
+  const podeVer = useResourcePageGuard(CONTRATOS_RESOURCE);
+  if (!podeVer) return null;
   return <ContratoDetalheView id={id} />;
 }

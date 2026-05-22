@@ -4,6 +4,12 @@ import { getDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { getEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config";
 import type { DocumentoSnapshot } from "@/lib/documentos/documento-html";
 import { getOperacionalReportById, type OperacionalReportId, type OperacionalSituacao } from "@/lib/relatorios/operacional-catalogo";
+import {
+  assertRelatorioClienteId,
+  filterRelatorioTicketsRaw,
+  filterRelatorioTarefasRaw,
+  type RelatorioAccessContext,
+} from "@/lib/server/relatorio-scope";
 
 export type OperacionalBuildParams = {
   reportId: OperacionalReportId;
@@ -12,6 +18,7 @@ export type OperacionalBuildParams = {
   periodoInicio: string;
   periodoFim: string;
   situacao?: OperacionalSituacao;
+  access?: RelatorioAccessContext;
 };
 
 export type OperacionalBuildResult = {
@@ -73,6 +80,10 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
   ]);
   if (!modelo) throw new Error("Modelo de documento não encontrado.");
 
+  if (params.access) {
+    await assertRelatorioClienteId(params.access, params.clienteId);
+  }
+
   const now = Date.now();
   const onlyOverdue = params.reportId === "itens_atrasados" || params.situacao === "atrasados";
   const onlyOpen = params.situacao === "abertos";
@@ -82,7 +93,10 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
       ...(params.clienteId ? { clienteId: params.clienteId } : {}),
       createdAt: { gte: inicio, lte: fim },
     },
-    include: { responsavel: { select: { nomeExibicao: true, email: true } } },
+    include: {
+      responsavel: { select: { nomeExibicao: true, email: true } },
+      colaboradores: { select: { usuarioId: true } },
+    },
     orderBy: [{ dataFim: "asc" }, { createdAt: "asc" }],
   });
   const ticketsRaw = await prisma.helpdeskTicket.findMany({
@@ -94,14 +108,22 @@ export async function buildOperacionalSnapshot(params: OperacionalBuildParams): 
     orderBy: [{ previsaoConclusao: "asc" }, { dataCriacao: "asc" }],
   });
 
-  const tarefas = tarefasRaw.filter((t) => {
+  const scope = params.access?.scope;
+  const tarefasFiltered = params.access
+    ? filterRelatorioTarefasRaw(tarefasRaw, params.access.userId, scope!)
+    : tarefasRaw;
+  const ticketsFiltered = params.access
+    ? filterRelatorioTicketsRaw(ticketsRaw, params.access.userId, scope!)
+    : ticketsRaw;
+
+  const tarefas = tarefasFiltered.filter((t) => {
     const isOpen = t.status !== "concluido";
     const isOverdue = isOpen && t.dataFim.getTime() < now;
     if (onlyOverdue) return isOverdue;
     if (onlyOpen) return isOpen;
     return true;
   });
-  const tickets = ticketsRaw.filter((t) => {
+  const tickets = ticketsFiltered.filter((t) => {
     const isOpen = !["finalizado", "nao_solucionado"].includes(t.status);
     const isOverdue = isOpen && t.previsaoConclusao.getTime() < now;
     if (onlyOverdue) return isOverdue;

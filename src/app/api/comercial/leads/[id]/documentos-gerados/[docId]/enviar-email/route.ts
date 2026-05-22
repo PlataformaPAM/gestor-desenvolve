@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
+import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 import { getSessionUserId } from "@/lib/server/request-session";
 import { getPublicBaseUrl } from "@/lib/server/request-base-url";
 import { montarDocumentoHtmlCompleto, type DocumentoSnapshot } from "@/lib/documentos/documento-html";
@@ -33,6 +34,8 @@ function parseSnapshot(newValue: unknown): { modeloNome: string; snapshot: Docum
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string; docId: string }> }) {
   const { id: leadId, docId } = await ctx.params;
+  const gate = await comercialAccessGate(req, "editar", leadId);
+  if (!gate.ok) return gate.response;
   const parsedBody = await parseJsonSafe<Body>(req);
   if (!parsedBody.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const toEmail = (parsedBody.value.toEmail ?? "").trim().toLowerCase();

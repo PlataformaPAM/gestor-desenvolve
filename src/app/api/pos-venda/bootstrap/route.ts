@@ -9,6 +9,7 @@ import {
 import { ok } from "@/lib/server/api-response";
 import type { ClienteHealth } from "@/lib/pos-venda/types";
 import { emitAlert } from "@/lib/server/alerts";
+import { filterPosVendaTarefasRaw, posvendaAccessGate } from "@/lib/server/posvenda-access";
 
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
@@ -81,19 +82,24 @@ function computeHealth(
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await posvendaAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
+
   const marker = getPosVendaMarker();
-  const [clientes, tarefasRaw] = await Promise.all([
+  const [clientes, tarefasRawAll] = await Promise.all([
     prisma.cliente.findMany({ orderBy: { nome: "asc" } }),
     prisma.tarefa.findMany({
       where: { descricao: { contains: marker } },
       include: {
         cliente: true,
         historico: { orderBy: { data: "asc" } },
+        colaboradores: { select: { usuarioId: true } },
       },
       orderBy: { dataFim: "asc" },
     }),
   ]);
+  const tarefasRaw = filterPosVendaTarefasRaw(tarefasRawAll, gate.session, gate.userId);
 
   // Tempo real (via polling da página): gera alerta quando tarefa vence hoje.
   const hojeIso = new Date().toISOString().slice(0, 10);

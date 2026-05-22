@@ -14,6 +14,7 @@ import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
 import { syncLeadSolucoesForPayload } from "@/lib/server/lead-solucoes-sync";
 import { emitAlert } from "@/lib/server/alerts";
+import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 import { getSessionUserId } from "@/lib/server/request-session";
 
 async function loadLead(id: string) {
@@ -34,6 +35,9 @@ async function loadLead(id: string) {
 }
 
 export async function POST(req: Request) {
+  const gate = await comercialAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   try {
     const parsed = await parseJsonSafe<{ lead?: Lead }>(req);
     if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);

@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { mapParticipacao } from "@/app/api/comissoes/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_COMISSOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 import { consultoresUnicosResolvidos, resolveEquipeVendaParaComissao } from "@/lib/server/comissoes-ownership-resolve";
 
 const SUM_EPS = 0.02;
@@ -83,6 +87,9 @@ async function persistEscopo(
 }
 
 export async function POST(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "editar");
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<Body>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const body = parsed.value;

@@ -103,11 +103,13 @@ export function DadosEmpresaFormSection({
   withFixedFooter = false,
   onCancel,
   onSaved,
+  permitirSalvar = true,
 }: {
   compact?: boolean;
   withFixedFooter?: boolean;
   onCancel?: () => void;
   onSaved?: () => void;
+  permitirSalvar?: boolean;
 }) {
   const [config, setConfig] = useState<DadosEmpresaForm>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -323,12 +325,14 @@ export function DadosEmpresaFormSection({
               </span>
             </button>
           ) : null}
-          <button type="button" disabled={saving} onClick={salvar} className={formModalSubmitButtonClass}>
-            <span className="inline-flex items-center gap-2">
-              <Save className="h-4 w-4 shrink-0" aria-hidden />
-              {saving ? "Salvando..." : "Salvar"}
-            </span>
-          </button>
+          {permitirSalvar ? (
+            <button type="button" disabled={saving} onClick={salvar} className={formModalSubmitButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4 shrink-0" aria-hidden />
+                {saving ? "Salvando..." : "Salvar"}
+              </span>
+            </button>
+          ) : null}
         </div>
       </div>
       <Toast

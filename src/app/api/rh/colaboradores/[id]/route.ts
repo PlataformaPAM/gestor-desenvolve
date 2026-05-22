@@ -8,6 +8,7 @@ import {
   isCadastroEfetivadoMissingInDatabase,
 } from "@/lib/server/rh-colaborador-db-errors";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { rhColaboradoresAccessGate } from "@/lib/server/rh-access";
 import { RH_CONSULTOR_PRE_CADASTRO_CARGO } from "@/lib/rh/pre-cadastro-consultor";
 
 function digitsOnly(v: string | undefined): string {
@@ -63,6 +64,8 @@ function validateConsultorAoEfetivar(c: ColaboradorParceiro): string | null {
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await rhColaboradoresAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
   const body = await parseJsonSafe<{ colaborador?: ColaboradorParceiro }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const c = body.value.colaborador;

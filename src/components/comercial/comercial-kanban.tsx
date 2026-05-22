@@ -45,6 +45,8 @@ type ComercialKanbanProps = {
   pendingStageCountById?: Partial<Record<PipelineStageId, number>>;
   /** Borda em destaque (~3s) após criar/editar/mover o lead. */
   pulsingLeadIds?: Record<string, boolean>;
+  /** Desabilita arrastar cartões (sem permissão Editar). */
+  dragEnabled?: boolean;
 };
 
 export function ComercialKanban({
@@ -57,6 +59,7 @@ export function ComercialKanban({
   pendingLeadCountById = {},
   pendingStageCountById = {},
   pulsingLeadIds = {},
+  dragEnabled = true,
 }: ComercialKanbanProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [buscasColunas, setBuscasColunas] = useState<Record<string, string>>({});
@@ -204,6 +207,7 @@ export function ComercialKanban({
                                   key={String(lead.id)}
                                   draggableId={String(lead.id)}
                                   index={index}
+                                  isDragDisabled={!dragEnabled}
                                 >
                                   {(dragProvided, snapshot) => (
                                     <div

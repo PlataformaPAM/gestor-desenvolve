@@ -4,6 +4,7 @@ import { getDocumentoTimbresConfig, saveDocumentoTimbresConfig } from "@/lib/doc
 import { htmlTemTextoVisivel } from "@/lib/documentos/html-text";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 import type { DocumentoModeloTipo } from "@prisma/client";
 
 const TIPOS: DocumentoModeloTipo[] = [
@@ -33,6 +34,9 @@ type PatchBody = {
 };
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.construtorDocumentos, "editar");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   const body = await parseJsonSafe<PatchBody>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);

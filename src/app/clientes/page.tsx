@@ -7,6 +7,7 @@ import { ClienteFormSheet } from "@/components/clientes/cliente-form-sheet";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useResourcePageGuard, useResourceRbac } from "@/hooks/use-rbac-resource";
 import { STATUS_LABELS } from "@/lib/clientes/constants";
 import type { Cliente, ClienteStatus } from "@/lib/clientes/types";
 
@@ -25,8 +26,12 @@ function normalizeForSearch(s: string): string {
     .trim();
 }
 
+const CLIENTES_RESOURCE = "clientes.cadastro";
+
 export default function ClientesPage() {
   const { setPrimaryAction } = usePageHeader();
+  const podeVer = useResourcePageGuard(CLIENTES_RESOURCE);
+  const rbac = useResourceRbac(CLIENTES_RESOURCE);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | ClienteStatus>("");
   const [mostrarInativos, setMostrarInativos] = useState(false);
@@ -64,6 +69,10 @@ export default function ClientesPage() {
   }, []);
 
   useEffect(() => {
+    if (!rbac.podeCriar) {
+      setPrimaryAction(null);
+      return () => setPrimaryAction(null);
+    }
     setPrimaryAction({
       label: "Novo Cliente",
       onClick: () => {
@@ -73,7 +82,7 @@ export default function ClientesPage() {
       showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, rbac.podeCriar]);
 
   const filteredClientes = useMemo(() => {
     const term = normalizeForSearch(searchTerm);
@@ -176,6 +185,8 @@ export default function ClientesPage() {
     })();
   };
 
+  if (!podeVer) return null;
+
   return (
     <section className="w-full min-w-0 space-y-6">
       {/* Busca + status à esquerda; “Mostrar inativos” à direita — mesma linha no desktop */}
@@ -227,7 +238,7 @@ export default function ClientesPage() {
           setSelectedCliente(c);
           setFormSheetOpen(true);
         }}
-        onExcluir={(c) => setClienteToDelete(c)}
+        onExcluir={rbac.podeExcluir ? (c) => setClienteToDelete(c) : undefined}
       />
 
       <ClienteFormSheet
@@ -238,8 +249,10 @@ export default function ClientesPage() {
         }}
         initialCliente={selectedCliente}
         onSave={handleSaveCliente}
+        readOnly={selectedCliente ? !rbac.podeEditar : !rbac.podeCriar}
       />
 
+      {rbac.podeExcluir && (
       <AlertDialog
         open={!!clienteToDelete}
         onClose={() => setClienteToDelete(null)}
@@ -260,6 +273,7 @@ export default function ClientesPage() {
         confirmLabel="Sim, excluir permanentemente"
         destructive
       />
+      )}
       <Toast
         visible={toast.visible}
         message={toast.message}

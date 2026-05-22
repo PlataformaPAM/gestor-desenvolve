@@ -4,6 +4,7 @@ import { getDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { getEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config";
 import type { DocumentoSnapshot } from "@/lib/documentos/documento-html";
 import { getComercialReportById, type ComercialReportId, type ComercialSituacao } from "@/lib/relatorios/comercial-catalogo";
+import { filterRelatorioLeads, type RelatorioAccessContext } from "@/lib/server/relatorio-scope";
 
 export type ComercialBuildParams = {
   reportId: ComercialReportId;
@@ -11,6 +12,7 @@ export type ComercialBuildParams = {
   periodoInicio: string;
   periodoFim: string;
   situacao?: ComercialSituacao;
+  access?: RelatorioAccessContext;
 };
 
 export type ComercialBuildResult = {
@@ -75,7 +77,15 @@ export async function buildComercialSnapshot(params: ComercialBuildParams): Prom
     where: { createdAt: { gte: inicio, lte: fim }, registroLead: "oportunidade" },
     orderBy: [{ createdAt: "asc" }],
   });
-  const leads = leadsBase.filter((l) => {
+  const leadsScoped = params.access
+    ? await filterRelatorioLeads(
+        leadsBase,
+        params.access.session,
+        params.access.userId,
+        params.access.resourceId
+      )
+    : leadsBase;
+  const leads = leadsScoped.filter((l) => {
     if (!params.situacao || params.situacao === "todos") return true;
     if (params.situacao === "abertos") return !["fechado", "perdido"].includes(l.stageId);
     if (params.situacao === "ganhos") return l.stageId === "fechado";

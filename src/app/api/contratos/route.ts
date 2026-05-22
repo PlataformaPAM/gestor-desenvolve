@@ -3,6 +3,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { emitManyAlerts } from "@/lib/server/alerts";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { getSessionUserId } from "@/lib/server/request-session";
+import { contratosAccessGate } from "@/lib/server/contratos-access";
 import type { ContratoStatus } from "@prisma/client";
 
 type ItemIn = { nome: string; valor?: number; condicoesPagamento?: string };
@@ -21,7 +22,10 @@ type PostBody = {
 };
 
 export async function POST(req: Request) {
-  const sessionUserId = getSessionUserId(req);
+  const gate = await contratosAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
+  const sessionUserId = gate.userId ?? getSessionUserId(req);
   const parsed = await parseJsonSafe<PostBody>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const b = parsed.value;

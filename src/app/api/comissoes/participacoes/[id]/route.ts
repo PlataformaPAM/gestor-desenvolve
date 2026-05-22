@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { mapParticipacao } from "@/app/api/comissoes/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_COMISSOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 type PayloadParticipacao = {
   percentualParticipacao?: number;
@@ -10,6 +14,9 @@ type PayloadParticipacao = {
 };
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "editar");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   const body = await parseJsonSafe<{ participacao?: PayloadParticipacao }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
@@ -33,7 +40,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return ok({ participacao: mapParticipacao(updated) });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "excluir");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   const before = await prisma.comissaoParticipacaoVenda.findUnique({ where: { id } });
   await prisma.comissaoParticipacaoVenda.delete({ where: { id } });

@@ -91,13 +91,15 @@ export default function CalendarioPage() {
   useEffect(() => {
     setPrimaryAction({
       label: "Novo Evento",
-      onClick: () => {
-        setDataPreenchida(undefined);
-        setModalAberto(true);
-      },
+      onClick: () => abrirNovoEvento(),
     });
     return () => setPrimaryAction(null);
   }, [setPrimaryAction]);
+
+  const abrirNovoEvento = (dateKey?: string) => {
+    setDataPreenchida(dateKey);
+    setModalAberto(true);
+  };
 
   const { dias } = useMemo(() => {
     const primeiro = new Date(ano, mes, 1);
@@ -146,13 +148,11 @@ export default function CalendarioPage() {
 
   const handleClickDia = (dia: number) => {
     const dateKey = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-    setDataPreenchida(dateKey);
-    setModalAberto(true);
+    abrirNovoEvento(dateKey);
   };
 
   const handleClickDate = (dateKey: string) => {
-    setDataPreenchida(dateKey);
-    setModalAberto(true);
+    abrirNovoEvento(dateKey);
   };
 
   const handleSalvarEvento = (ev: Omit<CalendarioEvento, "id">) => {

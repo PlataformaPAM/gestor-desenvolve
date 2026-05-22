@@ -1,3 +1,4 @@
+import { relatoriosAccessGate, RELATORIOS_OPERACIONAL_RESOURCE } from "@/lib/server/relatorios-access";
 import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import {
@@ -18,7 +19,11 @@ type Body = {
   };
 };
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_OPERACIONAL_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   const row = await prisma.configuracaoSistema.findUnique({
     where: { chave: CHAVE },
     select: { valor: true },
@@ -28,6 +33,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_OPERACIONAL_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   const parsed = await parseJsonSafe<Body>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const a = parsed.value.agendamento;

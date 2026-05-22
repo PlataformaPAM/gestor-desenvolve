@@ -2,8 +2,12 @@ import type { Contato } from "@/lib/clientes/types";
 import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { clientesAccessGate } from "@/lib/server/clientes-access";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await clientesAccessGate(req, "editar");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   const parsed = await parseJsonSafe<{ contatos?: Contato[] }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);

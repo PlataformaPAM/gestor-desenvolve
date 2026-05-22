@@ -8,6 +8,7 @@ import {
   isCadastroEfetivadoMissingInDatabase,
 } from "@/lib/server/rh-colaborador-db-errors";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { rhColaboradoresAccessGate } from "@/lib/server/rh-access";
 import { RH_CONSULTOR_PRE_CADASTRO_CARGO } from "@/lib/rh/pre-cadastro-consultor";
 
 function digitsOnly(v: string | undefined): string {
@@ -32,6 +33,9 @@ function isTipoContratoEnumError(error: unknown): boolean {
 }
 
 export async function POST(req: Request) {
+  const gate = await rhColaboradoresAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ colaborador?: ColaboradorParceiro; preCadastroConsultor?: boolean }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const c = body.value.colaborador;

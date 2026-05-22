@@ -64,6 +64,8 @@ type NovoColaboradorFormProps = {
   lockTipo?: boolean;
   onSave: (payload: NovoColaboradorPayload) => void;
   onCancel: () => void;
+  /** Quando false, oculta o botão Salvar (somente visualização). */
+  permitirSalvar?: boolean;
 };
 
 function tipoContratoInicial(
@@ -193,6 +195,7 @@ export function NovoColaboradorForm({
   lockTipo = false,
   onSave,
   onCancel,
+  permitirSalvar = true,
 }: NovoColaboradorFormProps) {
   const fornecedorTabListId = useId();
 
@@ -519,12 +522,14 @@ export function NovoColaboradorForm({
               Cancelar
             </span>
           </button>
-          <button type="submit" className={formModalSubmitButtonClass}>
-            <span className="inline-flex items-center gap-2">
-              <Save className="h-4 w-4 shrink-0" aria-hidden />
-              Salvar
-            </span>
-          </button>
+          {permitirSalvar ? (
+            <button type="submit" className={formModalSubmitButtonClass}>
+              <span className="inline-flex items-center gap-2">
+                <Save className="h-4 w-4 shrink-0" aria-hidden />
+                Salvar
+              </span>
+            </button>
+          ) : null}
         </div>
       </form>
     );
@@ -913,12 +918,14 @@ export function NovoColaboradorForm({
                 Cancelar
               </span>
             </button>
-            <button type="submit" className={formModalSubmitButtonClass}>
-              <span className="inline-flex items-center gap-2">
-                <Save className="h-4 w-4 shrink-0" aria-hidden />
-                Salvar
-              </span>
-            </button>
+            {permitirSalvar ? (
+              <button type="submit" className={formModalSubmitButtonClass}>
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4 shrink-0" aria-hidden />
+                  Salvar
+                </span>
+              </button>
+            ) : null}
           </div>
         </form>
         <AlertDialog
@@ -1140,12 +1147,14 @@ export function NovoColaboradorForm({
             Cancelar
           </span>
         </button>
-        <button type="submit" className={formModalSubmitButtonClass}>
-          <span className="inline-flex items-center gap-2">
-            <Save className="h-4 w-4 shrink-0" aria-hidden />
-            Salvar
-          </span>
-        </button>
+        {permitirSalvar ? (
+          <button type="submit" className={formModalSubmitButtonClass}>
+            <span className="inline-flex items-center gap-2">
+              <Save className="h-4 w-4 shrink-0" aria-hidden />
+              Salvar
+            </span>
+          </button>
+        ) : null}
       </div>
     </form>
   );

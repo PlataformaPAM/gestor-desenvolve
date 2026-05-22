@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { mapRegra } from "@/app/api/comissoes/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { resourceAccessGate } from "@/lib/server/rbac-gate";
 
 type PayloadRegra = {
   consultorId?: string;
@@ -17,6 +18,9 @@ type PayloadRegra = {
 };
 
 export async function GET(req: Request) {
+  const gate = await resourceAccessGate(req, "financeiro.comissoes", "ver", "Sem permissão para regras de comissão.");
+  if (!gate.ok) return gate.response;
+
   const { searchParams } = new URL(req.url);
   const consultorId = searchParams.get("consultorId") ?? undefined;
   const regras = await prisma.comissaoRegra.findMany({
@@ -31,6 +35,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const gate = await resourceAccessGate(req, "financeiro.comissoes", "criar", "Sem permissão para criar regra de comissão.");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ regra?: PayloadRegra }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const regra = body.value.regra;

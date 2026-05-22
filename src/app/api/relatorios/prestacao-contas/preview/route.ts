@@ -1,3 +1,9 @@
+import {
+  relatorioAccessFromGate,
+  relatoriosAccessGate,
+  RELATORIOS_PRESTACAO_CONTAS_RESOURCE,
+} from "@/lib/server/relatorios-access";
+import { RelatorioForbiddenError } from "@/lib/server/relatorio-scope";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 import { buildPrestacaoContasSnapshot } from "@/lib/relatorios/prestacao-contas";
@@ -11,6 +17,10 @@ type Body = {
 };
 
 export async function POST(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_PRESTACAO_CONTAS_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   const parsed = await parseJsonSafe<Body>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const clienteId = parsed.value.clienteId?.trim();
@@ -25,8 +35,10 @@ export async function POST(req: Request) {
       modeloId,
       periodoInicio: parsed.value.periodoInicio,
       periodoFim: parsed.value.periodoFim,
+      access: relatorioAccessFromGate(gate, RELATORIOS_PRESTACAO_CONTAS_RESOURCE),
     });
   } catch (error) {
+    if (error instanceof RelatorioForbiddenError) return fail("FORBIDDEN", error.message, 403);
     const message = error instanceof Error ? error.message : "Falha ao montar relatório.";
     if (message.includes("não encontrado")) return fail("NOT_FOUND", message, 404);
     return fail("BAD_REQUEST", message, 400);

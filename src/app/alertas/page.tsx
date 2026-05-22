@@ -7,6 +7,9 @@ import { AlertDialog } from "@/components/ui/alert-dialog";
 import { AlertsTable, type AlertaRow } from "@/components/alertas/alerts-table";
 import { emitAlertsUpdated } from "@/lib/alerts/live-sync";
 import { useAuth } from "@/contexts/auth-context";
+import { useResourcePageGuard } from "@/hooks/use-rbac-resource";
+
+const ALERTAS_RESOURCE = "alertas.caixa";
 
 type Alerta = AlertaRow;
 
@@ -29,6 +32,9 @@ function AlertasPageContent() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
   const isPortalCliente = session.isPortalCliente;
+  const podeVer = useResourcePageGuard(ALERTAS_RESOURCE, "/acesso-negado", {
+    skipForPortalCliente: true,
+  });
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [filtro, setFiltro] = useState<FiltroAlerta>("todas");
   const [filtroPrioridade, setFiltroPrioridade] = useState<"todas" | "urgente" | "alta" | "normal">("todas");
@@ -146,6 +152,8 @@ function AlertasPageContent() {
         { id: "posVenda", label: "Pós-venda" },
         { id: "sistema", label: "Sistema" },
       ];
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full max-w-full space-y-6">

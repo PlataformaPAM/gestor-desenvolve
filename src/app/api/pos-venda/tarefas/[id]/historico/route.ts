@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
-import { COOKIE_NAME, decodeSession } from "@/lib/auth";
+import { posvendaAccessGate } from "@/lib/server/posvenda-access";
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await posvendaAccessGate(req, "ver", id);
+  if (!gate.ok) return gate.response;
   const tarefa = await prisma.tarefa.findUnique({ where: { id }, select: { id: true } });
   if (!tarefa) return fail("NOT_FOUND", "Tarefa não encontrada.", 404);
 
@@ -31,6 +33,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await posvendaAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<{
     acao?: string;
     anexos?: Array<{ name?: string; url?: string }>;
@@ -39,19 +44,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const acao = parsed.value.acao?.trim();
   if (!acao) return fail("BAD_REQUEST", "Informe a descrição do comentário.", 400);
 
-  const tarefa = await prisma.tarefa.findUnique({ where: { id }, select: { id: true } });
-  if (!tarefa) return fail("NOT_FOUND", "Tarefa não encontrada.", 404);
-
-  const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  const session = decodeSession(match?.[1]?.trim());
-
   const created = await prisma.tarefaHistorico.create({
     data: {
       tarefaId: id,
       data: new Date(),
       acao,
-      autorId: session?.userId ?? null,
+      autorId: gate.userId ?? null,
       anexos: {
         create: (parsed.value.anexos ?? [])
           .filter((a) => a?.name?.trim())

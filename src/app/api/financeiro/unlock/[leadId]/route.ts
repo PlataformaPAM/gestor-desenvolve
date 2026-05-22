@@ -2,11 +2,20 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitManyAlerts } from "@/lib/server/alerts";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_APROVACOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 type Payload = { aprovado: boolean; motivo?: string; userName?: string };
 
 export async function POST(req: Request, ctx: { params: Promise<{ leadId: string }> }) {
   const { leadId } = await ctx.params;
+  const gate = await financeiroAccessGate(req, FINANCEIRO_APROVACOES_RESOURCE, "editar", {
+    leadId,
+  });
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<Payload>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const body = parsed.value;

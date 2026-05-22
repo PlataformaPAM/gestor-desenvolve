@@ -7,6 +7,11 @@ import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { markAlertsReadForLancamentoPaid } from "@/lib/server/alerts-resolve";
 import { syncComissoesFromLancamentoPagamento } from "@/lib/server/comissoes-service";
+import {
+  assertLancamentoLeadAccess,
+  financeiroAccessGate,
+  FINANCEIRO_LANCAMENTOS_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 function toDate(v: string): Date {
   const d = new Date(v);
@@ -28,6 +33,9 @@ async function resolveLeadIdOrigem(
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await financeiroAccessGate(req, FINANCEIRO_LANCAMENTOS_RESOURCE, "editar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ lancamento?: Lancamento }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const l = body.value.lancamento;
@@ -43,8 +51,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       valor: true,
       tipo: true,
       leadIdOrigem: true,
+      idPai: true,
     },
   });
+  if (!before) return fail("NOT_FOUND", "Lançamento não encontrado.", 404);
+
+  if (gate.scope === "vinculados") {
+    const resolvedLead = await resolveLeadIdOrigem(prisma, before);
+    const ok = await assertLancamentoLeadAccess(gate.userId, resolvedLead, gate.scope);
+    if (!ok) return fail("FORBIDDEN", "Sem acesso a este lançamento.", 403);
+    if (l.leadIdOrigem) {
+      const okNew = await assertLancamentoLeadAccess(gate.userId, l.leadIdOrigem, gate.scope);
+      if (!okNew) return fail("FORBIDDEN", "Sem acesso ao lead informado.", 403);
+    }
+  }
+
   const updated = await prisma.lancamento.update({
     where: { id },
     data: {
@@ -110,11 +131,26 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return ok({ lancamento: mapLancamentoFromDb(updated) });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await financeiroAccessGate(req, FINANCEIRO_LANCAMENTOS_RESOURCE, "excluir");
+  if (!gate.ok) return gate.response;
 
-  const existing = await prisma.lancamento.findUnique({ where: { id } });
+  const existing = await prisma.lancamento.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      leadIdOrigem: true,
+      idPai: true,
+    },
+  });
   if (!existing) return fail("NOT_FOUND", "Lançamento não encontrado.", 404);
+
+  if (gate.scope === "vinculados") {
+    const resolvedLead = await resolveLeadIdOrigem(prisma, existing);
+    const okLead = await assertLancamentoLeadAccess(gate.userId, resolvedLead, gate.scope);
+    if (!okLead) return fail("FORBIDDEN", "Sem acesso a este lançamento.", 403);
+  }
 
   try {
     await prisma.$transaction(async (tx) => {

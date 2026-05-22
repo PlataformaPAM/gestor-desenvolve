@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { ComponentType } from "react";
 import clsx from "clsx";
 import {
@@ -42,6 +42,9 @@ import {
 } from "lucide-react";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useResourcePageGuard, useResourceRbac } from "@/hooks/use-rbac-resource";
+
+const SOLUCOES_RESOURCE = "solucoes.catalogo";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import {
@@ -189,12 +192,20 @@ function countPlaybookSteps(playbook: PlaybookEtapa[]): number {
 // --- Page ---
 export default function SolucoesPage() {
   const { setPrimaryAction } = usePageHeader();
+  const podeVer = useResourcePageGuard(SOLUCOES_RESOURCE);
+  const rbac = useResourceRbac(SOLUCOES_RESOURCE);
+  const podeCriarSolucao = rbac.podeCriar;
+  const podeEditarSolucao = rbac.podeEditar;
   const [solucoes, setSolucoes] = useState<Solucao[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingSolucao, setEditingSolucao] = useState<Solucao | null>(null);
   const [activeTab, setActiveTab] = useState<"dados" | "comercial" | "playbook">("dados");
 
   useEffect(() => {
+    if (!podeCriarSolucao) {
+      setPrimaryAction(null);
+      return;
+    }
     setPrimaryAction({
       label: "Nova Solução",
       showPlusIcon: true,
@@ -205,7 +216,7 @@ export default function SolucoesPage() {
       },
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, podeCriarSolucao]);
 
   useEffect(() => {
     let active = true;
@@ -227,11 +238,13 @@ export default function SolucoesPage() {
   }, []);
 
   const openSheet = (solucao: Solucao) => {
+    if (!podeEditarSolucao) return;
     setEditingSolucao(solucao);
     setSheetOpen(true);
     setActiveTab("dados");
   };
   const handleToggleAtivo = (solucao: Solucao) => {
+    if (!podeEditarSolucao) return;
     const updated = { ...solucao, ativo: !(solucao.ativo ?? true) };
     setSolucoes((prev) => prev.map((s) => (s.id === solucao.id ? updated : s)));
     void fetch(`/api/solucoes/${solucao.id}`, {
@@ -247,6 +260,9 @@ export default function SolucoesPage() {
   };
 
   const handleSalvarSheet = (sol: Solucao) => {
+    const isNew = !solucoes.some((s) => s.id === sol.id);
+    if (isNew && !podeCriarSolucao) return;
+    if (!isNew && !podeEditarSolucao) return;
     const finalSol = {
       ...sol,
       parcelasPadrao: sol.parcelasPadrao ?? 12,
@@ -307,6 +323,8 @@ export default function SolucoesPage() {
     ativo: true,
   };
 
+  if (!podeVer) return null;
+
   return (
     <div className="min-h-full w-full bg-slate-50 dark:bg-slate-950">
       {/* Grid de cards — primeiro elemento abaixo do padding do shell */}
@@ -323,7 +341,11 @@ export default function SolucoesPage() {
                   openSheet(sol);
                 }
               }}
-              className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:focus-visible:ring-offset-slate-950"
+              className={clsx(
+                "rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm dark:border-slate-700 dark:bg-slate-900",
+                podeEditarSolucao &&
+                  "transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6D28D9] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+              )}
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
@@ -350,6 +372,7 @@ export default function SolucoesPage() {
               <div className="mt-2 flex items-center justify-between">
                 <button
                   type="button"
+                  disabled={!podeEditarSolucao}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleToggleAtivo(sol);
@@ -436,6 +459,7 @@ export default function SolucoesPage() {
                   Cancelar
                 </span>
               </button>
+              {(editingSolucao === null ? podeCriarSolucao : podeEditarSolucao) ? (
               <button
                 type="button"
                 onClick={() => handleSalvarSheet(currentFormData)}
@@ -446,6 +470,7 @@ export default function SolucoesPage() {
                   Salvar
                 </span>
               </button>
+              ) : null}
             </div>
           </div>
         </div>

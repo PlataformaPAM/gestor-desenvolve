@@ -4,11 +4,15 @@ import { Prisma } from "@prisma/client";
 import { mapUsuario } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 import { hashPassword, validatePasswordPolicy } from "@/lib/server/password";
 
 type UsuarioCreateBody = UsuarioSistema & { senha?: string };
 
 export async function POST(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.usuarios, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ usuario?: UsuarioCreateBody }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const payload = body.value;

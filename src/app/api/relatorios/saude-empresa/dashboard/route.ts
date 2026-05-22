@@ -1,3 +1,12 @@
+import { relatoriosAccessGate, RELATORIOS_SAUDE_EMPRESA_RESOURCE } from "@/lib/server/relatorios-access";
+import {
+  filterRelatorioClientes,
+  filterRelatorioLancamentos,
+  filterRelatorioLeads,
+  filterRelatorioTarefasRaw,
+  filterRelatorioTicketsRaw,
+} from "@/lib/server/relatorio-scope";
+import { authorize } from "@/lib/server/authorize";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/server/api-response";
 
@@ -12,33 +21,71 @@ function clampScore(v: number): number {
   return Math.max(0, Math.min(100, v));
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_SAUDE_EMPRESA_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   try {
     const { start, end } = monthBounds();
     const now = Date.now();
 
-    const [clientes, tarefas, tickets, lancamentos, leads] = await Promise.all([
+    const view = authorize(gate.session, RELATORIOS_SAUDE_EMPRESA_RESOURCE, "ver");
+    const scope = view.scope;
+
+    const [clientesRaw, tarefasRaw, ticketsRaw, lancamentosRaw, leadsRaw] = await Promise.all([
       prisma.cliente.findMany({
-        select: { id: true, nome: true, empresa: true },
+        select: { id: true, nome: true, empresa: true, criadoPorId: true },
         orderBy: { nome: "asc" },
       }),
       prisma.tarefa.findMany({
         where: { createdAt: { gte: start, lte: end } },
-        select: { clienteId: true, status: true, dataFim: true },
+        select: {
+          clienteId: true,
+          status: true,
+          dataFim: true,
+          responsavelId: true,
+          colaboradores: { select: { usuarioId: true } },
+        },
       }),
       prisma.helpdeskTicket.findMany({
         where: { dataCriacao: { gte: start, lte: end } },
-        select: { clienteId: true, status: true, previsaoConclusao: true },
+        select: {
+          clienteId: true,
+          status: true,
+          previsaoConclusao: true,
+          responsaveis: { select: { usuarioId: true } },
+        },
       }),
       prisma.lancamento.findMany({
         where: { vencimento: { gte: start, lte: end } },
-        select: { clienteId: true, tipo: true, status: true, valor: true, vencimento: true },
+        select: {
+          clienteId: true,
+          tipo: true,
+          status: true,
+          valor: true,
+          vencimento: true,
+          leadIdOrigem: true,
+        },
       }),
       prisma.lead.findMany({
         where: { createdAt: { gte: start, lte: end }, registroLead: "oportunidade" },
-        select: { stageId: true, valorTotal: true, value: true },
+        select: { id: true, stageId: true, valorTotal: true, value: true },
       }),
     ]);
+
+    const [clientes, leads] = await Promise.all([
+      filterRelatorioClientes(clientesRaw, gate.session, gate.userId, RELATORIOS_SAUDE_EMPRESA_RESOURCE),
+      filterRelatorioLeads(leadsRaw, gate.session, gate.userId, RELATORIOS_SAUDE_EMPRESA_RESOURCE),
+    ]);
+    const tarefas = filterRelatorioTarefasRaw(tarefasRaw, gate.userId, scope);
+    const tickets = filterRelatorioTicketsRaw(ticketsRaw, gate.userId, scope);
+    const lancamentos = await filterRelatorioLancamentos(
+      lancamentosRaw,
+      gate.session,
+      gate.userId,
+      RELATORIOS_SAUDE_EMPRESA_RESOURCE
+    );
 
     const tarefasAtrasadas = tarefas.filter((t) => t.status !== "concluido" && t.dataFim.getTime() < now).length;
     const ticketsAtrasados = tickets.filter(

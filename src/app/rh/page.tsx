@@ -9,6 +9,9 @@ import { Toast } from "@/components/ui/toast";
 import { ColaboradoresTable } from "@/components/rh/colaboradores-table";
 import { NovoColaboradorForm } from "@/components/rh/novo-colaborador-form";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useAuth } from "@/contexts/auth-context";
+import { useRhColaboradoresRbac } from "@/hooks/use-rbac-resource";
+import { useRouter } from "next/navigation";
 import type { ColaboradorParceiro, TipoPessoaRH, TipoContrato } from "@/lib/rh/types";
 import type { NovoColaboradorPayload } from "@/components/rh/novo-colaborador-form";
 import { TIPO_CONTRATO_LABELS, TIPO_CONTRATO_OPCOES_CONSULTOR } from "@/lib/rh/constants";
@@ -79,6 +82,9 @@ function extrairRhBootstrap(json: unknown): {
 }
 
 export default function RHPage() {
+  const router = useRouter();
+  const { session } = useAuth();
+  const rbac = useRhColaboradoresRbac();
   const { setPrimaryAction } = usePageHeader();
   const [colaboradores, setColaboradores] = useState<ColaboradorParceiro[]>([]);
   const [usuariosParaVinculo, setUsuariosParaVinculo] = useState<
@@ -139,13 +145,25 @@ export default function RHPage() {
   }, [colaboradores, tab, busca, mostrarInativos]);
 
   useEffect(() => {
+    if (!session.perfilId && !session.isSystemAdmin) return;
+    if (!rbac.podeVer) {
+      router.replace("/");
+      return;
+    }
+  }, [session.perfilId, session.isSystemAdmin, rbac.podeVer, router]);
+
+  useEffect(() => {
+    if (!rbac.podeCriar) {
+      setPrimaryAction(null);
+      return () => setPrimaryAction(null);
+    }
     setPrimaryAction({
       label: "Nova Pessoa",
       onClick: () => setIsCreateOpen(true),
       showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, rbac.podeCriar]);
 
   useEffect(() => {
     let active = true;
@@ -493,6 +511,7 @@ export default function RHPage() {
             key={selected?.id ?? "view-edit"}
             initialValues={selected ? { ...selected } : null}
             onSave={handleSalvarEdicao}
+            permitirSalvar={rbac.podeEditar}
             onCancel={() => {
               setDrawerOpen(false);
               setSelected(null);
@@ -534,6 +553,7 @@ export default function RHPage() {
             key={selected?.id ?? "edit"}
             initialValues={selected ? { ...selected } : null}
             onSave={handleSalvarEdicao}
+            permitirSalvar={rbac.podeEditar}
             onCancel={() => setIsEditOpen(false)}
           />
         </div>

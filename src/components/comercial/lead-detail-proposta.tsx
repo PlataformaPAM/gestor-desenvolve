@@ -48,6 +48,7 @@ type LeadDetailPropostaProps = {
   onGerarPdfSuccess: () => void;
   /** Para listar contatos do cliente vinculado (envio por e-mail / WhatsApp). */
   clientes?: Cliente[];
+  readOnly?: boolean;
 };
 type CatalogSolucao = {
   id: string;
@@ -269,6 +270,7 @@ export function LeadDetailProposta({
   onUpdateLead,
   onGerarPdfSuccess,
   clientes = [],
+  readOnly = false,
 }: LeadDetailPropostaProps) {
   const { session } = useAuth();
   const currentUserName = session.userName ?? "Usuário";
@@ -427,6 +429,7 @@ export function LeadDetailProposta({
   );
 
   const addSolucao = (solId: string) => {
+    if (readOnly) return;
     const sol = catalogoSolucoes.find((s) => s.id === solId);
     if (!sol) return;
     const valorNum = getValorReais(sol.valorVenda);
@@ -463,6 +466,7 @@ export function LeadDetailProposta({
   };
 
   const patchSolucao = (idx: number, patch: Partial<LeadSolucaoRef>) => {
+    if (readOnly) return;
     const next = solucoesNaOportunidade.map((s, i) => (i === idx ? { ...s, ...patch } : s));
     const novoTotal = next.reduce((acc, s) => acc + (s.valor ?? 0), 0);
     onUpdateLead(
@@ -475,6 +479,7 @@ export function LeadDetailProposta({
   };
 
   const removeSolucao = (idx: number) => {
+    if (readOnly) return;
     const list = solucoesNaOportunidade.slice();
     const removed = list.splice(idx, 1)[0];
     if (!removed) return;
@@ -714,12 +719,18 @@ export function LeadDetailProposta({
   return (
     <>
     <div className="flex flex-col gap-4 p-4 lg:p-6">
-      <p className="text-sm text-slate-600">
-        Adicione <strong>uma ou mais</strong> soluções; ao escolher no catálogo, o sistema traz valor e forma de
-        pagamento sugeridos (mensal, única ou parcelado). Você pode ajustar cada linha na lista abaixo.
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        {readOnly
+          ? "Proposta e documentos desta oportunidade em modo somente leitura."
+          : (
+            <>
+              Adicione <strong>uma ou mais</strong> soluções; ao escolher no catálogo, o sistema traz valor e forma de
+              pagamento sugeridos (mensal, única ou parcelado). Você pode ajustar cada linha na lista abaixo.
+            </>
+          )}
       </p>
 
-      {needsPrevisaoFechamento && (
+      {needsPrevisaoFechamento && !readOnly && (
         <div className="space-y-1">
           <FormDateField
             id="lead-previsao-fechamento-proposta"
@@ -742,6 +753,14 @@ export function LeadDetailProposta({
         </div>
       )}
 
+      {needsPrevisaoFechamento && readOnly && lead.previsaoFechamento ? (
+        <p className="text-sm text-slate-700 dark:text-slate-200">
+          <span className="font-medium text-slate-600 dark:text-slate-400">Previsão de fechamento: </span>
+          {new Date(lead.previsaoFechamento + "T12:00:00").toLocaleDateString("pt-BR")}
+        </p>
+      ) : null}
+
+      {!readOnly ? (
       <div>
         <label className={comercialLabelClass}>Buscar solução para adicionar</label>
         {disponiveis.length === 0 ? (
@@ -829,7 +848,9 @@ export function LeadDetailProposta({
           </div>
         )}
       </div>
+      ) : null}
 
+      <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
       <div>
         <div className="mb-2">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Soluções na oportunidade</h3>
@@ -871,6 +892,7 @@ export function LeadDetailProposta({
                       ) : null}
                     </div>
                   </div>
+                  {!readOnly ? (
                   <button
                     type="button"
                     onClick={() => setSolucaoIdxParaRemover(idx)}
@@ -879,7 +901,9 @@ export function LeadDetailProposta({
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
+                  ) : null}
                 </div>
+                {!readOnly ? (
                 <div className="mt-4 flex flex-col gap-3 sm:mt-3 sm:flex-row sm:items-end">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -920,6 +944,16 @@ export function LeadDetailProposta({
                     </div>
                   )}
                 </div>
+                ) : (s.recorrenciaPagamento ?? "unica") === "parcelado" ? (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Pagamento: {REC_COMERCIAL_LABEL[s.recorrenciaPagamento ?? "unica"]} · {Math.max(2, s.parcelas ?? 12)}{" "}
+                    parcelas
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Pagamento: {REC_COMERCIAL_LABEL[s.recorrenciaPagamento ?? "unica"]}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -935,7 +969,9 @@ export function LeadDetailProposta({
           </div>
         )}
       </div>
+      </fieldset>
 
+      {!readOnly ? (
       <div>
         <h3 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
           Documento a partir de modelo
@@ -1022,12 +1058,14 @@ export function LeadDetailProposta({
           </div>
         )}
       </div>
+      ) : null}
 
       <div>
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Documentos já gerados</h3>
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-          Use os contatos do cliente e da oportunidade abaixo para escolher o destinatário, envie por WhatsApp com mensagem
-          padrão prévia ou por e-mail.
+          {readOnly
+            ? "Abra ou baixe os PDFs gerados para esta oportunidade."
+            : "Use os contatos do cliente e da oportunidade abaixo para escolher o destinatário, envie por WhatsApp com mensagem padrão prévia ou por e-mail."}
         </p>
         {docDestinatarios.length === 0 && docsGerados.length > 0 ? (
           <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
@@ -1072,6 +1110,8 @@ export function LeadDetailProposta({
                     </button>
                   </div>
                 </div>
+                {!readOnly ? (
+                <>
                 <p className="mb-2 mt-3 text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   Enviar este documento
                 </p>
@@ -1137,6 +1177,8 @@ export function LeadDetailProposta({
                     </tbody>
                   </table>
                 </div>
+                </>
+                ) : null}
               </li>
             ))}
           </ul>

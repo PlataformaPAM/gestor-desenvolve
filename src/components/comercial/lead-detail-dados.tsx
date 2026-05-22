@@ -43,6 +43,7 @@ type LeadDetailDadosProps = {
   onAtualizarContatosCliente?: (clienteId: string, contatos: Contato[]) => void;
   usuarios?: UsuarioSistema[];
   onClose?: () => void;
+  readOnly?: boolean;
 };
 
 function deepCloneLead(l: Lead): Lead {
@@ -73,6 +74,7 @@ export function LeadDetailDados({
   onAtualizarContatosCliente = () => {},
   usuarios = [],
   onClose,
+  readOnly = false,
 }: LeadDetailDadosProps) {
   const { session } = useAuth();
   const usuarioAtual = { nome: session.userName ?? "Usuário", userId: session.userId };
@@ -150,6 +152,7 @@ export function LeadDetailDados({
   );
 
   const handleSalvar = async (e?: React.FormEvent) => {
+    if (readOnly) return;
     if (e) e.preventDefault();
 
     const novosLogs: NonNullable<Lead["interactions"]> = [];
@@ -321,6 +324,7 @@ export function LeadDetailDados({
 
   return (
     <form onSubmit={handleSalvar} className="flex min-h-0 flex-1 flex-col">
+      <fieldset disabled={readOnly} className="flex min-h-0 flex-1 flex-col border-0 p-0 m-0 min-w-0">
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 lg:p-6">
       {saveErrorMessage && (
         <div
@@ -527,6 +531,7 @@ export function LeadDetailDados({
       )}
 
       </div>
+      </fieldset>
 
       <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
@@ -534,16 +539,18 @@ export function LeadDetailDados({
           <button type="button" onClick={onClose} className={formModalCancelButtonClass}>
             <span className="inline-flex items-center gap-2">
               <X className="h-4 w-4" />
-              Cancelar
+              {readOnly ? "Fechar" : "Cancelar"}
             </span>
           </button>
         ) : null}
-        <button type="submit" className={formModalSubmitButtonClass}>
-          <span className="inline-flex items-center gap-2">
-            <Save className="h-4 w-4" />
-            Salvar
-          </span>
-        </button>
+        {!readOnly ? (
+          <button type="submit" className={formModalSubmitButtonClass}>
+            <span className="inline-flex items-center gap-2">
+              <Save className="h-4 w-4" />
+              Salvar
+            </span>
+          </button>
+        ) : null}
         </div>
       </div>
     </form>

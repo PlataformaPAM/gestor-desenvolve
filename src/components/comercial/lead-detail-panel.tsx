@@ -19,6 +19,8 @@ type LeadDetailPanelProps = {
   onClienteRegistrado?: (cliente: Cliente) => void;
   onAtualizarContatosCliente?: (clienteId: string, contatos: Contato[]) => void;
   usuarios?: UsuarioSistema[];
+  /** Sem permissão Editar no pipeline: visualização apenas. */
+  readOnly?: boolean;
 };
 
 export function LeadDetailPanel({
@@ -34,6 +36,7 @@ export function LeadDetailPanel({
   onClienteRegistrado = () => {},
   onAtualizarContatosCliente = () => {},
   usuarios = [],
+  readOnly = false,
 }: LeadDetailPanelProps) {
   if (!lead) return null;
 
@@ -58,6 +61,7 @@ export function LeadDetailPanel({
         onClienteRegistrado={onClienteRegistrado}
         onAtualizarContatosCliente={onAtualizarContatosCliente}
         usuarios={usuarios}
+        readOnly={readOnly}
       />
     </DrawerSheet>
   );

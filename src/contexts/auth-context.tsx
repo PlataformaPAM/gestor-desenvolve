@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
+import type { GrantsMap } from "@/lib/configuracoes/permission-grants";
 
 type AuthSession = {
   perfilId: string | null;
@@ -23,6 +24,7 @@ type AuthSession = {
   isSystemAdmin: boolean;
   perfilNome: string;
   permissoes: Partial<Record<ModuloPermissao, boolean>>;
+  permissoesGranulares?: GrantsMap;
 };
 
 type AuthContextValue = {
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSystemAdmin: false,
     perfilNome: "",
     permissoes: {},
+    permissoesGranulares: undefined,
   });
 
   const syncFromCookie = useCallback(async () => {
@@ -85,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isSystemAdmin?: boolean;
           perfilNome?: string;
           permissoes?: Partial<Record<ModuloPermissao, boolean>>;
+          permissoesGranulares?: GrantsMap;
         };
       };
       setSession({
@@ -100,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSystemAdmin: payload?.data?.isSystemAdmin ?? false,
         perfilNome: payload?.data?.perfilNome ?? "",
         permissoes: payload?.data?.permissoes ?? {},
+        permissoesGranulares: payload?.data?.permissoesGranulares,
       });
     } catch {
       setSession({

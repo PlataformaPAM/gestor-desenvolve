@@ -11,6 +11,9 @@ import { PlaybookDrawer } from "@/components/pos-venda/playbook-drawer";
 import { AgendarTarefaForm } from "@/components/pos-venda/agendar-tarefa-form";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useResourcePageGuard, useResourceRbac } from "@/hooks/use-rbac-resource";
+
+const POSVENDA_RESOURCE = "posvenda.tarefas";
 import {
   TIPO_TAREFA_LABELS,
 } from "@/lib/pos-venda/constants";
@@ -86,6 +89,11 @@ function buildAlertPlaybookTask(alerta: { id: string; titulo: string; descricao:
 
 export default function PosVendaPage() {
   const { setPrimaryAction } = usePageHeader();
+  const podeVer = useResourcePageGuard(POSVENDA_RESOURCE);
+  const rbac = useResourceRbac(POSVENDA_RESOURCE);
+  const podeCriarAgendamento = rbac.podeCriar;
+  const podeEditarTarefa = rbac.podeEditar;
+  const podeExcluirTarefa = rbac.podeExcluir;
   const [tarefas, setTarefas] = useState<TarefaRegua[]>([]);
   const [, setEventos] = useState<EventoHistorico[]>([]);
   const [clienteHealth, setClienteHealth] = useState<ClienteHealth[]>([]);
@@ -95,7 +103,6 @@ export default function PosVendaPage() {
   const [playbookTarefa, setPlaybookTarefa] = useState<TarefaRegua | null>(null);
   const [drawerPlaybookOpen, setDrawerPlaybookOpen] = useState(false);
   const [alertTasks, setAlertTasks] = useState<TarefaRegua[]>([]);
-  const [podeVerLixeira, setPodeVerLixeira] = useState(false);
   const [lixeiraOpen, setLixeiraOpen] = useState(false);
   const [removendo, setRemovendo] = useState(false);
   const [restaurarOpen, setRestaurarOpen] = useState(false);
@@ -111,13 +118,17 @@ export default function PosVendaPage() {
   const reguaRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (!podeCriarAgendamento) {
+      setPrimaryAction(null);
+      return;
+    }
     setPrimaryAction({
       label: "Novo Agendamento",
       onClick: () => setDrawerAgendarOpen(true),
       showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, podeCriarAgendamento]);
 
   useEffect(() => {
     let active = true;
@@ -157,24 +168,6 @@ export default function PosVendaPage() {
 
   useEffect(() => {
     let active = true;
-    void (async () => {
-      try {
-        const res = await fetch("/api/pos-venda/permissions", { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = (await res.json()) as { data?: { isAdmin?: boolean } };
-        if (!active) return;
-        setPodeVerLixeira(payload?.data?.isAdmin === true);
-      } catch {
-        // noop
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
     const loadPosVendaAlerts = async () => {
       try {
         const res = await fetch("/api/alertas/bootstrap", { cache: "no-store" });
@@ -206,6 +199,7 @@ export default function PosVendaPage() {
   };
 
   const handleRegistrarResultado = (tarefa: TarefaRegua, descricaoResultado: string) => {
+    if (!podeEditarTarefa && !tarefa.id.startsWith("alert-")) return;
     if (tarefa.id.startsWith("alert-")) {
       const alertaId = tarefa.id.replace("alert-", "");
       setAlertTasks((prev) => prev.filter((t) => t.id !== tarefa.id));
@@ -282,6 +276,7 @@ export default function PosVendaPage() {
   };
 
   const handleAdiar = (tarefa: TarefaRegua, motivoAdiar: string, dias: number) => {
+    if (!podeEditarTarefa) return;
     const base = new Date().toISOString().slice(0, 10);
     const reagendada = addDays(base, Math.max(1, Math.floor(dias)));
     // Reagendamento precisa continuar "selecionável/aberto" na régua (permitimos clique em "adiada").
@@ -319,6 +314,7 @@ export default function PosVendaPage() {
   const handleAgendar = (
     nova: Omit<TarefaRegua, "id"> & { intervaloRecorrenciaDias?: number }
   ) => {
+    if (!podeCriarAgendamento) return;
     const { intervaloRecorrenciaDias, ...rest } = nova;
     const created: TarefaRegua = {
       ...rest,
@@ -338,6 +334,7 @@ export default function PosVendaPage() {
   };
 
   const handleEnviarParaLixeira = async (motivoRemocao: string) => {
+    if (!podeExcluirTarefa) return;
     if (!playbookTarefa) {
       window.alert("Não foi possível enviar para a lixeira: item não selecionado.");
       return;
@@ -473,6 +470,8 @@ export default function PosVendaPage() {
       });
   }, [lixeira, lixeiraBusca, lixeiraDe, lixeiraAte, lixeiraPeriodo]);
 
+  if (!podeVer) return null;
+
   return (
     <section className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
@@ -483,7 +482,7 @@ export default function PosVendaPage() {
             clienteHealth={clienteHealth}
             onIrParaPrioridade={() => prioridadesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
             onIrParaRegua={() => reguaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            podeVerLixeira={podeVerLixeira}
+            podeVerLixeira={podeExcluirTarefa}
             onAbrirLixeira={() => setLixeiraOpen(true)}
             janela={janela}
             onChangeJanela={setJanela}
@@ -531,7 +530,9 @@ export default function PosVendaPage() {
             tarefa={playbookTarefa}
             onRegistrarResultado={handleRegistrarResultado}
             onAdiar={handleAdiar}
-            podeEnviarParaLixeira={!!playbookTarefa && !playbookTarefa.id.startsWith("alert-")}
+            podeEnviarParaLixeira={
+              podeExcluirTarefa && !!playbookTarefa && !playbookTarefa.id.startsWith("alert-")
+            }
             enviandoLixeira={removendo}
             onEnviarParaLixeira={(motivo) => void handleEnviarParaLixeira(motivo)}
             onFechar={() => {
@@ -608,7 +609,7 @@ export default function PosVendaPage() {
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Removido em: {item.removidaEm ? new Date(item.removidaEm).toLocaleString("pt-BR") : "-"}
               </p>
-              {podeVerLixeira && (
+              {podeExcluirTarefa && (
                 <button
                   type="button"
                   onClick={() => abrirRestauro(item)}

@@ -13,6 +13,9 @@ import type {
   Lancamento,
 } from "@/lib/financeiro/types";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useFinanceiroLancamentosRbac, useResourcePageGuard } from "@/hooks/use-rbac-resource";
+
+const FINANCEIRO_EXTRATO_RESOURCE = "financeiro.extrato";
 import { LancamentosTable } from "@/components/financeiro/lancamentos-table";
 import { LancamentoForm } from "@/components/financeiro/lancamento-form";
 import { DrawerSheet } from "@/components/comercial/drawer-sheet";
@@ -83,6 +86,8 @@ function lancamentoTemVinculoFechamento(l: Lancamento, todos: Lancamento[]): boo
 export default function FinanceiroExtratoPage() {
   const router = useRouter();
   const { setPrimaryAction, setSecondaryAction } = usePageHeader();
+  const podeVer = useResourcePageGuard(FINANCEIRO_EXTRATO_RESOURCE, "/acesso-negado");
+  const lancamentosRbac = useFinanceiroLancamentosRbac();
   const now = new Date();
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -514,6 +519,8 @@ export default function FinanceiroExtratoPage() {
     });
   }, [month, year]);
 
+  if (!podeVer) return null;
+
   return (
     <section className="w-full min-w-0 space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -734,9 +741,9 @@ export default function FinanceiroExtratoPage() {
         lancamentos={lancamentosParaTabela}
         clientesMap={clientesMap}
         onVerCliente={openCliente360}
-        onEditar={abrirEdicaoLancamento}
-        onAlternarBaixa={alternarBaixaLancamento}
-        onExcluir={solicitarExclusaoLancamento}
+        onEditar={lancamentosRbac.podeEditar ? abrirEdicaoLancamento : undefined}
+        onAlternarBaixa={lancamentosRbac.podeEditar ? alternarBaixaLancamento : undefined}
+        onExcluir={lancamentosRbac.podeExcluir ? solicitarExclusaoLancamento : undefined}
         disabledActionIds={pendingLancamentoAction}
         showTipo
         pendingByLancamentoId={pendingByLancamentoId}

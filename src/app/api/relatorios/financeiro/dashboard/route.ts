@@ -1,3 +1,5 @@
+import { relatoriosAccessGate, RELATORIOS_FINANCEIRO_RESOURCE } from "@/lib/server/relatorios-access";
+import { filterRelatorioLancamentos } from "@/lib/server/relatorio-scope";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/server/api-response";
 
@@ -10,16 +12,26 @@ function monthBounds() {
   return { now, start, end, todayEnd };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_FINANCEIRO_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   try {
     const { now, start, end, todayEnd } = monthBounds();
-    const rows = await prisma.lancamento.findMany({
+    const rowsRaw = await prisma.lancamento.findMany({
       where: { vencimento: { gte: start, lte: end } },
       orderBy: { vencimento: "asc" },
       include: {
         categoria: { select: { nome: true } },
       },
     });
+    const rows = await filterRelatorioLancamentos(
+      rowsRaw,
+      gate.session,
+      gate.userId,
+      RELATORIOS_FINANCEIRO_RESOURCE
+    );
 
     const acumuladoAteHoje = rows.filter((x) => x.vencimento <= todayEnd);
     const futuroAteFimMes = rows.filter((x) => x.vencimento > todayEnd);

@@ -19,6 +19,12 @@ import type { ComissaoEvento, ComissaoStatus } from "@/lib/comissoes/types";
 import { formatCurrency } from "@/lib/clientes/utils";
 import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  canViewFinanceiroComissoes,
+  canViewFinanceiroLancamentos,
+} from "@/lib/financeiro/financeiro-nav";
+import { useResourcePageGuard } from "@/hooks/use-rbac-resource";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { FormLabel } from "@/components/ui/form-fields/form-label";
 import { formModalCancelButtonClass, formModalSubmitButtonClass } from "@/components/ui/field-patterns";
@@ -91,9 +97,14 @@ const STATUS_OPTIONS: SearchableOption[] = [
   },
 ];
 
+const FINANCEIRO_COMISSOES_RESOURCE = "financeiro.comissoes";
+
 export default function FinanceiroComissoesPage() {
   const router = useRouter();
+  const { session } = useAuth();
   const { setPrimaryAction, setSecondaryAction } = usePageHeader();
+  const podeVer = useResourcePageGuard(FINANCEIRO_COMISSOES_RESOURCE, "/acesso-negado");
+  const podeVoltarAoFinanceiro = canViewFinanceiroLancamentos(session);
   const now = new Date();
   const anoMinimo = 2026;
   const [ano, setAno] = useState(Math.max(now.getFullYear(), anoMinimo));
@@ -149,17 +160,21 @@ export default function FinanceiroComissoesPage() {
   }, [ano, mes, consultorId, status]);
 
   useEffect(() => {
-    setPrimaryAction({
-      label: "Voltar ao Financeiro",
-      onClick: () => router.push("/financeiro"),
-      showPlusIcon: false,
-      tone: "navigation",
-    });
+    if (podeVoltarAoFinanceiro) {
+      setPrimaryAction({
+        label: "Voltar ao Financeiro",
+        onClick: () => router.push("/financeiro"),
+        showPlusIcon: false,
+        tone: "navigation",
+      });
+    } else {
+      setPrimaryAction(null);
+    }
     return () => {
       setPrimaryAction(null);
       setSecondaryAction(null);
     };
-  }, [router, setPrimaryAction, setSecondaryAction]);
+  }, [router, setPrimaryAction, setSecondaryAction, podeVoltarAoFinanceiro]);
 
   useEffect(() => {
     void carregar();
@@ -259,6 +274,8 @@ export default function FinanceiroComissoesPage() {
     });
     await carregar();
   };
+
+  if (!podeVer) return null;
 
   return (
     <section className="flex w-full min-w-0 flex-col gap-4 min-h-[calc(100dvh-10.5rem)]">

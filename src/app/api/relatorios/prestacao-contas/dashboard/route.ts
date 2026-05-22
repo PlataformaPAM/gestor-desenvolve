@@ -1,3 +1,10 @@
+import { relatoriosAccessGate, RELATORIOS_PRESTACAO_CONTAS_RESOURCE } from "@/lib/server/relatorios-access";
+import { userCanAccessClienteId } from "@/lib/server/cliente-access";
+import {
+  filterRelatorioTarefasRaw,
+  filterRelatorioTicketsRaw,
+} from "@/lib/server/relatorio-scope";
+import { authorize } from "@/lib/server/authorize";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/server/api-response";
 
@@ -8,6 +15,10 @@ function parseDate(value: string | null, fallback: Date): Date {
 }
 
 export async function GET(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_PRESTACAO_CONTAS_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   try {
     const url = new URL(req.url);
     const now = new Date();
@@ -17,23 +28,56 @@ export async function GET(req: Request) {
     const fim = parseDate(url.searchParams.get("periodoFim"), defaultFim);
     fim.setHours(23, 59, 59, 999);
     const clienteId = url.searchParams.get("clienteId")?.trim() || "";
+    const view = authorize(gate.session, RELATORIOS_PRESTACAO_CONTAS_RESOURCE, "ver");
+
+    if (clienteId && view.scope === "vinculados") {
+      const okCliente = await userCanAccessClienteId(gate.userId, clienteId, view.scope);
+      if (!okCliente) return fail("FORBIDDEN", "Sem acesso a este cliente.", 403);
+    }
 
     const whereCliente = clienteId ? { clienteId } : {};
-    const [tarefas, tickets, cliente] = await Promise.all([
+    const [tarefasRaw, ticketsRaw, cliente] = await Promise.all([
       prisma.tarefa.findMany({
         where: { ...whereCliente, createdAt: { gte: inicio, lte: fim } },
-        include: { responsavel: { select: { nomeExibicao: true, email: true } } },
+        include: {
+          responsavel: { select: { nomeExibicao: true, email: true } },
+          colaboradores: { select: { usuarioId: true } },
+        },
         orderBy: { createdAt: "asc" },
       }),
       prisma.helpdeskTicket.findMany({
         where: { ...whereCliente, dataCriacao: { gte: inicio, lte: fim } },
-        include: { responsaveis: { include: { usuario: { select: { nomeExibicao: true, email: true } } } } },
+        include: {
+          responsaveis: {
+            include: {
+              usuario: { select: { nomeExibicao: true, email: true } },
+            },
+          },
+        },
         orderBy: { dataCriacao: "asc" },
       }),
       clienteId
         ? prisma.cliente.findUnique({ where: { id: clienteId }, select: { nome: true, empresa: true } })
         : Promise.resolve(null),
     ]);
+
+    const tarefas = filterRelatorioTarefasRaw(
+      tarefasRaw.map((t) => ({
+        ...t,
+        responsavelId: t.responsavelId,
+        colaboradores: t.colaboradores,
+      })),
+      gate.userId,
+      view.scope
+    );
+    const tickets = filterRelatorioTicketsRaw(
+      ticketsRaw.map((t) => ({
+        ...t,
+        responsaveis: t.responsaveis,
+      })),
+      gate.userId,
+      view.scope
+    );
 
     const nowTs = Date.now();
     const tarefasConcluidas = tarefas.filter((t) => t.status === "concluido").length;

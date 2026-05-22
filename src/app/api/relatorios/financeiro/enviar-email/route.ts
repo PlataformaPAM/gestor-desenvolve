@@ -1,3 +1,9 @@
+import {
+  relatorioAccessFromGate,
+  relatoriosAccessGate,
+  RELATORIOS_FINANCEIRO_RESOURCE,
+} from "@/lib/server/relatorios-access";
+import { RelatorioForbiddenError } from "@/lib/server/relatorio-scope";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
 import { renderHtmlToPdfBuffer } from "@/lib/server/html-to-pdf";
@@ -21,6 +27,10 @@ function isEmail(value: string): boolean {
 }
 
 export async function POST(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_FINANCEIRO_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   const parsed = await parseJsonSafe<Body>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const reportId = parsed.value.reportId;
@@ -42,6 +52,7 @@ export async function POST(req: Request) {
       periodoFim,
       situacao: parsed.value.situacao,
       tipo: parsed.value.tipo,
+      access: relatorioAccessFromGate(gate, RELATORIOS_FINANCEIRO_RESOURCE),
     });
     const subject = report.assunto || `Relatório financeiro - ${report.resumo.reportTitulo}`;
     const htmlDocumento = montarDocumentoHtmlCompleto({
@@ -65,6 +76,7 @@ export async function POST(req: Request) {
     }
     return ok({ sent: true, messageId: send.messageId, response: send.response });
   } catch (error) {
+    if (error instanceof RelatorioForbiddenError) return fail("FORBIDDEN", error.message, 403);
     const message = error instanceof Error ? error.message : "Falha ao enviar relatório.";
     if (message.includes("não encontrado")) return fail("NOT_FOUND", message, 404);
     return fail("BAD_REQUEST", message, 400);

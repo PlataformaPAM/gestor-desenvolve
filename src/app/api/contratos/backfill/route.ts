@@ -2,9 +2,13 @@ import { backfillContratosFaltantes } from "@/lib/server/contratos-sync";
 import { fail, ok } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { prisma } from "@/lib/prisma";
+import { contratosAccessGate } from "@/lib/server/contratos-access";
 
 /** Quantos leads em Fechado ainda não têm contrato (antes de rodar o POST). */
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await contratosAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   try {
     const pendentes = await prisma.lead.count({
       where: {
@@ -19,7 +23,10 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const gate = await contratosAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   try {
     const result = await backfillContratosFaltantes();
     await writeAuditLog(prisma, {

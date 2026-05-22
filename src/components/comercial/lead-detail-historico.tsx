@@ -8,6 +8,7 @@ import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 type LeadDetailHistoricoProps = {
   interactions: LeadInteraction[];
   onAddInteraction: (entry: { description: string; anexos?: Array<string | { name: string; url: string }> }) => void;
+  readOnly?: boolean;
 };
 
 const TYPE_CONFIG: Record<
@@ -122,6 +123,7 @@ function formatValue(value: unknown): string {
 export function LeadDetailHistorico({
   interactions,
   onAddInteraction,
+  readOnly = false,
 }: LeadDetailHistoricoProps) {
   const [novaAtualizacao, setNovaAtualizacao] = useState("");
   const [arquivosAtualizacao, setArquivosAtualizacao] = useState<File[]>([]);
@@ -187,6 +189,7 @@ export function LeadDetailHistorico({
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
+      {!readOnly ? (
       <div className="space-y-3">
         <div className="relative">
           <MessageSquare className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
@@ -217,8 +220,9 @@ export function LeadDetailHistorico({
           </button>
         </div>
       </div>
+      ) : null}
 
-      <ul className="relative space-y-0 border-t border-slate-200 pt-6">
+      <ul className={`relative space-y-0 ${readOnly ? "" : "border-t border-slate-200 pt-6"}`}>
         <span
           className="absolute left-[11px] top-2 bottom-2 w-px bg-slate-200"
           aria-hidden

@@ -24,6 +24,9 @@ import {
   type OperacaoViewId,
 } from "@/lib/operacao/priorizacao";
 import { useAuth } from "@/contexts/auth-context";
+import { useResourcePageGuard, useResourceRbac } from "@/hooks/use-rbac-resource";
+
+const TAREFAS_RESOURCE = "tarefas.internas";
 import type { Cliente } from "@/lib/clientes/types";
 import type { DropResult } from "@hello-pangea/dnd";
 import { User } from "lucide-react";
@@ -80,6 +83,11 @@ const OPERACAO_VIEW_STORAGE_KEY = "operacao_view_tarefas";
 export default function TarefasPage() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
+  const podeVer = useResourcePageGuard(TAREFAS_RESOURCE);
+  const rbac = useResourceRbac(TAREFAS_RESOURCE);
+  const podeCriarTarefa = rbac.podeCriar;
+  const podeEditarTarefa = rbac.podeEditar;
+  const podeExcluirTarefa = rbac.podeExcluir;
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioTarefa[]>([]);
   const [clientes, setClientes] = useState<Pick<Cliente, "id" | "nome" | "empresa">[]>([]);
@@ -169,6 +177,10 @@ export default function TarefasPage() {
   );
 
   useEffect(() => {
+    if (!podeCriarTarefa) {
+      setPrimaryAction(null);
+      return;
+    }
     setPrimaryAction({
       label: "Nova Tarefa",
       onClick: () => {
@@ -178,7 +190,7 @@ export default function TarefasPage() {
       showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, podeCriarTarefa]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(OPERACAO_VIEW_STORAGE_KEY) as OperacaoViewId | null;
@@ -595,6 +607,8 @@ export default function TarefasPage() {
 
   const sheetTitle = selectedTarefa ? selectedTarefa.codigo : "Nova Tarefa";
 
+  if (!podeVer) return null;
+
   return (
     <section className="w-full min-w-0 space-y-6">
       <OperacaoViews value={operacaoView} onChange={setOperacaoView} closedLabel="Concluídas" />
@@ -650,13 +664,13 @@ export default function TarefasPage() {
         <TarefasKanban
           tarefas={tarefasFiltradas}
           onAbrirTarefa={abrirTarefa}
-          onDragEnd={handleDragEnd}
+          onDragEnd={podeEditarTarefa ? handleDragEnd : undefined}
         />
       ) : (
         <TarefasTable
           tarefas={tarefasFiltradas}
           onAbrirTarefa={abrirTarefa}
-          onExcluir={handleExcluirClick}
+          onExcluir={podeExcluirTarefa ? handleExcluirClick : undefined}
         />
       )}
 
@@ -720,9 +734,9 @@ export default function TarefasPage() {
                     .catch(() => undefined);
                 }
               }}
-              onSalvar={handleSalvarTarefa}
+              onSalvar={podeEditarTarefa ? handleSalvarTarefa : undefined}
             />
-          ) : (
+          ) : podeCriarTarefa ? (
             <NovaTarefaForm
               usuarios={usuarios}
               clientes={clientes}
@@ -730,10 +744,15 @@ export default function TarefasPage() {
               onSave={handleNovaTarefa}
               onCancel={handleCloseSheet}
             />
+          ) : (
+            <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              Sem permissão para criar tarefas.
+            </p>
           )}
         </div>
       </DrawerSheet>
 
+      {podeExcluirTarefa && (
       <AlertDialog
         open={!!tarefaToDelete}
         onClose={() => setTarefaToDelete(null)}
@@ -753,6 +772,7 @@ export default function TarefasPage() {
         confirmLabel="Sim, excluir permanentemente"
         destructive
       />
+      )}
 
       <Toast
         visible={toast.visible}

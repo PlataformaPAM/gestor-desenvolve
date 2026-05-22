@@ -1,4 +1,7 @@
-import type { ModuloPermissao } from "@/lib/configuracoes/types";
+import {
+  canViewResourceClient,
+  type ClientAuthSession,
+} from "@/lib/configuracoes/permission-client";
 
 export type SearchModule = "clientes" | "comercial" | "tarefas";
 
@@ -15,6 +18,12 @@ export type GroupedSearchResults = {
   tarefas: SearchResultItem[];
 };
 
+const SEARCH_MODULE_RESOURCES: Record<SearchModule, string> = {
+  clientes: "clientes.cadastro",
+  comercial: "comercial.pipeline",
+  tarefas: "tarefas.internas",
+};
+
 function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -28,13 +37,17 @@ function matchQuery(text: string, query: string): boolean {
   return normalize(text).includes(normalize(query));
 }
 
+function canSearchModule(session: ClientAuthSession, modulo: SearchModule): boolean {
+  return canViewResourceClient(session, SEARCH_MODULE_RESOURCES[modulo]);
+}
+
 /**
  * Busca global com regra de segurança: só procura e retorna resultados
- * de módulos para os quais o usuário tem permissão.
+ * de módulos para os quais o usuário tem permissão granular (Ver).
  */
 export function globalSearch(
   query: string,
-  userPermissions: Record<ModuloPermissao, boolean>
+  session: ClientAuthSession
 ): GroupedSearchResults {
   const q = query.trim();
   const results: GroupedSearchResults = {
@@ -47,9 +60,9 @@ export function globalSearch(
 
   // Busca global com dados reais será implementada em endpoint dedicado.
   // Enquanto isso, retornamos vazio para evitar resultados inconsistentes.
-  if (userPermissions.clientes && matchQuery("clientes", q)) results.clientes = [];
-  if (userPermissions.comercial && matchQuery("comercial", q)) results.comercial = [];
-  if (userPermissions.tarefas && matchQuery("tarefas", q)) results.tarefas = [];
+  if (canSearchModule(session, "clientes") && matchQuery("clientes", q)) results.clientes = [];
+  if (canSearchModule(session, "comercial") && matchQuery("comercial", q)) results.comercial = [];
+  if (canSearchModule(session, "tarefas") && matchQuery("tarefas", q)) results.tarefas = [];
 
   return results;
 }

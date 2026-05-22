@@ -1,9 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_LANCAMENTOS_RESOURCE,
+} from "@/lib/server/financeiro-access";
 import { ensureFinanceiroCadastros } from "../seed-defaults";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_LANCAMENTOS_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     const rows = await prisma.financeiroConta.findMany({
       orderBy: [{ ordem: "asc" }, { nome: "asc" }],
@@ -15,6 +22,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_LANCAMENTOS_RESOURCE, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{
     nome?: string;
     saldoInicial?: number;

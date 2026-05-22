@@ -8,6 +8,15 @@ import {
   backfillComissaoPagasSemLancamentoSaida,
   ensureComissaoEventoLancamentoSaidaSchema,
 } from "@/lib/server/ensure-comissao-evento-pg-schema";
+import {
+  assertComissaoIdsAllowed,
+  assertLancamentoLeadAccess,
+  filterComissoesConsultorId,
+  financeiroAccessGate,
+  FINANCEIRO_COMISSOES_RESOURCE,
+  FINANCEIRO_LANCAMENTOS_RESOURCE,
+  resolveConsultorRhForUsuario,
+} from "@/lib/server/financeiro-access";
 
 function toInt(v: string | null): number | undefined {
   if (!v) return undefined;
@@ -16,6 +25,9 @@ function toInt(v: string | null): number | undefined {
 }
 
 export async function GET(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
   await ensureComissaoEventoLancamentoSaidaSchema(prisma).catch((err) => {
     console.error("[api/financeiro/comissoes GET] ensure schema:", err);
   });
@@ -27,8 +39,18 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const competenciaAno = toInt(searchParams.get("ano"));
     const competenciaMes = toInt(searchParams.get("mes"));
-    const consultorId = searchParams.get("consultorId") ?? undefined;
+    const consultorIdParam = searchParams.get("consultorId") ?? undefined;
     const status = (searchParams.get("status") as ComissaoStatus | null) ?? undefined;
+
+    const ownConsultor = await resolveConsultorRhForUsuario(gate.userId);
+    const consultorId = filterComissoesConsultorId(consultorIdParam, ownConsultor?.id ?? null);
+    if (consultorId === "__none__") {
+      return ok({
+        eventos: [],
+        consultores: ownConsultor ? [{ id: ownConsultor.id, nome: ownConsultor.nome }] : [],
+        resumo: { previsto: 0, elegivel: 0, aprovado: 0, pago: 0 },
+      });
+    }
 
     const eventos = await prisma.comissaoEvento.findMany({
       where: {
@@ -44,11 +66,14 @@ export async function GET(req: Request) {
       },
       orderBy: [{ competenciaAno: "desc" }, { competenciaMes: "desc" }, { createdAt: "desc" }],
     });
-    const consultores = await prisma.colaboradorRH.findMany({
+    let consultores = await prisma.colaboradorRH.findMany({
       where: { tipoPessoa: { in: ["vendedor_externo", "equipe_interna"] }, status: "ativo" },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     });
+    if (gate.scope === "vinculados" && ownConsultor) {
+      consultores = consultores.filter((c) => c.id === ownConsultor.id);
+    }
     const resumo = eventos.reduce(
       (acc, e) => {
         const v = Number(e.valorComissao.toString());
@@ -87,8 +112,22 @@ export async function PATCH(req: Request) {
   const body = await parseJsonSafe<AcaoPayload>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const payload = body.value;
+
   if (payload.acao === "recalcular_lancamento") {
+    const gateLanc = await financeiroAccessGate(req, FINANCEIRO_LANCAMENTOS_RESOURCE, "editar");
+    if (!gateLanc.ok) return gateLanc.response;
     if (!payload.lancamentoId) return fail("BAD_REQUEST", "Informe o lançamento.", 400);
+    const lancRow = await prisma.lancamento.findUnique({
+      where: { id: payload.lancamentoId },
+      select: { leadIdOrigem: true },
+    });
+    if (!lancRow) return fail("NOT_FOUND", "Lançamento não encontrado.", 404);
+    const okLead = await assertLancamentoLeadAccess(
+      gateLanc.userId,
+      lancRow.leadIdOrigem,
+      gateLanc.scope
+    );
+    if (!okLead) return fail("FORBIDDEN", "Sem acesso a este lançamento.", 403);
     const result = await syncComissoesFromLancamentoPagamento(prisma, payload.lancamentoId);
     await writeAuditLog(prisma, {
       acao: "Recalcular comissão por lançamento",
@@ -97,8 +136,18 @@ export async function PATCH(req: Request) {
     });
     return ok({ recalculo: result });
   }
+
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "editar");
+  if (!gate.ok) return gate.response;
+
   const ids = payload.ids ?? [];
   if (!ids.length) return fail("BAD_REQUEST", "Nenhuma comissão selecionada.", 400);
+
+  const ownConsultor = await resolveConsultorRhForUsuario(gate.userId);
+  const idsOk = await assertComissaoIdsAllowed(ids, ownConsultor?.id ?? null, gate.scope);
+  if (!idsOk) {
+    return fail("FORBIDDEN", "Uma ou mais comissões não pertencem ao seu escopo.", 403);
+  }
 
   if (payload.acao === "aprovar_lote") {
     const updated = await prisma.comissaoEvento.updateMany({

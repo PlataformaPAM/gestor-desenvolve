@@ -5,6 +5,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { COOKIE_NAME, decodeSession } from "@/lib/auth";
+import { posvendaAccessGate } from "@/lib/server/posvenda-access";
 
 function mapStatus(status: TarefaRegua["status"]) {
   if (status === "concluida") return "concluido" as const;
@@ -14,6 +15,8 @@ function mapStatus(status: TarefaRegua["status"]) {
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await posvendaAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
   const cookieHeader = req.headers.get("cookie") || "";
   const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
   const session = decodeSession(match?.[1]?.trim());
@@ -100,6 +103,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+    const gate = await posvendaAccessGate(req, "excluir", id);
+    if (!gate.ok) return gate.response;
     const cookieHeader = req.headers.get("cookie") || "";
     const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
     const session = decodeSession(match?.[1]?.trim());

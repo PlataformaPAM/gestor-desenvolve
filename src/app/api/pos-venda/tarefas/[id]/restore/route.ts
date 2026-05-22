@@ -4,9 +4,13 @@ import { decodePosVendaMeta, encodePosVendaMeta } from "../../../_shared";
 import { emitAlert } from "@/lib/server/alerts";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { COOKIE_NAME, decodeSession } from "@/lib/auth";
+import { posvendaAccessGate } from "@/lib/server/posvenda-access";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await posvendaAccessGate(req, "excluir", id);
+  if (!gate.ok) return gate.response;
+
   const parsedBody = await parseJsonSafe<{ motivo?: string }>(req);
   if (!parsedBody.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const motivo = parsedBody.value.motivo?.trim();
@@ -15,13 +19,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const cookieHeader = req.headers.get("cookie") || "";
   const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
   const session = decodeSession(match?.[1]?.trim());
-  if (!session?.perfilId) return fail("UNAUTHORIZED", "Sessão inválida.", 401);
-  const perfil = await prisma.perfilAcesso.findUnique({
-    where: { id: session.perfilId },
-    select: { nome: true },
-  });
-  const isAdmin = (perfil?.nome || "").toLowerCase().includes("admin");
-  if (!isAdmin) return fail("FORBIDDEN", "Apenas administrador pode restaurar itens.", 403);
 
   const current = await prisma.tarefa.findUnique({ where: { id } });
   if (!current) return fail("NOT_FOUND", "Tarefa não encontrada.", 404);

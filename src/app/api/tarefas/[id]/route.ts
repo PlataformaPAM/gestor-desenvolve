@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
 import { composeDescricaoWithCategoria } from "@/lib/tarefas/categorias";
+import { tarefasAccessGate } from "@/lib/server/tarefas-access";
 
 function buildHistoricoId(tarefaId: string, index: number): string {
   return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
@@ -13,6 +14,9 @@ function buildHistoricoId(tarefaId: string, index: number): string {
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await tarefasAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<{ tarefa?: Tarefa }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const tarefa = parsed.value.tarefa;
@@ -235,8 +239,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return ok({ tarefa: mapTarefaFromDb(saved) });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await tarefasAccessGate(req, "excluir", id);
+  if (!gate.ok) return gate.response;
+
   const existing = await prisma.tarefa.findUnique({ where: { id }, select: { id: true, titulo: true } });
   if (!existing) return fail("NOT_FOUND", "Tarefa não encontrada.", 404);
   await prisma.tarefa.delete({ where: { id } });

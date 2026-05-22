@@ -76,6 +76,9 @@ type TicketFormSheetProps = {
   onClose: () => void;
   onSave: (data: TicketFormPayload) => void;
   clientes?: Array<{ id: string; nome: string; empresa?: string }>;
+  /** Usuários ativos do sistema (não pessoas de RH). */
+  usuarios?: TicketResponsavel[];
+  /** @deprecated Use `usuarios`. */
   equipe?: TicketResponsavel[];
   usuarioAtual?: TicketResponsavel;
   /** Ticket existente para visualizar/editar; null = novo ticket */
@@ -135,7 +138,8 @@ export function TicketFormSheet({
   onClose,
   onSave,
   clientes = [],
-  equipe = [],
+  usuarios: usuariosProp,
+  equipe: equipeLegacy = [],
   usuarioAtual = { id: "usuario-atual", nome: "Usuário" },
   initialTicket = null,
   title: titleProp,
@@ -145,6 +149,7 @@ export function TicketFormSheet({
   readOnlyStatus = false,
   hideSlaPreview = false,
 }: TicketFormSheetProps) {
+  const usuarios = usuariosProp ?? equipeLegacy;
   const id = useId();
   const [activeTab, setActiveTab] = useState<TabId>("detalhes");
 
@@ -196,14 +201,14 @@ export function TicketFormSheet({
     [clientes]
   );
 
-  /** Lista completa para o select de Responsável Principal (logado + equipe), sem duplicados por id */
+  /** Lista completa para o select de Responsável (logado + usuários do sistema), sem duplicados por id */
   const listaResponsaveisPrincipal = useMemo(() => {
     const byId = new Map<string, TicketResponsavel>();
-    [usuarioAtual, ...equipe].forEach((m) => {
+    [usuarioAtual, ...usuarios].forEach((m) => {
       if (!byId.has(m.id)) byId.set(m.id, m);
     });
     return Array.from(byId.values());
-  }, [usuarioAtual, equipe]);
+  }, [usuarioAtual, usuarios]);
   const responsavelOptions: SearchableOption[] = useMemo(
     () =>
       listaResponsaveisPrincipal.map((r) => ({
@@ -215,10 +220,10 @@ export function TicketFormSheet({
   );
   const colaboradorOptions: SearchableOption[] = useMemo(
     () =>
-      equipe
+      usuarios
         .filter((m) => m.id !== responsavelPrincipal.id)
         .map((m) => ({ value: m.id, label: m.nome, icon: Users })),
-    [equipe, responsavelPrincipal.id]
+    [usuarios, responsavelPrincipal.id]
   );
   const colaboradorIds = useMemo(() => colaboradores.map((c) => c.id), [colaboradores]);
   const categoriaOptions: SearchableOption[] = useMemo(
@@ -404,7 +409,7 @@ export function TicketFormSheet({
   useEffect(() => {
     if (prevResponsavelPrincipalIdRef.current === "") return;
     if (prevResponsavelPrincipalIdRef.current === responsavelPrincipal.id) return;
-    const todosMembros = [usuarioAtual, ...equipe];
+    const todosMembros = [usuarioAtual, ...usuarios];
     const prevNome = todosMembros.find((m) => m.id === prevResponsavelPrincipalIdRef.current)?.nome ?? "Responsável";
     const nextNome = responsavelPrincipal.nome;
     setHistorico((prev) => [
@@ -435,7 +440,7 @@ export function TicketFormSheet({
       if (r) entries.push({ id: `h-${Date.now()}-${id}`, data: now, acao: `Colaborador ${r.nome} adicionado ao ticket`, autor: usuarioAtual.nome });
     });
     removed.forEach((id) => {
-      const nome = equipe.find((m) => m.id === id)?.nome ?? "Colaborador";
+      const nome = usuarios.find((m) => m.id === id)?.nome ?? "Usuário";
       entries.push({ id: `h-${Date.now()}-rm-${id}`, data: now, acao: `Colaborador ${nome} removido do ticket`, autor: usuarioAtual.nome });
     });
     if (entries.length) setHistorico((prev) => [...prev, ...entries]);
@@ -550,7 +555,7 @@ export function TicketFormSheet({
   };
   const handleChangeColaboradores = (ids: string[]) => {
     const next = ids
-      .map((id) => equipe.find((m) => m.id === id))
+      .map((id) => usuarios.find((m) => m.id === id))
       .filter(Boolean) as TicketResponsavel[];
     setColaboradores(next);
   };
@@ -734,14 +739,14 @@ export function TicketFormSheet({
                   <div className="space-y-2">
                     <span className={labelClass}>Colaboradores</span>
                     <p className="text-xs text-slate-500">
-                      Outros membros da equipe que atuam no chamado em conjunto.
+                      Outros usuários do sistema que atuam no chamado em conjunto.
                     </p>
                     <SearchableMultiSelect
                       options={colaboradorOptions}
                       values={colaboradorIds}
                       onChange={handleChangeColaboradores}
-                      placeholder="Selecionar colaboradores..."
-                      searchPlaceholder="Buscar colaborador..."
+                      placeholder="Selecionar usuários..."
+                      searchPlaceholder="Buscar usuário..."
                       selectedLabel="Selecionados"
                       leadingIcon={Users}
                     />

@@ -1,3 +1,10 @@
+import {
+  relatorioAccessForResource,
+  relatoriosAccessGate,
+  RELATORIOS_OPERACIONAL_RESOURCE,
+  RELATORIOS_PRESTACAO_CONTAS_RESOURCE,
+} from "@/lib/server/relatorios-access";
+import { RelatorioForbiddenError } from "@/lib/server/relatorio-scope";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/server/api-response";
 import { montarDocumentoHtmlCompleto } from "@/lib/documentos/documento-html";
@@ -24,6 +31,10 @@ function isAuthorized(req: Request): boolean {
 }
 
 export async function POST(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_OPERACIONAL_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   if (!isAuthorized(req)) return fail("UNAUTHORIZED", "Token de execução inválido.", 401);
 
   const today = new Date();
@@ -83,6 +94,7 @@ export async function POST(req: Request) {
         modeloId: ag.modeloId,
         periodoInicio: period.inicio,
         periodoFim: period.fim,
+        access: relatorioAccessForResource(gate, RELATORIOS_PRESTACAO_CONTAS_RESOURCE),
       });
       const htmlDocumento = montarDocumentoHtmlCompleto({
         title: `Relatório - ${report.resumo.cliente}`,
@@ -159,6 +171,10 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_OPERACIONAL_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   if (!isAuthorized(req)) return fail("UNAUTHORIZED", "Token de execução inválido.", 401);
   const row = await prisma.configuracaoSistema.findUnique({
     where: { chave: RELATORIOS_AGENDAMENTOS_ESTADO_CHAVE },

@@ -4,6 +4,11 @@ import { mapLancamentoFromDb } from "../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncComissoesFromLancamentoPagamento } from "@/lib/server/comissoes-service";
+import {
+  assertLancamentoLeadAccess,
+  financeiroAccessGate,
+  FINANCEIRO_LANCAMENTOS_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 function toDate(v: string): Date {
   const d = new Date(v);
@@ -11,11 +16,23 @@ function toDate(v: string): Date {
 }
 
 export async function POST(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_LANCAMENTOS_RESOURCE, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ lancamentos?: Lancamento[] }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const lancamentos = body.value.lancamentos ?? [];
   if (!lancamentos.length) {
     return fail("BAD_REQUEST", "Nenhum lançamento informado.", 400);
+  }
+
+  for (const l of lancamentos) {
+    if (l.leadIdOrigem) {
+      const ok = await assertLancamentoLeadAccess(gate.userId, l.leadIdOrigem, gate.scope);
+      if (!ok) return fail("FORBIDDEN", "Sem acesso ao lead vinculado ao lançamento.", 403);
+    } else if (gate.scope === "vinculados") {
+      return fail("FORBIDDEN", "Lançamentos manuais exigem escopo ampliado.", 403);
+    }
   }
 
   await prisma.$transaction(

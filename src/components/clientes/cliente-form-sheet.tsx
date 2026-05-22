@@ -99,6 +99,7 @@ type ClienteFormSheetProps = {
   onClose: () => void;
   initialCliente?: Cliente | null;
   onSave: (cliente: Cliente) => void;
+  readOnly?: boolean;
 };
 
 export function ClienteFormSheet({
@@ -106,6 +107,7 @@ export function ClienteFormSheet({
   onClose,
   initialCliente = null,
   onSave,
+  readOnly = false,
 }: ClienteFormSheetProps) {
   const id = useId();
   const isEdit = !!initialCliente?.id;
@@ -260,6 +262,7 @@ export function ClienteFormSheet({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     const cliente: Cliente = {
       id: initialCliente?.id ?? String(Date.now()),
       nome: nome.trim() || empresaTrim,
@@ -338,6 +341,7 @@ export function ClienteFormSheet({
       desktopContentPaddingClassName="px-0"
     >
       <form onSubmit={handleSubmit} autoComplete="off" className="flex h-full min-h-0 flex-col">
+        <fieldset disabled={readOnly} className="flex min-h-0 flex-1 flex-col border-0 p-0 m-0">
         <div
           role="tablist"
           className="flex shrink-0 border-b border-slate-300 bg-slate-50/50 dark:border-slate-600 dark:bg-slate-800/50"
@@ -713,6 +717,7 @@ export function ClienteFormSheet({
             </div>
           )}
         </div>
+        </fieldset>
 
         <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 lg:px-6">
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
@@ -723,9 +728,10 @@ export function ClienteFormSheet({
             >
               <span className="inline-flex items-center gap-2">
                 <X className="h-4 w-4 shrink-0" aria-hidden />
-                Cancelar
+                {readOnly ? "Fechar" : "Cancelar"}
               </span>
             </button>
+            {!readOnly ? (
             <button
               type="submit"
               className={formModalSubmitButtonClass}
@@ -735,6 +741,7 @@ export function ClienteFormSheet({
                 Salvar
               </span>
             </button>
+            ) : null}
           </div>
         </div>
       </form>

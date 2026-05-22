@@ -19,6 +19,7 @@ type LeadDetailAcoesProps = {
   stages: PipelineStage[];
   onMudarEtapa: (stageId: PipelineStageId, options?: { motivoPerda?: string }) => void;
   onSolicitarLiberacaoFinanceiro?: (motivo: string) => void;
+  readOnly?: boolean;
 };
 
 export function LeadDetailAcoes({
@@ -26,6 +27,7 @@ export function LeadDetailAcoes({
   stages,
   onMudarEtapa,
   onSolicitarLiberacaoFinanceiro = () => {},
+  readOnly = false,
 }: LeadDetailAcoesProps) {
   const [motivoPerda, setMotivoPerda] = useState("");
   const [perdidoModalOpen, setPerdidoModalOpen] = useState(false);
@@ -37,7 +39,7 @@ export function LeadDetailAcoes({
   const prevStageLinear = prevId ? stages.find((s) => s.id === prevId) : null;
   const nextStage = nextId ? stages.find((s) => s.id === nextId) : null;
   const isContrato = lead.stageId === "contratacao";
-  const isLockedByFinanceiro = !!lead.financeiroFluxo?.bloqueadoEdicao;
+  const isLockedByFinanceiro = !!lead.financeiroFluxo?.bloqueadoEdicao || readOnly;
   const prevStageFechado = stages.find((s) => s.id === "contratacao") ?? null;
   const prevStage =
     lead.stageId === "fechado" && !isLockedByFinanceiro ? prevStageFechado : prevStageLinear;

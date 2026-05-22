@@ -292,13 +292,15 @@ model UsuarioVinculo {
 }
 
 model PerfilAcesso {
-  id                 String                 @id @default(uuid())
-  nome               String
-  descricao          String?
-  permissoes         PerfilPermissao[]
-  usuarios           Usuario[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id                    String                 @id @default(uuid())
+  nome                  String
+  descricao             String?
+  /// Matriz JSON: { [resourceId]: { ver, criar, editar, excluir, verTodos } }
+  permissoesGranulares  Json?
+  permissoes            PerfilPermissao[]
+  usuarios              Usuario[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 }
 
 model PerfilPermissao {

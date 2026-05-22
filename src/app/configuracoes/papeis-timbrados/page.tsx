@@ -33,6 +33,10 @@ import {
   formTextareaClass,
 } from "@/components/ui/field-patterns";
 import { usePageHeader } from "@/contexts/page-header-context";
+import {
+  useConfiguracoesResourceRbac,
+  useConfiguracoesSectionGuard,
+} from "@/hooks/use-rbac-resource";
 import { emptyEmpresaDocumentoConfig, type EmpresaDocumentoConfig } from "@/lib/documentos/empresa-config-schema";
 
 type LayoutSlice = Pick<
@@ -111,6 +115,8 @@ function defaultRenderConfig(papelTimbradoUrl = ""): LayoutSlice {
 }
 
 export default function PapeisTimbradosPage() {
+  useConfiguracoesSectionGuard("configuracoes.papeis_timbrados");
+  const rbac = useConfiguracoesResourceRbac("configuracoes.papeis_timbrados");
   const { setPrimaryAction } = usePageHeader();
   const [timbres, setTimbres] = useState<DocumentoTimbre[]>([]);
   const [busca, setBusca] = useState("");
@@ -157,6 +163,10 @@ export default function PapeisTimbradosPage() {
   }, [carregar]);
 
   useEffect(() => {
+    if (!rbac.podeCriar) {
+      setPrimaryAction(null);
+      return () => setPrimaryAction(null);
+    }
     setPrimaryAction({
       label: "Novo Timbrado",
       showPlusIcon: true,
@@ -173,7 +183,7 @@ export default function PapeisTimbradosPage() {
       },
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, rbac.podeCriar]);
 
   useEffect(() => {
     return () => {
@@ -316,18 +326,24 @@ export default function PapeisTimbradosPage() {
               <img src={t.url} alt={t.nome} className="h-24 w-full rounded object-contain" />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => abrirEdicao(t)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </button>
+              {rbac.podeEditar ? (
+                <button type="button" onClick={() => abrirEdicao(t)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </button>
+              ) : null}
               <a href={t.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
                 <Eye className="h-3.5 w-3.5" /> Prévia
               </a>
-              <button type="button" disabled={savingId === t.id} onClick={() => toggleAtivo(t)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
-                <Power className="h-3.5 w-3.5" /> {t.ativo ? "Desativar" : "Ativar"}
-              </button>
-              <button type="button" disabled={removingId === t.id} onClick={() => remover(t.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/30">
-                <Trash2 className="h-3.5 w-3.5" /> {removingId === t.id ? "Excluindo..." : "Excluir"}
-              </button>
+              {rbac.podeEditar ? (
+                <button type="button" disabled={savingId === t.id} onClick={() => toggleAtivo(t)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                  <Power className="h-3.5 w-3.5" /> {t.ativo ? "Desativar" : "Ativar"}
+                </button>
+              ) : null}
+              {rbac.podeExcluir ? (
+                <button type="button" disabled={removingId === t.id} onClick={() => remover(t.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/30">
+                  <Trash2 className="h-3.5 w-3.5" /> {removingId === t.id ? "Excluindo..." : "Excluir"}
+                </button>
+              ) : null}
             </div>
           </article>
         ))}
@@ -566,12 +582,14 @@ export default function PapeisTimbradosPage() {
                 Cancelar
               </span>
             </button>
-            <button type="button" disabled={savingId !== null} onClick={salvarFormulario} className={formModalSubmitButtonClass}>
-              <span className="inline-flex items-center gap-2">
-                <Save className="h-4 w-4 shrink-0" aria-hidden />
-                {savingId ? "Salvando..." : "Salvar"}
-              </span>
-            </button>
+            {(form.id ? rbac.podeEditar : rbac.podeCriar) ? (
+              <button type="button" disabled={savingId !== null} onClick={salvarFormulario} className={formModalSubmitButtonClass}>
+                <span className="inline-flex items-center gap-2">
+                  <Save className="h-4 w-4 shrink-0" aria-hidden />
+                  {savingId ? "Salvando..." : "Salvar"}
+                </span>
+              </button>
+            ) : null}
           </div>
         </div>
       </DrawerSheet>

@@ -11,6 +11,7 @@ import {
   type FinanceiroTipo,
 } from "@/lib/relatorios/financeiro-catalogo";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useRelatorioRbac } from "@/hooks/use-rbac-resource";
 
 type ClienteOption = { id: string; nome: string; empresa?: string };
 type ModeloDocumento = { id: string; nome: string };
@@ -32,6 +33,7 @@ function asDateInput(date: Date): string {
 }
 
 export default function RelatoriosFinanceiroPage() {
+  const podeVer = useRelatorioRbac("relatorios.financeiro");
   const router = useRouter();
   const { setPrimaryAction } = usePageHeader();
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
@@ -225,6 +227,8 @@ export default function RelatoriosFinanceiroPage() {
       setBusyEmail(false);
     }
   };
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full min-w-0 space-y-6">

@@ -9,6 +9,7 @@ import {
   type OperacionalSituacao,
 } from "@/lib/relatorios/operacional-catalogo";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useRelatorioRbac } from "@/hooks/use-rbac-resource";
 
 type ClienteOption = { id: string; nome: string; empresa?: string };
 type ModeloDocumento = { id: string; nome: string };
@@ -30,6 +31,7 @@ function asDateInput(date: Date): string {
 }
 
 export default function RelatoriosOperacionalPage() {
+  const podeVer = useRelatorioRbac("relatorios.operacional");
   const router = useRouter();
   const { setPrimaryAction } = usePageHeader();
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
@@ -179,6 +181,8 @@ export default function RelatoriosOperacionalPage() {
       setBusyEmail(false);
     }
   };
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full min-w-0 space-y-6">

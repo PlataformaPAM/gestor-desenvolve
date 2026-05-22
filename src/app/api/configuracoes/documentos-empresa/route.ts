@@ -1,4 +1,5 @@
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 import {
   getEmpresaDocumentoConfig,
   normalizeEmpresaDocumentoConfig,
@@ -8,7 +9,10 @@ import {
 
 type PutBody = { config?: Partial<EmpresaDocumentoConfig> };
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.dadosEmpresa, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     const config = await getEmpresaDocumentoConfig();
     return ok({ config });
@@ -18,6 +22,9 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.dadosEmpresa, "editar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<PutBody>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   try {

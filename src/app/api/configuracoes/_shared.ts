@@ -7,6 +7,7 @@ import type {
   VinculacaoPessoa,
 } from "@/lib/configuracoes/types";
 import { DB_PERMISSION_MODULES, withDerivedConfiguracoes } from "@/lib/configuracoes/permission-utils";
+import { loadGrantsForPerfil, attachGrantsToPerfilFront } from "@/lib/server/perfil-grants";
 
 function mapVinculacaoLegacy(u: Usuario): VinculacaoPessoa | undefined {
   if (!u.vinculacaoTipo || !u.vinculacaoPessoaId) return undefined;
@@ -37,7 +38,7 @@ export function mapUsuario(u: Usuario & { vinculos?: UsuarioVinculo[] }): Usuari
 }
 
 export function mapPerfil(
-  p: PerfilAcesso & { permissoes: PerfilPermissao[] },
+  p: PerfilAcesso & { permissoes: PerfilPermissao[]; permissoesGranulares?: unknown },
   extras?: Partial<Record<ModuloPermissao, boolean>>
 ): PerfilAcessoFront {
   const permissoesBase = Object.fromEntries(
@@ -48,12 +49,23 @@ export function mapPerfil(
     permissoesBase[modulo] = pp.permitido;
   }
   const permissoes = withDerivedConfiguracoes({ ...permissoesBase, ...(extras ?? {}) });
-  return {
-    id: p.id,
-    nome: p.nome,
-    descricao: p.descricao ?? undefined,
-    permissoes,
-  };
+  const grants = loadGrantsForPerfil(
+    {
+      nome: p.nome,
+      permissoesGranulares: p.permissoesGranulares,
+      permissoes: p.permissoes.map((pp) => ({ modulo: pp.modulo, permitido: pp.permitido })),
+    },
+    extras
+  );
+  return attachGrantsToPerfilFront(
+    {
+      id: p.id,
+      nome: p.nome,
+      descricao: p.descricao ?? undefined,
+      permissoes,
+    },
+    grants
+  );
 }
 
 export function mapLog(l: LogSistema & { usuario: Usuario | null }): LogSistemaFront {

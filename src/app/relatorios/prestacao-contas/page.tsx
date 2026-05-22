@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { CalendarRange, Download, FileText, Send } from "lucide-react";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useRelatorioRbac } from "@/hooks/use-rbac-resource";
 
 type ClienteOption = { id: string; nome: string; empresa?: string };
 type ModeloDocumento = { id: string; nome: string };
@@ -17,6 +18,7 @@ function asDateInput(date: Date): string {
 }
 
 export default function RelatoriosPrestacaoContasPage() {
+  const podeVer = useRelatorioRbac("relatorios.prestacao_contas");
   const router = useRouter();
   const { setPrimaryAction } = usePageHeader();
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
@@ -192,6 +194,8 @@ export default function RelatoriosPrestacaoContasPage() {
       setBusyEmail(false);
     }
   };
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full min-w-0 space-y-6">

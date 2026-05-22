@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { Activity, BarChart3, Briefcase, CircleDollarSign, Layers, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { canViewResourceClient } from "@/lib/configuracoes/permission-client";
 
 const AREAS = [
   {
     id: "saude-empresa",
+    resourceId: "relatorios.saude_empresa",
     titulo: "Saúde da Empresa",
     descricao: "Visão executiva integrada com score por cliente e indicadores críticos da operação.",
     href: "/relatorios/saude-empresa",
@@ -15,6 +19,7 @@ const AREAS = [
   },
   {
     id: "operacional",
+    resourceId: "relatorios.operacional",
     titulo: "Operacional",
     descricao: "Relatórios de Tarefas Internas e Suporte para priorização e acompanhamento diário.",
     href: "/relatorios/operacional",
@@ -24,6 +29,7 @@ const AREAS = [
   },
   {
     id: "financeiro",
+    resourceId: "relatorios.financeiro",
     titulo: "Financeiro",
     descricao: "Fluxo de caixa, inadimplência, desempenho por categoria e visão de fechamento.",
     href: "/relatorios/financeiro",
@@ -33,6 +39,7 @@ const AREAS = [
   },
   {
     id: "comercial",
+    resourceId: "relatorios.comercial",
     titulo: "Comercial",
     descricao: "Conversão de funil, propostas emitidas, ciclo de vendas e motivos de perda.",
     href: "/relatorios/comercial",
@@ -42,6 +49,7 @@ const AREAS = [
   },
   {
     id: "prestacao-contas",
+    resourceId: "relatorios.prestacao_contas",
     titulo: "Prestação de Contas",
     descricao: "Consolida resultados por cliente com foco em comunicação executiva e entrega mensal.",
     href: "/relatorios/prestacao-contas",
@@ -52,6 +60,12 @@ const AREAS = [
 ] as const;
 
 export default function RelatoriosPage() {
+  const { session } = useAuth();
+  const areasVisiveis = useMemo(
+    () => AREAS.filter((area) => canViewResourceClient(session, area.resourceId)),
+    [session]
+  );
+
   return (
     <section className="w-full min-w-0 space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -68,8 +82,14 @@ export default function RelatoriosPage() {
         </div>
       </header>
 
+      {areasVisiveis.length === 0 ? (
+        <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+          Nenhuma área de relatórios liberada para o seu perfil.
+        </p>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
-        {AREAS.map((area) => {
+        {areasVisiveis.map((area) => {
           const Icon = area.icon;
           return area.enabled ? (
             <Link

@@ -2,6 +2,9 @@ import { fail, ok } from "@/lib/server/api-response";
 import { COOKIE_NAME, decodeSession, encodeSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadSessionPermissions } from "@/lib/server/session-permissions";
+import { applySessionAccessRules } from "@/lib/server/session-access";
+import { isAdminProfileName, withAdminOverride } from "@/lib/configuracoes/permission-utils";
+import { grantsForAdmin, grantsFromLegacyPermissoes } from "@/lib/configuracoes/permission-grants";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 
@@ -14,17 +17,29 @@ export async function GET(req: Request) {
     return fail("UNAUTHORIZED", "Sessão inválida.", 401);
   }
 
-  let permissoes = session.permissoes ?? {};
-  let perfilNome = session.perfilNome ?? "";
-  let isSystemAdmin = session.isSystemAdmin === true;
-
+  let resolved: Awaited<ReturnType<typeof loadSessionPermissions>> | undefined;
   try {
-    const resolved = await loadSessionPermissions(prisma, session.perfilId);
-    permissoes = resolved.permissoes;
-    perfilNome = resolved.perfilNome;
-    isSystemAdmin = resolved.isSystemAdmin;
+    resolved = await loadSessionPermissions(prisma, session.perfilId);
   } catch (error) {
     console.error("[auth/session] falha ao carregar perfil/permissões:", error);
+    try {
+      const perfil = await prisma.perfilAcesso.findUnique({
+        where: { id: session.perfilId },
+        select: { nome: true },
+      });
+      const perfilNomeFallback = perfil?.nome?.trim() ?? session.perfilNome ?? "";
+      const permissoesFallback = withAdminOverride(session.permissoes ?? {}, perfilNomeFallback);
+      resolved = {
+        perfilNome: perfilNomeFallback,
+        isSystemAdmin: isAdminProfileName(perfilNomeFallback),
+        permissoes: permissoesFallback,
+        grants: isAdminProfileName(perfilNomeFallback)
+          ? grantsForAdmin()
+          : grantsFromLegacyPermissoes(permissoesFallback),
+      };
+    } catch (fallbackError) {
+      console.error("[auth/session] fallback de perfil falhou:", fallbackError);
+    }
   }
 
   let usuario: {
@@ -76,12 +91,13 @@ export async function GET(req: Request) {
     console.error("[auth/session] falha ao carregar vínculos cliente:", error);
   }
 
-  const isPortalCliente = (clienteIds?.length ?? 0) > 0 || session.isPortalCliente === true;
-  const isAdminCliente =
-    isPortalCliente &&
-    (permissoes.configuracoes === true ||
-      isSystemAdmin ||
-      session.isAdminCliente === true);
+  const access = applySessionAccessRules({ ...session, clienteIds }, resolved);
+  const { permissoes, perfilNome, isSystemAdmin, isPortalCliente, isAdminCliente } = access;
+
+  const permissoesGranulares =
+    resolved?.grants ??
+    (isSystemAdmin ? grantsForAdmin() : grantsFromLegacyPermissoes(permissoes));
+
   const response = ok({
     perfilId: session.perfilId,
     userId,
@@ -95,6 +111,7 @@ export async function GET(req: Request) {
     isSystemAdmin,
     perfilNome,
     permissoes,
+    permissoesGranulares,
   });
 
   response.cookies.set({

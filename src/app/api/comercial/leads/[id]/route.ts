@@ -11,6 +11,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
 import { emitAlert, emitManyAlerts } from "@/lib/server/alerts";
+import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 import { getSessionUserId } from "@/lib/server/request-session";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 import { syncLeadSolucoesForPayload } from "@/lib/server/lead-solucoes-sync";
@@ -34,6 +35,8 @@ async function loadLead(id: string) {
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const gate = await comercialAccessGate(req, "editar", id);
+  if (!gate.ok) return gate.response;
   const sessionUserId = getSessionUserId(req);
   const parsed = await parseJsonSafe<{ lead?: Lead }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);

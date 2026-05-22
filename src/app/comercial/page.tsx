@@ -26,6 +26,7 @@ import {
 import { canTransitionStage } from "@/lib/comercial/stage-gates";
 import { usePageHeader } from "@/contexts/page-header-context";
 import { useAuth } from "@/contexts/auth-context";
+import { useComercialPageGuard, useComercialRbac } from "@/hooks/use-rbac-resource";
 import { createLeadCreatedLog, generateAuditLogs } from "@/lib/comercial/audit";
 import { createInitialOwnershipInteraction } from "@/lib/comercial/ownership";
 import { formModalCancelButtonClass } from "@/components/ui/field-patterns";
@@ -86,6 +87,8 @@ function clearFinanceiroFluxoPendente(lead: Lead): NonNullable<Lead["financeiroF
 function ComercialPageContent() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
+  const podeVerComercial = useComercialPageGuard();
+  const { podeCriar: podeCriarLead, podeEditar: podeEditarLead } = useComercialRbac();
   const currentUserName = session.userName ?? "Usuário";
   const searchParams = useSearchParams();
 
@@ -368,13 +371,17 @@ function ComercialPageContent() {
   );
 
   useEffect(() => {
+    if (!podeCriarLead) {
+      setPrimaryAction(null);
+      return;
+    }
     setPrimaryAction({
       label: "Novo Lead",
       onClick: () => setNovoLeadOpen(true),
       showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, podeCriarLead]);
 
   useEffect(() => {
     let active = true;
@@ -597,6 +604,7 @@ function ComercialPageContent() {
   );
 
   const onDragEnd = useCallback((result: DropResult) => {
+    if (!podeEditarLead) return;
     const { source, destination } = result;
     if (!destination) return;
 
@@ -630,10 +638,11 @@ function ComercialPageContent() {
       sourceIndex: source.index,
       destIndex: destination.index,
     });
-  }, [columns, applyKanbanMove]);
+  }, [columns, applyKanbanMove, podeEditarLead]);
 
   const handleNovoLeadSubmit = useCallback(
     async (raw: Partial<Lead> & Pick<Lead, "name" | "value" | "stageId" | "priority">) => {
+      if (!podeCriarLead) return;
       const now = new Date().toISOString();
       const lead: Lead = {
         origem: "outro",
@@ -684,6 +693,7 @@ function ComercialPageContent() {
       showErrorToast,
       pulseLeadCard,
       recomputePendingAlerts,
+      podeCriarLead,
     ]
   );
 
@@ -692,6 +702,7 @@ function ComercialPageContent() {
       updates: Partial<Lead>,
       opts?: { allowWhileFinanceiroLocked?: boolean; skipSuccessToast?: boolean }
     ) => {
+    if (!podeEditarLead) return;
     if (!selectedLeadId) return;
     if (
       selectedLead?.financeiroFluxo?.bloqueadoEdicao &&
@@ -746,10 +757,12 @@ function ComercialPageContent() {
     rollbackFromServer,
     showErrorToast,
     scheduleLeadCardPulse,
+    podeEditarLead,
   ]);
 
   const handleMudarEtapa = useCallback(
     (stageId: PipelineStageId, options?: { motivoPerda?: string }) => {
+      if (!podeEditarLead) return;
       if (!selectedLeadId || !selectedLead) return;
       if (selectedLead.financeiroFluxo?.bloqueadoEdicao) {
         showErrorToast("Lead bloqueado pelo Financeiro. Solicite liberação na aba Ações.");
@@ -832,6 +845,7 @@ function ComercialPageContent() {
       showErrorToast,
       scheduleLeadCardPulse,
       clearComercialPendingBadgeIfLeftProspecao,
+      podeEditarLead,
     ]
   );
 
@@ -994,6 +1008,8 @@ function ComercialPageContent() {
     [selectedLeadId, selectedLead, handleUpdateLead, currentUserName, session.userId, showErrorToast]
   );
 
+  if (!podeVerComercial) return null;
+
   return (
     <section className="w-full min-w-0 space-y-6">
       <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end sm:gap-3">
@@ -1012,6 +1028,7 @@ function ComercialPageContent() {
             pendingLeadCountById={pendingLeadCountById}
             pendingStageCountById={pendingStageCountById}
             pulsingLeadIds={pulsingLeadIds}
+            dragEnabled={podeEditarLead}
           />
         </div>
       ) : (
@@ -1043,6 +1060,7 @@ function ComercialPageContent() {
         onAtualizarContatosCliente={handleAtualizarContatosCliente}
         onSolicitarLiberacaoFinanceiro={handleSolicitarLiberacaoFinanceiro}
         usuarios={usuarios}
+        readOnly={!podeEditarLead}
       />
 
       <NovoLeadPanel

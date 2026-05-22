@@ -1,140 +1,35 @@
-import type { TipoPessoaRH } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapTarefaFromDb } from "../_shared";
 import { ok } from "@/lib/server/api-response";
+import { filterTarefasForSession, tarefasAccessGate } from "@/lib/server/tarefas-access";
+import { loadUsuariosAtivosParaVinculo } from "@/lib/server/usuarios-ativos";
 
-export async function GET() {
-  const [usuariosBase, colaboradoresRh, tarefas] = await Promise.all([
-    loadUsuariosBase(),
-    loadColaboradoresRhSafe(),
+export async function GET(req: Request) {
+  const gate = await tarefasAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
+  const [mappedUsuarios, tarefas] = await Promise.all([
+    loadUsuariosAtivosParaVinculo(),
     loadTarefasSafe(),
   ]);
-
-  const usuariosById = new Map<string, { id: string; nome: string }>();
-  usuariosBase.forEach((u) => {
-    usuariosById.set(u.id, { id: u.id, nome: u.nomeExibicao?.trim() || u.email });
-  });
-
-  const usuariosByEmail = new Map<string, string>();
-  const usuariosByCpf = new Map<string, string>();
-  usuariosBase.forEach((u) => {
-    const email = (u.email ?? "").trim().toLowerCase();
-    const cpf = (u.cpf ?? "").replace(/\D/g, "");
-    if (email) usuariosByEmail.set(email, u.id);
-    if (cpf) usuariosByCpf.set(cpf, u.id);
-  });
-
-  colaboradoresRh.forEach((c) => {
-    const email = (c.email ?? "").trim().toLowerCase();
-    const cpfCnpj = (c.cpfCnpj ?? "").replace(/\D/g, "");
-    const maybeUserId =
-      (email ? usuariosByEmail.get(email) : undefined) ??
-      (cpfCnpj ? usuariosByCpf.get(cpfCnpj) : undefined);
-    if (!maybeUserId) return;
-    if (usuariosById.has(maybeUserId)) {
-      usuariosById.set(maybeUserId, { id: maybeUserId, nome: c.nome.trim() || usuariosById.get(maybeUserId)!.nome });
-    }
-  });
-
-  const mappedUsuarios = [...usuariosById.values()].sort((a, b) =>
-    a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
+  const mappedTarefas = filterTarefasForSession(
+    tarefas
+      .map((t) => {
+        try {
+          return mapTarefaFromDb(t as Parameters<typeof mapTarefaFromDb>[0]);
+        } catch (e) {
+          console.warn("[tarefas/bootstrap] falha ao mapear tarefa; item ignorado.", e);
+          return null;
+        }
+      })
+      .filter((t): t is NonNullable<typeof t> => t != null),
+    gate.session,
+    gate.userId
   );
-  const mappedTarefas = tarefas
-    .map((t) => {
-      try {
-        return mapTarefaFromDb(t as Parameters<typeof mapTarefaFromDb>[0]);
-      } catch (e) {
-        console.warn("[tarefas/bootstrap] falha ao mapear tarefa; item ignorado.", e);
-        return null;
-      }
-    })
-    .filter((t): t is NonNullable<typeof t> => t != null);
   return ok({
     usuarios: mappedUsuarios,
     tarefas: mappedTarefas,
     data: { usuarios: mappedUsuarios, tarefas: mappedTarefas },
   });
-}
-
-type UsuarioBase = {
-  id: string;
-  nomeExibicao?: string | null;
-  email: string;
-  cpf?: string | null;
-};
-
-async function loadUsuariosBase(): Promise<UsuarioBase[]> {
-  // Tentativa principal (schema completo).
-  try {
-    const ativos = await prisma.usuario.findMany({
-      where: { ativo: true },
-      orderBy: { nomeExibicao: "asc" },
-      select: { id: true, nomeExibicao: true, email: true, cpf: true },
-    });
-    if (ativos.length > 0) return ativos;
-  } catch (e) {
-    console.warn("[tarefas/bootstrap] usuarios com cpf falhou; fallback sem cpf.", e);
-  }
-
-  // Fallback sem cpf (ambientes com cliente Prisma/schema divergente).
-  try {
-    const ativos = await prisma.usuario.findMany({
-      where: { ativo: true },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, nomeExibicao: true, email: true },
-    });
-    if (ativos.length > 0) return ativos;
-  } catch (e) {
-    console.warn("[tarefas/bootstrap] usuarios ativos falhou; fallback geral.", e);
-  }
-
-  // Último fallback: não bloquear dropdowns se não houver flag de ativo consistente.
-  try {
-    return await prisma.usuario.findMany({
-      orderBy: { createdAt: "desc" },
-      select: { id: true, nomeExibicao: true, email: true },
-    });
-  } catch (e) {
-    console.error("[tarefas/bootstrap] usuarios fallback geral falhou.", e);
-    return [];
-  }
-}
-
-type ColaboradorRhLite = {
-  nome: string;
-  email: string | null;
-  cpfCnpj: string | null;
-};
-
-const RH_TIPOS_COLABORADOR: TipoPessoaRH[] = ["equipe_interna", "vendedor_externo", "fornecedor_parceiro"];
-
-const rhAtivosBaseWhere = {
-  status: "ativo" as const,
-  tipoPessoa: { in: RH_TIPOS_COLABORADOR },
-};
-
-async function loadColaboradoresRhSafe(): Promise<ColaboradorRhLite[]> {
-  try {
-    return await prisma.colaboradorRH.findMany({
-      where: {
-        ...rhAtivosBaseWhere,
-        NOT: { AND: [{ tipoPessoa: "vendedor_externo" }, { cadastroEfetivado: false }] },
-      },
-      orderBy: { nome: "asc" },
-      select: { nome: true, email: true, cpfCnpj: true },
-    });
-  } catch (e) {
-    try {
-      return await prisma.colaboradorRH.findMany({
-        where: rhAtivosBaseWhere,
-        orderBy: { nome: "asc" },
-        select: { nome: true, email: true, cpfCnpj: true },
-      });
-    } catch (e2) {
-      console.warn("[tarefas/bootstrap] RH indisponível; seguindo apenas com usuarios.", e2);
-      return [];
-    }
-  }
 }
 
 async function loadTarefasSafe() {

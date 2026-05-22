@@ -9,6 +9,11 @@ import {
   type FinanceiroSituacao,
   type FinanceiroTipo,
 } from "@/lib/relatorios/financeiro-catalogo";
+import {
+  assertRelatorioClienteId,
+  filterRelatorioLancamentos,
+  type RelatorioAccessContext,
+} from "@/lib/server/relatorio-scope";
 
 export type FinanceiroBuildParams = {
   reportId: FinanceiroReportId;
@@ -18,6 +23,7 @@ export type FinanceiroBuildParams = {
   periodoFim: string;
   situacao?: FinanceiroSituacao;
   tipo?: FinanceiroTipo;
+  access?: RelatorioAccessContext;
 };
 
 export type FinanceiroBuildResult = {
@@ -79,6 +85,10 @@ export async function buildFinanceiroSnapshot(params: FinanceiroBuildParams): Pr
   ]);
   if (!modelo) throw new Error("Modelo de documento não encontrado.");
 
+  if (params.access) {
+    await assertRelatorioClienteId(params.access, params.clienteId);
+  }
+
   const lancamentosBase = await prisma.lancamento.findMany({
     where: {
       ...(params.clienteId ? { clienteId: params.clienteId } : {}),
@@ -92,7 +102,16 @@ export async function buildFinanceiroSnapshot(params: FinanceiroBuildParams): Pr
     orderBy: [{ vencimento: "asc" }, { createdAt: "asc" }],
   });
 
-  const lancamentos = lancamentosBase.filter((l) => {
+  const lancamentosScoped = params.access
+    ? await filterRelatorioLancamentos(
+        lancamentosBase,
+        params.access.session,
+        params.access.userId,
+        params.access.resourceId
+      )
+    : lancamentosBase;
+
+  const lancamentos = lancamentosScoped.filter((l) => {
     const matchTipo = params.tipo && params.tipo !== "todos" ? l.tipo === params.tipo : true;
     const matchSituacao = params.situacao && params.situacao !== "todos" ? l.status === params.situacao : true;
     return matchTipo && matchSituacao;

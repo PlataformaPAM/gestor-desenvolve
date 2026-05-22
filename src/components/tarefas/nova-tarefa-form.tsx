@@ -318,12 +318,15 @@ export function NovaTarefaForm({
         <label className={formLabelClass}>
           Colaboradores
         </label>
+        <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">
+          Outros usuários do sistema vinculados à tarefa.
+        </p>
         <SearchableMultiSelect
           options={colaboradorOptions}
           values={colaboradorIds}
           onChange={setColaboradorIds}
-          placeholder="Selecionar colaboradores..."
-          searchPlaceholder="Buscar colaborador..."
+          placeholder="Selecionar usuários..."
+          searchPlaceholder="Buscar usuário..."
           selectedLabel="Selecionados"
           leadingIcon={Users}
         />

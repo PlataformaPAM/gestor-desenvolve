@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/server/api-response";
+import { clientesAccessGate } from "@/lib/server/clientes-access";
 
 type BrasilApiCnpjResponse = {
   cnpj?: string;
@@ -28,7 +29,10 @@ function formatCep(digits: string): string {
   return `${digits.slice(0, 5)}-${digits.slice(5, 8)}`;
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ cnpj: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ cnpj: string }> }) {
+  const gate = await clientesAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
+
   const { cnpj: cnpjParam } = await ctx.params;
   const digits = onlyDigits(cnpjParam);
   if (digits.length !== 14) {

@@ -2,6 +2,7 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 import {
   getDocumentoTimbresConfig,
   saveDocumentoTimbresConfig,
@@ -51,6 +52,9 @@ function resolveStoredPath(uploadUrl: string): string {
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.papeisTimbrados, "editar");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   if (!id?.trim()) return fail("BAD_REQUEST", "Id inválido.", 400);
   const contentType = req.headers.get("content-type") || "";
@@ -145,7 +149,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.papeisTimbrados, "excluir");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   if (!id?.trim()) return fail("BAD_REQUEST", "Id inválido.", 400);
 

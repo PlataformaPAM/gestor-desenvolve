@@ -1,18 +1,11 @@
-import { fail, ok } from "@/lib/server/api-response";
-import { COOKIE_NAME, decodeSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { ok } from "@/lib/server/api-response";
+import { isSessionAdmin } from "@/lib/server/authorize";
+import { posvendaAccessGate } from "@/lib/server/posvenda-access";
 
 export async function GET(req: Request) {
-  const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  const session = decodeSession(match?.[1]?.trim());
-  if (!session?.perfilId) return fail("UNAUTHORIZED", "Sessão inválida.", 401);
+  const gate = await posvendaAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
 
-  const perfil = await prisma.perfilAcesso.findUnique({
-    where: { id: session.perfilId },
-    select: { nome: true },
-  });
-  const nome = (perfil?.nome || "").toLowerCase();
-  const isAdmin = nome.includes("admin");
+  const isAdmin = isSessionAdmin(gate.session);
   return ok({ isAdmin });
 }

@@ -1,5 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  configuracoesAccessGate,
+  CONFIG_RESOURCES,
+} from "@/lib/server/configuracoes-access";
 
 function contentTypeFromExt(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
@@ -16,7 +20,10 @@ function safeFileName(raw: string): string | null {
   return name;
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ filename: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ filename: string }> }) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.papeisTimbrados, "ver");
+  if (!gate.ok) return gate.response;
+
   const { filename: raw } = await ctx.params;
   const filename = safeFileName(raw);
   if (!filename) return new Response("Arquivo inválido.", { status: 400 });

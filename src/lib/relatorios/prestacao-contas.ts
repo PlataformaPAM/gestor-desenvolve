@@ -3,12 +3,19 @@ import { preencherTemplateDocumento, valoresPreviewExemplo } from "@/lib/documen
 import { getDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { getEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config";
 import type { DocumentoSnapshot } from "@/lib/documentos/documento-html";
+import {
+  assertRelatorioClienteId,
+  filterRelatorioTicketsRaw,
+  filterRelatorioTarefasRaw,
+  type RelatorioAccessContext,
+} from "@/lib/server/relatorio-scope";
 
 export type PrestacaoContasBuildParams = {
   clienteId: string;
   modeloId: string;
   periodoInicio: string;
   periodoFim: string;
+  access?: RelatorioAccessContext;
 };
 
 export type PrestacaoContasBuildResult = {
@@ -69,11 +76,16 @@ export async function buildPrestacaoContasSnapshot(
   if (!cliente) throw new Error("Cliente não encontrado.");
   if (!modelo) throw new Error("Modelo de documento não encontrado.");
 
-  const [tarefas, tickets] = await Promise.all([
+  if (params.access) {
+    await assertRelatorioClienteId(params.access, params.clienteId);
+  }
+
+  const [tarefasRaw, ticketsRaw] = await Promise.all([
     prisma.tarefa.findMany({
       where: { clienteId: params.clienteId, createdAt: { gte: inicio, lte: fim } },
       include: {
         responsavel: { select: { nomeExibicao: true, email: true } },
+        colaboradores: { select: { usuarioId: true } },
         historico: {
           include: { autor: { select: { nomeExibicao: true, email: true } } },
           orderBy: { data: "asc" },
@@ -97,6 +109,14 @@ export async function buildPrestacaoContasSnapshot(
       orderBy: [{ previsaoConclusao: "asc" }, { dataCriacao: "asc" }],
     }),
   ]);
+
+  const scope = params.access?.scope;
+  const tarefas = params.access
+    ? filterRelatorioTarefasRaw(tarefasRaw, params.access.userId, scope!)
+    : tarefasRaw;
+  const tickets = params.access
+    ? filterRelatorioTicketsRaw(ticketsRaw, params.access.userId, scope!)
+    : ticketsRaw;
 
   const tarefaRows = tarefas
     .map((t) => {

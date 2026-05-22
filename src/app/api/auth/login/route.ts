@@ -5,6 +5,7 @@ import { COOKIE_NAME, encodeSession } from "@/lib/auth";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { loadSessionPermissions } from "@/lib/server/session-permissions";
+import { applySessionAccessRules } from "@/lib/server/session-access";
 
 type Payload = {
   cpf: string;
@@ -103,20 +104,12 @@ export async function POST(req: Request) {
     });
 
     // Enriquecimentos de sessão não podem derrubar autenticação.
-    let permissoes: Partial<Record<ModuloPermissao, boolean>> | undefined = undefined;
+    let resolvedPerms: Awaited<ReturnType<typeof loadSessionPermissions>> | undefined;
     let clienteIds: string[] = [];
-    let perfilNome = "";
-    let isSystemAdmin = false;
     try {
-      const resolved = await loadSessionPermissions(prisma, usuario.perfilId);
-      permissoes = resolved.permissoes;
-      perfilNome = resolved.perfilNome;
-      isSystemAdmin = resolved.isSystemAdmin;
+      resolvedPerms = await loadSessionPermissions(prisma, usuario.perfilId);
     } catch (error) {
       console.error("[auth/login] falha ao carregar perfil/permissões:", error);
-      permissoes = undefined;
-      perfilNome = "";
-      isSystemAdmin = false;
     }
     try {
       const vinculosCliente = await prisma.usuarioVinculo.findMany({
@@ -128,17 +121,21 @@ export async function POST(req: Request) {
       console.error("[auth/login] falha ao carregar vínculos do usuário:", error);
       clienteIds = [];
     }
-    const isPortalCliente = clienteIds.length > 0;
-    const isAdminCliente =
-      isPortalCliente &&
-      (permissoes?.configuracoes === true || isSystemAdmin);
-    const redirectTo = isPortalCliente ? "/portal" : "/";
+    const access = applySessionAccessRules(
+      {
+        perfilId: usuario.perfilId,
+        clienteIds,
+        isPortalCliente: clienteIds.length > 0,
+      },
+      resolvedPerms
+    );
+    const redirectTo = access.isPortalCliente ? "/portal" : "/";
 
     const response = ok({
       perfilId: usuario.perfilId,
       user: { id: usuario.id, nome: usuario.nomeExibicao ?? "Usuário" },
       redirectTo,
-      permissoes,
+      permissoes: access.permissoes,
     });
     response.cookies.set({
       name: COOKIE_NAME,
@@ -150,11 +147,11 @@ export async function POST(req: Request) {
         userEmail: usuario.email,
         userPhone: usuario.telefone ?? undefined,
         clienteIds,
-        isPortalCliente,
-        isAdminCliente,
-        isSystemAdmin,
-        perfilNome,
-        permissoes,
+        isPortalCliente: access.isPortalCliente,
+        isAdminCliente: access.isAdminCliente,
+        isSystemAdmin: access.isSystemAdmin,
+        perfilNome: access.perfilNome,
+        permissoes: access.permissoes,
       }),
       httpOnly: true,
       secure: IS_PROD,

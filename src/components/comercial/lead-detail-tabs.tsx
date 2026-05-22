@@ -50,6 +50,7 @@ type LeadDetailTabsProps = {
   onAtualizarContatosCliente?: (clienteId: string, contatos: Contato[]) => void;
   usuarios?: UsuarioSistema[];
   onClose?: () => void;
+  readOnly?: boolean;
 };
 
 export function LeadDetailTabs({
@@ -64,6 +65,7 @@ export function LeadDetailTabs({
   onAtualizarContatosCliente = () => {},
   usuarios = [],
   onClose,
+  readOnly = false,
 }: LeadDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<LeadDetailTabId>("dados");
   const id = useId();
@@ -77,8 +79,20 @@ export function LeadDetailTabs({
     if (!visibleTabIds.includes(activeTab)) setActiveTab("dados");
   }, [activeTab, visibleTabIds]);
 
+  const persistLead = readOnly
+    ? (_updates: Partial<Lead>) => {}
+    : onUpdateLead;
+  const mudarEtapa = readOnly
+    ? (_stageId: Lead["stageId"], _options?: { motivoPerda?: string }) => {}
+    : onMudarEtapa;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {readOnly ? (
+        <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
+          Modo somente leitura — você não pode editar este lead.
+        </p>
+      ) : null}
       <div
         role="tablist"
         aria-label="Abas do lead"
@@ -122,7 +136,8 @@ export function LeadDetailTabs({
           <LeadDetailDados
             key={lead.id}
             lead={lead}
-            onPersistLead={onUpdateLead}
+            onPersistLead={persistLead}
+            readOnly={readOnly}
             clientes={clientes}
             onClienteRegistrado={onClienteRegistrado}
             onAtualizarContatosCliente={onAtualizarContatosCliente}
@@ -135,23 +150,25 @@ export function LeadDetailTabs({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <LeadDetailProposta
             lead={lead}
-            onUpdateLead={onUpdateLead}
+            onUpdateLead={persistLead}
             onGerarPdfSuccess={onGerarPdfSuccess}
             clientes={clientes}
+            readOnly={readOnly}
           />
         </div>
       )}
       {activeTab === "contrato" && (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <LeadDetailContratos lead={lead} onUpdateLead={onUpdateLead} />
+          <LeadDetailContratos lead={lead} onUpdateLead={persistLead} readOnly={readOnly} />
         </div>
       )}
       {activeTab === "historico" && (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <LeadDetailHistorico
             interactions={lead.interactions ?? []}
+            readOnly={readOnly}
             onAddInteraction={(entry) =>
-              onUpdateLead({
+              persistLead({
                 interactions: [
                   ...(lead.interactions ?? []),
                   {
@@ -173,7 +190,8 @@ export function LeadDetailTabs({
           <LeadDetailAcoes
             lead={lead}
             stages={stages}
-            onMudarEtapa={onMudarEtapa}
+            onMudarEtapa={mudarEtapa}
+            readOnly={readOnly}
             onSolicitarLiberacaoFinanceiro={onSolicitarLiberacaoFinanceiro}
           />
         </div>

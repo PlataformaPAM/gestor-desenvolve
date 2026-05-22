@@ -6,6 +6,7 @@ import { CalendarRange, Download, FileText, Filter, Send } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { COMERCIAL_REPORTS, type ComercialReportId, type ComercialSituacao } from "@/lib/relatorios/comercial-catalogo";
 import { usePageHeader } from "@/contexts/page-header-context";
+import { useRelatorioRbac } from "@/hooks/use-rbac-resource";
 
 type ModeloDocumento = { id: string; nome: string };
 
@@ -26,6 +27,7 @@ function asDateInput(date: Date): string {
 }
 
 export default function RelatoriosComercialPage() {
+  const podeVer = useRelatorioRbac("relatorios.comercial");
   const router = useRouter();
   const { setPrimaryAction } = usePageHeader();
   const [modelosDocumento, setModelosDocumento] = useState<ModeloDocumento[]>([]);
@@ -178,6 +180,8 @@ export default function RelatoriosComercialPage() {
       setBusyEmail(false);
     }
   };
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full min-w-0 space-y-6">

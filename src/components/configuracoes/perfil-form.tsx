@@ -26,6 +26,16 @@ import {
 import type { PerfilAcesso, ModuloPermissao } from "@/lib/configuracoes/types";
 import { MODULOS } from "@/lib/configuracoes/constants";
 import {
+  buildEmptyGrantsMap,
+  deriveLegacyPermissoesFromGrants,
+  grantsForAdmin,
+  grantsFromLegacyPermissoes,
+  parseGrantsMap,
+  type GrantsMap,
+} from "@/lib/configuracoes/permission-grants";
+import { isAdminProfileName } from "@/lib/configuracoes/permission-utils";
+import { PerfilPermissionMatrix } from "@/components/configuracoes/perfil-permission-matrix";
+import {
   formInputClass,
   formLabelClass,
   formModalCancelButtonClass,
@@ -38,6 +48,7 @@ export type PerfilFormPayload = {
   nome: string;
   descricao?: string;
   permissoes: Record<ModuloPermissao, boolean>;
+  permissoesGranulares: GrantsMap;
 };
 
 type PerfilFormProps = {
@@ -235,17 +246,36 @@ export function PerfilForm({
     sanitizePermissoes(initialPerfil?.permissoes ?? initialPermissoes())
   );
 
+  const resolveInitialGrants = useCallback((): GrantsMap => {
+    if (initialPerfil?.permissoesGranulares) {
+      return parseGrantsMap(initialPerfil.permissoesGranulares);
+    }
+    if (initialPerfil && isAdminProfileName(initialPerfil.nome)) {
+      return grantsForAdmin();
+    }
+    if (initialPerfil) {
+      return grantsFromLegacyPermissoes(initialPerfil.permissoes);
+    }
+    return buildEmptyGrantsMap();
+  }, [initialPerfil]);
+
+  const [grants, setGrants] = useState<GrantsMap>(resolveInitialGrants);
+  const showGranularMatrix = !restrictModuleSelection;
+  const isAdminProfile = isAdminProfileName(nome.trim() || initialPerfil?.nome || "");
+
   useEffect(() => {
     if (initialPerfil) {
       setNome(initialPerfil.nome);
       setDescricao(initialPerfil.descricao ?? "");
       setPermissoes(sanitizePermissoes(initialPerfil.permissoes));
+      setGrants(resolveInitialGrants());
     } else {
       setNome("");
       setDescricao("");
       setPermissoes(sanitizePermissoes(initialPermissoes()));
+      setGrants(buildEmptyGrantsMap());
     }
-  }, [initialPerfil, sanitizePermissoes]);
+  }, [initialPerfil, sanitizePermissoes, resolveInitialGrants]);
 
   const handleToggle = (mod: ModuloPermissao) => {
     setPermissoes((prev) => ({ ...prev, [mod]: !prev[mod] }));
@@ -280,10 +310,17 @@ export function PerfilForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) return;
+    const finalGrants = showGranularMatrix
+      ? isAdminProfile
+        ? grantsForAdmin()
+        : grants
+      : grantsFromLegacyPermissoes(sanitizePermissoes({ ...permissoes }));
+    const derivedPermissoes = sanitizePermissoes(deriveLegacyPermissoesFromGrants(finalGrants));
     const payload: PerfilFormPayload = {
       nome: nome.trim(),
       descricao: descricao.trim() || undefined,
-      permissoes: sanitizePermissoes({ ...permissoes }),
+      permissoes: derivedPermissoes,
+      permissoesGranulares: finalGrants,
     };
     if (initialPerfil) payload.id = initialPerfil.id;
     onSave(payload);
@@ -297,44 +334,105 @@ export function PerfilForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 lg:p-6">
-        <div className="space-y-1">
-          <label htmlFor="perfil-nome" className={formLabelClass}>
-            Nome do perfil <span className="text-red-600 dark:text-red-400">*</span>
-          </label>
-          <input
-            id="perfil-nome"
-            type="text"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Ex.: Vendedor Externo"
-            className={formInputClass}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="perfil-desc" className={formLabelClass}>
-            Descrição
-          </label>
-          <div className="relative">
-            <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <textarea
-              id="perfil-desc"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Breve descrição do perfil"
-              rows={3}
-              className={`${formTextareaClass} pl-10`}
-            />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {showGranularMatrix ? (
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+            <div className="w-full min-w-0 space-y-4 px-4 pt-4 lg:px-6 lg:pt-6">
+              <div className="space-y-1">
+                <label htmlFor="perfil-nome" className={formLabelClass}>
+                  Nome do perfil <span className="text-red-600 dark:text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <ShieldCheck
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                    aria-hidden
+                  />
+                  <input
+                    id="perfil-nome"
+                    type="text"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex.: Vendedor Externo"
+                    className={`${formInputClass} pl-10`}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="perfil-desc" className={formLabelClass}>
+                  Descrição
+                </label>
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                  <textarea
+                    id="perfil-desc"
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    placeholder="Breve descrição do perfil"
+                    rows={3}
+                    className={`${formTextareaClass} pl-10`}
+                  />
+                </div>
+              </div>
+              <div>
+                <span className={formLabelClass}>Permissões detalhadas</span>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {isAdminProfile
+                    ? "Perfil Administrador: acesso total a todas as áreas e ações."
+                    : "Marque o que este perfil pode fazer em cada área da plataforma."}
+                </p>
+              </div>
+              <PerfilPermissionMatrix
+                grants={isAdminProfile ? grantsForAdmin() : grants}
+                onChange={setGrants}
+                readOnly={isAdminProfile}
+                tableOnly
+              />
+            </div>
+            <div className="h-4 shrink-0 lg:h-6" aria-hidden />
           </div>
-        </div>
-
+        ) : (
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 lg:p-6">
+          <div className="space-y-1">
+            <label htmlFor="perfil-nome" className={formLabelClass}>
+              Nome do perfil <span className="text-red-600 dark:text-red-400">*</span>
+            </label>
+            <div className="relative">
+              <ShieldCheck
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                aria-hidden
+              />
+              <input
+                id="perfil-nome"
+                type="text"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex.: Vendedor Externo"
+                className={`${formInputClass} pl-10`}
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="perfil-desc" className={formLabelClass}>
+              Descrição
+            </label>
+            <div className="relative">
+              <FileText className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+              <textarea
+                id="perfil-desc"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Breve descrição do perfil"
+                rows={3}
+                className={`${formTextareaClass} pl-10`}
+              />
+            </div>
+          </div>
         <div>
           <span className={formLabelClass}>Permissões por módulo</span>
           <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-            {restrictModuleSelection
-              ? "Marque apenas os acessos disponíveis no portal para este perfil."
-              : "Marque os módulos que este perfil pode visualizar na sidebar."}
+            Marque apenas os acessos disponíveis no portal para este perfil.
           </p>
           <ul className="space-y-1">
             {sidebarOptionsFiltered.map((option) => {
@@ -431,6 +529,8 @@ export function PerfilForm({
             })}
           </ul>
         </div>
+        </div>
+        )}
       </div>
       <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:justify-end sm:gap-3 lg:px-6">
         <button type="button" onClick={onCancel} className={formModalCancelButtonClass}>

@@ -3,6 +3,10 @@ import { composeCodigoContrato, getContratoCodigoPersonalizadoMap } from "@/lib/
 import { fail, ok } from "@/lib/server/api-response";
 import { emitAlert } from "@/lib/server/alerts";
 import { reconcileStaleContratosAlerts } from "@/lib/server/alerts-resolve";
+import {
+  contratosAccessGate,
+  filterContratosForSession,
+} from "@/lib/server/contratos-access";
 
 function formatContratoCode(year: number, seq: number): string {
   return `CTT-${year}-${String(seq).padStart(4, "0")}`;
@@ -55,12 +59,15 @@ async function suspenderContratosVencidos(): Promise<void> {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await contratosAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     await suspenderContratosVencidos().catch(() => undefined);
     await reconcileStaleContratosAlerts(prisma).catch(() => undefined);
 
-    const rows = await prisma.contrato.findMany({
+    const rowsRaw = await prisma.contrato.findMany({
       orderBy: { updatedAt: "desc" },
       take: 300,
       include: {
@@ -70,6 +77,14 @@ export async function GET() {
         criadoPor: { select: { nomeExibicao: true } },
       },
     });
+    const rows = await filterContratosForSession(
+      rowsRaw.map((c) => ({
+        ...c,
+        criadoPorId: c.criadoPorId,
+      })),
+      gate.userId,
+      gate.scope
+    );
     const rowsComCodigo = withContratoCode(rows);
     const customMap = await getContratoCodigoPersonalizadoMap();
 

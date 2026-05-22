@@ -4,10 +4,14 @@ import { Prisma } from "@prisma/client";
 import { mapClienteFromDb, toDateOrUndefined } from "../comercial/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { clientesAccessGate } from "@/lib/server/clientes-access";
 
 type CreateClientePayload = Omit<Cliente, "id"> & { contatos?: Contato[] };
 
 export async function POST(req: Request) {
+  const gate = await clientesAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<{ cliente?: CreateClientePayload }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const cliente = parsed.value.cliente;

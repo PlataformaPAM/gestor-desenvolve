@@ -5,6 +5,7 @@ import { preencherTemplateDocumento } from "@/lib/documentos/template-vars";
 import { getEmpresaDocumentoConfig } from "@/lib/documentos/empresa-config";
 import { getDocumentoTimbresConfig } from "@/lib/documentos/timbres-config";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
+import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 import { getSessionUserId } from "@/lib/server/request-session";
 
 async function loadLeadComCliente(id: string) {
@@ -52,6 +53,8 @@ type PostBody = { modeloId?: string };
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id: leadId } = await ctx.params;
+  const gate = await comercialAccessGate(req, "editar", leadId);
+  if (!gate.ok) return gate.response;
   const parsed = await parseJsonSafe<PostBody>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const modeloId = parsed.value.modeloId?.trim();

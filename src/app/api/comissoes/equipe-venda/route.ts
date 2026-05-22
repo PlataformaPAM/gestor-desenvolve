@@ -5,8 +5,15 @@ import {
   resolveEquipeVendaParaComissao,
   somaPercentuaisParticipacao,
 } from "@/lib/server/comissoes-ownership-resolve";
+import {
+  financeiroAccessGate,
+  FINANCEIRO_COMISSOES_RESOURCE,
+} from "@/lib/server/financeiro-access";
 
 export async function GET(req: Request) {
+  const gate = await financeiroAccessGate(req, FINANCEIRO_COMISSOES_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId")?.trim();
   if (!leadId) return fail("BAD_REQUEST", "Informe leadId.", 400);

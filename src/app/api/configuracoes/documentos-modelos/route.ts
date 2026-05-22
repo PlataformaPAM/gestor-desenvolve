@@ -5,6 +5,7 @@ import { getDocumentoTimbresConfig, saveDocumentoTimbresConfig } from "@/lib/doc
 import { htmlTemTextoVisivel } from "@/lib/documentos/html-text";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 import type { DocumentoModeloTipo } from "@prisma/client";
 
 const TIPOS: DocumentoModeloTipo[] = [
@@ -18,7 +19,10 @@ function isTipo(v: unknown): v is DocumentoModeloTipo {
   return typeof v === "string" && TIPOS.includes(v as DocumentoModeloTipo);
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.construtorDocumentos, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     const timbresConfig = await getDocumentoTimbresConfig();
     const rows = await prisma.documentoModelo.findMany({
@@ -56,6 +60,9 @@ type CreateBody = {
 };
 
 export async function POST(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.construtorDocumentos, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<CreateBody>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON invÃ¡lido.", 400);
   const m = body.value.modelo;

@@ -3,8 +3,12 @@
  * A autenticação é feita no backend; este módulo mantém utilitários de sessão e autorização.
  */
 
+import type { GrantsMap } from "@/lib/configuracoes/permission-grants";
 import type { ModuloPermissao } from "@/lib/configuracoes/types";
-import { isAdminProfileName, withAdminOverride } from "@/lib/configuracoes/permission-utils";
+import {
+  hasStaleEmptyPermissions,
+  isPrivilegedSession,
+} from "@/lib/server/session-access";
 
 export const COOKIE_NAME = "gestor_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 dias
@@ -22,6 +26,8 @@ export type SessionPayload = {
   isSystemAdmin?: boolean;
   perfilNome?: string;
   permissoes?: Partial<Record<ModuloPermissao, boolean>>;
+  /** Matriz granular (carregada no servidor quando necessário). */
+  permissoesGranulares?: GrantsMap;
 };
 
 /** Codifica payload da sessão para o cookie. Compatível com Edge e browser (perfilId é ASCII). */
@@ -79,16 +85,14 @@ function getModuleForPath(pathname: string): ModuloPermissao | null {
  * Usado no middleware (Edge) e no client. Não depende de getPerfilById para evitar imports pesados no Edge.
  */
 function effectivePermissoes(session: SessionPayload): Partial<Record<ModuloPermissao, boolean>> | undefined {
-  if (session?.isSystemAdmin) return undefined;
-  if (session?.perfilNome && isAdminProfileName(session.perfilNome)) {
-    return withAdminOverride(session.permissoes ?? {}, session.perfilNome);
-  }
+  if (isPrivilegedSession(session)) return undefined;
+  if (hasStaleEmptyPermissions(session)) return undefined;
   return session?.permissoes;
 }
 
 export function hasModuleAccess(session: SessionPayload, pathname: string): boolean {
-  if (session?.isSystemAdmin === true) return true;
-  if (session?.perfilNome && isAdminProfileName(session.perfilNome)) return true;
+  if (isPrivilegedSession(session)) return true;
+  if (hasStaleEmptyPermissions(session)) return true;
   if (pathname === "/portal" || pathname.startsWith("/portal/")) {
     if (session?.isPortalCliente === true) return true;
     return session?.permissoes?.portal_cliente === true;

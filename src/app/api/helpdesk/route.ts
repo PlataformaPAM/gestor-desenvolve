@@ -4,8 +4,12 @@ import { mapTicketFromDb } from "./_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
+import { helpdeskAccessGate } from "@/lib/server/helpdesk-access";
 
 export async function POST(req: Request) {
+  const gate = await helpdeskAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<{ ticket?: Ticket }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const ticket = parsed.value.ticket;

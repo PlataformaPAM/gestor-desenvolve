@@ -17,24 +17,27 @@ import type { UsuarioFormPayload } from "@/components/configuracoes/novo-usuario
 import type { PerfilFormPayload } from "@/components/configuracoes/perfil-form";
 import { enrichUsuarioVinculos } from "@/lib/configuracoes/enrich-usuario-vinculos";
 import { ConfiguracoesTopNav } from "@/components/configuracoes/configuracoes-top-nav";
+import {
+  useConfiguracoesResourceRbac,
+  useConfiguracoesSectionGuard,
+} from "@/hooks/use-rbac-resource";
 
 type ConfiguracoesSection = "usuarios" | "perfis" | "logs";
+
+const SECTION_RESOURCE: Record<ConfiguracoesSection, string> = {
+  usuarios: "configuracoes.usuarios",
+  perfis: "configuracoes.perfis",
+  logs: "configuracoes.logs",
+};
 
 function generateUserId(): string {
   return `usr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function generatePerfilId(nome: string): string {
-  const slug = nome
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "");
-  return slug || `perfil-${Date.now()}`;
-}
-
 export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSection }) {
+  const resourceId = SECTION_RESOURCE[section];
+  useConfiguracoesSectionGuard(resourceId);
+  const rbac = useConfiguracoesResourceRbac(resourceId);
   const { setPrimaryAction } = usePageHeader();
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
   const [perfis, setPerfis] = useState<PerfilAcesso[]>([]);
@@ -60,7 +63,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
   };
 
   useEffect(() => {
-    if (section === "logs") {
+    if (section === "logs" || !rbac.podeCriar) {
       setPrimaryAction(null);
       return () => setPrimaryAction(null);
     }
@@ -73,14 +76,18 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
       showPlusIcon: true,
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction, section]);
+  }, [setPrimaryAction, section, rbac.podeCriar]);
 
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
         const res = await fetch("/api/configuracoes/bootstrap", { cache: "no-store" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+          showToast(err?.error?.message ?? "Não foi possível carregar perfis e usuários.", "error");
+          return;
+        }
         const data = (await res.json()) as {
           data?: {
             usuarios?: UsuarioSistema[];
@@ -181,37 +188,79 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
   };
 
   const handleSalvarPerfil = (payload: PerfilFormPayload) => {
-    if (payload.id) {
-      const next = perfis.find((p) => p.id === payload.id);
-      setPerfis((prev) =>
-        prev.map((p) =>
-          p.id === payload.id
-            ? { ...p, nome: payload.nome, descricao: payload.descricao, permissoes: payload.permissoes }
-            : p
-        )
-      );
-      if (next) {
-        void fetch(`/api/configuracoes/perfis/${payload.id}`, {
+    void (async () => {
+      if (payload.id) {
+        const next = perfis.find((p) => p.id === payload.id);
+        if (!next) return;
+        const perfilPayload: PerfilAcesso = {
+          ...next,
+          id: payload.id,
+          nome: payload.nome,
+          descricao: payload.descricao,
+          permissoes: payload.permissoes,
+          permissoesGranulares: payload.permissoesGranulares,
+        };
+        const res = await fetch(`/api/configuracoes/perfis/${payload.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            perfil: { ...next, nome: payload.nome, descricao: payload.descricao, permissoes: payload.permissoes },
-          }),
+          body: JSON.stringify({ perfil: perfilPayload }),
         });
+        const json = (await res.json().catch(() => ({}))) as {
+          data?: { perfil?: PerfilAcesso };
+          error?: { message?: string };
+        };
+        if (!res.ok) {
+          showToast(json?.error?.message ?? "Não foi possível atualizar o perfil.", "error");
+          return;
+        }
+        const servidor = json?.data?.perfil;
+        setPerfis((prev) =>
+          prev.map((p) => (p.id === payload.id ? (servidor ?? perfilPayload) : p))
+        );
+        setDrawerEditarPerfilOpen(false);
+        setPerfilEmEdicao(null);
+        showToast("Perfil atualizado com sucesso.", "success");
+        return;
       }
-      setDrawerEditarPerfilOpen(false);
-      setPerfilEmEdicao(null);
-    } else {
-      const id = generatePerfilId(payload.nome);
-      const created: PerfilAcesso = { id, nome: payload.nome, descricao: payload.descricao, permissoes: payload.permissoes };
-      setPerfis((prev) => [created, ...prev]);
-      void fetch("/api/configuracoes/perfis", {
+
+      const tempId = `temp-perfil-${Date.now()}`;
+      const optimistic: PerfilAcesso = {
+        id: tempId,
+        nome: payload.nome,
+        descricao: payload.descricao,
+        permissoes: payload.permissoes,
+        permissoesGranulares: payload.permissoesGranulares,
+      };
+      setPerfis((prev) => [optimistic, ...prev]);
+      setDrawerNovoPerfilOpen(false);
+
+      const res = await fetch("/api/configuracoes/perfis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ perfil: created }),
+        body: JSON.stringify({
+          perfil: {
+            nome: payload.nome,
+            descricao: payload.descricao,
+            permissoes: payload.permissoes,
+            permissoesGranulares: payload.permissoesGranulares,
+          },
+        }),
       });
-      setDrawerNovoPerfilOpen(false);
-    }
+      const json = (await res.json().catch(() => ({}))) as {
+        data?: { perfil?: PerfilAcesso };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        setPerfis((prev) => prev.filter((p) => p.id !== tempId));
+        showToast(json?.error?.message ?? "Não foi possível criar o perfil.", "error");
+        return;
+      }
+      const servidor = json?.data?.perfil;
+      if (servidor) {
+        setPerfis((prev) => prev.map((p) => (p.id === tempId ? servidor : p)));
+      }
+      showToast("Perfil criado com sucesso.", "success");
+    })();
   };
 
   const usuariosFiltrados = useMemo(() => {
@@ -273,20 +322,28 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           usuarios={usuariosFiltrados}
           perfis={perfis}
           pessoasVinculo={pessoasVinculo}
-          onEditar={(u) => {
-            setUsuarioEmEdicao(u);
-            setDrawerEditarUsuarioOpen(true);
-          }}
+          onEditar={
+            rbac.podeEditar
+              ? (u) => {
+                  setUsuarioEmEdicao(u);
+                  setDrawerEditarUsuarioOpen(true);
+                }
+              : undefined
+          }
         />
       )}
       {section === "perfis" && (
         <PerfisAcessoTable
           perfis={perfisFiltrados}
-          onEditar={(p) => {
-            setPerfilEmEdicao(p);
-            setDrawerEditarPerfilOpen(true);
-          }}
-          readOnly
+          onEditar={
+            rbac.podeEditar
+              ? (p) => {
+                  setPerfilEmEdicao(p);
+                  setDrawerEditarPerfilOpen(true);
+                }
+              : undefined
+          }
+          readOnly={!rbac.podeEditar}
         />
       )}
       {section === "logs" && <LogsTable logs={logsFiltrados} />}
@@ -336,6 +393,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
         open={drawerNovoPerfilOpen}
         onClose={() => setDrawerNovoPerfilOpen(false)}
         title="Novo perfil"
+        scrollBody={false}
         mobileContentPaddingClassName="px-0"
         desktopContentPaddingClassName="px-0"
       >
@@ -351,6 +409,7 @@ export function ConfiguracoesSectionPage({ section }: { section: ConfiguracoesSe
           setPerfilEmEdicao(null);
         }}
         title="Editar perfil"
+        scrollBody={false}
         mobileContentPaddingClassName="px-0"
         desktopContentPaddingClassName="px-0"
       >

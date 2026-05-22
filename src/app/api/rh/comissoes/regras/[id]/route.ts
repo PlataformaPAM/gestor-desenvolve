@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { mapRegra } from "@/app/api/comissoes/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { resourceAccessGate } from "@/lib/server/rbac-gate";
 
 type PayloadRegra = {
   ativo?: boolean;
@@ -17,6 +18,9 @@ type PayloadRegra = {
 };
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await resourceAccessGate(req, "financeiro.comissoes", "editar", "Sem permissão para editar regra de comissão.");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   const body = await parseJsonSafe<{ regra?: PayloadRegra }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
@@ -79,7 +83,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return ok({ regra: mapRegra(updated) });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await resourceAccessGate(req, "financeiro.comissoes", "excluir", "Sem permissão para excluir regra de comissão.");
+  if (!gate.ok) return gate.response;
+
   const { id } = await ctx.params;
   const before = await prisma.comissaoRegra.findUnique({ where: { id } });
   if (!before) return fail("NOT_FOUND", "Regra não encontrada.", 404);

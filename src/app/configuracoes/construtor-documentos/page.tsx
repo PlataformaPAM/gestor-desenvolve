@@ -10,6 +10,10 @@ import {
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { Toast } from "@/components/ui/toast";
 import { usePageHeader } from "@/contexts/page-header-context";
+import {
+  useConfiguracoesResourceRbac,
+  useConfiguracoesSectionGuard,
+} from "@/hooks/use-rbac-resource";
 import { htmlOuParagrafoSimples, htmlTemTextoVisivel } from "@/lib/documentos/html-text";
 import {
   VARIAVEIS_DOCUMENTO_MODULOS,
@@ -276,6 +280,9 @@ function construirCatalogoVariaveisColuna(): ModuloVariaveisDocumento[] {
 }
 
 export default function ConstrutorDocumentosPage() {
+  useConfiguracoesSectionGuard("configuracoes.construtor_documentos");
+  const rbac = useConfiguracoesResourceRbac("configuracoes.construtor_documentos");
+  const rbacDadosEmpresa = useConfiguracoesResourceRbac("configuracoes.dados_empresa");
   const { setPrimaryAction } = usePageHeader();
   const [modelos, setModelos] = useState<ModeloDocumento[]>([]);
   const [busca, setBusca] = useState("");
@@ -439,6 +446,10 @@ export default function ConstrutorDocumentosPage() {
   }, []);
 
   useEffect(() => {
+    if (!rbac.podeCriar) {
+      setPrimaryAction(null);
+      return () => setPrimaryAction(null);
+    }
     setPrimaryAction({
       label: "Novo Modelo",
       showPlusIcon: true,
@@ -450,7 +461,7 @@ export default function ConstrutorDocumentosPage() {
       },
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, rbac.podeCriar]);
 
   const modelosFiltrados = useMemo(() => {
     const term = busca.trim().toLowerCase();
@@ -761,34 +772,40 @@ export default function ConstrutorDocumentosPage() {
               Atualizado em {new Date(m.atualizadoEm).toLocaleString("pt-BR")} · v{m.versao}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={acaoId === m.id}
-                onClick={() => {
-                  setModeloAtual(normalizarModeloCarregado(m));
-                  campoVariavelAlvoRef.current = "corpo";
-                  setDrawerOpen(true);
-                }}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </button>
-              <button
-                type="button"
-                disabled={acaoId === m.id}
-                onClick={() => duplicarModelo(m)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Copy className="h-3.5 w-3.5" /> Duplicar
-              </button>
-              <button
-                type="button"
-                disabled={acaoId === m.id}
-                onClick={() => toggleAtivo(m.id)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Power className="h-3.5 w-3.5" /> {m.ativo ? "Desativar" : "Ativar"}
-              </button>
+              {rbac.podeEditar ? (
+                <button
+                  type="button"
+                  disabled={acaoId === m.id}
+                  onClick={() => {
+                    setModeloAtual(normalizarModeloCarregado(m));
+                    campoVariavelAlvoRef.current = "corpo";
+                    setDrawerOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </button>
+              ) : null}
+              {rbac.podeCriar ? (
+                <button
+                  type="button"
+                  disabled={acaoId === m.id}
+                  onClick={() => duplicarModelo(m)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Duplicar
+                </button>
+              ) : null}
+              {rbac.podeEditar ? (
+                <button
+                  type="button"
+                  disabled={acaoId === m.id}
+                  onClick={() => toggleAtivo(m.id)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <Power className="h-3.5 w-3.5" /> {m.ativo ? "Desativar" : "Ativar"}
+                </button>
+              ) : null}
             </div>
           </article>
         ))}
@@ -1046,12 +1063,14 @@ export default function ConstrutorDocumentosPage() {
                   Cancelar
                 </span>
               </button>
-              <button type="button" disabled={salvando} onClick={salvarModelo} className={formModalSubmitButtonClass}>
-                <span className="inline-flex items-center gap-2">
-                  <Save className="h-4 w-4" />
-                  {salvando ? "Salvando..." : "Salvar"}
-                </span>
-              </button>
+              {(modeloAtual.id ? rbac.podeEditar : rbac.podeCriar) ? (
+                <button type="button" disabled={salvando} onClick={salvarModelo} className={formModalSubmitButtonClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <Save className="h-4 w-4" />
+                    {salvando ? "Salvando..." : "Salvar"}
+                  </span>
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1068,6 +1087,7 @@ export default function ConstrutorDocumentosPage() {
         <DadosEmpresaFormSection
           compact
           withFixedFooter
+          permitirSalvar={rbacDadosEmpresa.podeEditar}
           onCancel={() => setDrawerDadosEmpresaOpen(false)}
           onSaved={() => setDrawerDadosEmpresaOpen(false)}
         />

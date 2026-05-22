@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { mapClienteFromDb, mapLeadFromDb } from "../_shared";
 import { fail, ok } from "@/lib/server/api-response";
+import { comercialAccessGate, filterLeadsForSession } from "@/lib/server/comercial-lead-access";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await comercialAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     const [clientesRaw, leadsRaw] = await Promise.all([
       prisma.cliente.findMany({
@@ -33,7 +37,11 @@ export async function GET() {
     ]);
 
     const mappedClientes = clientesRaw.map(mapClienteFromDb);
-    const mappedLeads = leadsRaw.map(mapLeadFromDb);
+    const mappedLeads = filterLeadsForSession(
+      leadsRaw.map(mapLeadFromDb),
+      gate.session,
+      gate.userId
+    );
     return ok({
       clientes: mappedClientes,
       leads: mappedLeads,

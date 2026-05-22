@@ -6,29 +6,9 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Users, Handshake, CheckCircle2 } from "lucide-react";
 import { globalSearch, flattenResults, type GroupedSearchResults, type SearchResultItem } from "@/lib/global-search";
-import type { ModuloPermissao } from "@/lib/configuracoes/types";
 import { useAuth } from "@/contexts/auth-context";
 
 const PRIMARY = "#6D28D9";
-
-const DEFAULT_PERMISSOES: Record<ModuloPermissao, boolean> = {
-  comercial: false,
-  financeiro: false,
-  tarefas: false,
-  clientes: false,
-  contratos: false,
-  helpdesk: false,
-  posVenda: false,
-  solucoes: false,
-  rh: false,
-  configuracoes: false,
-  relatorios: false,
-  configuracoes_construtor_documentos: false,
-  configuracoes_logs: false,
-  configuracoes_perfis: false,
-  configuracoes_usuarios: false,
-  portal_cliente: false,
-};
 
 type GlobalSearchProps = {
   open: boolean;
@@ -55,14 +35,24 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const permissions: Record<ModuloPermissao, boolean> = useMemo(
-    () => ({ ...DEFAULT_PERMISSOES, ...session.permissoes }),
-    [session.permissoes]
+  const authSession = useMemo(
+    () => ({
+      isSystemAdmin: session.isSystemAdmin,
+      perfilNome: session.perfilNome,
+      permissoes: session.permissoes,
+      permissoesGranulares: session.permissoesGranulares,
+    }),
+    [
+      session.isSystemAdmin,
+      session.perfilNome,
+      session.permissoes,
+      session.permissoesGranulares,
+    ]
   );
 
   const grouped = useMemo(
-    () => globalSearch(query, permissions),
-    [query, permissions]
+    () => globalSearch(query, authSession),
+    [query, authSession]
   );
   const flatResults = useMemo(() => flattenResults(grouped), [grouped]);
   const totalCount = flatResults.length;

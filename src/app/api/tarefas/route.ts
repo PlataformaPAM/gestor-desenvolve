@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/server/audit-log";
 import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
 import { composeDescricaoWithCategoria } from "@/lib/tarefas/categorias";
+import { tarefasAccessGate } from "@/lib/server/tarefas-access";
 
 type TxTarefaCompat = {
   tarefa: {
@@ -109,6 +110,9 @@ async function proximoCodigoTarefa(
 }
 
 export async function POST(req: Request) {
+  const gate = await tarefasAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   const parsed = await parseJsonSafe<{ tarefa?: Tarefa }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const tarefa = parsed.value.tarefa;

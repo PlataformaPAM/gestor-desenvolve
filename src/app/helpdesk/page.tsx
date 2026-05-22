@@ -17,6 +17,10 @@ import {
 } from "@/lib/operacao/priorizacao";
 import { useAuth } from "@/contexts/auth-context";
 import { formLabelClass } from "@/components/ui/field-patterns";
+import { canViewResourceClient } from "@/lib/configuracoes/permission-client";
+import { useResourcePageGuard, useResourceRbac } from "@/hooks/use-rbac-resource";
+
+const HELPDESK_RESOURCE = "helpdesk.tickets";
 
 type SlaFilter = "" | "no_prazo" | "atencao" | "atrasado";
 const OPERACAO_VIEW_STORAGE_KEY = "operacao_view_suporte";
@@ -28,10 +32,18 @@ function normalizeForSearch(s: string): string {
 export default function SuportePage() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
+  const podeVer = useResourcePageGuard(HELPDESK_RESOURCE);
+  const rbac = useResourceRbac(HELPDESK_RESOURCE);
+  const podeCriarTicket = rbac.podeCriar;
+  const podeEditarTicket = rbac.podeEditar;
+  const podeVerClientes = useMemo(
+    () => canViewResourceClient(session, "clientes.cadastro"),
+    [session]
+  );
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("abertos");
   const [clientes, setClientes] = useState<Array<{ id: string; nome: string; empresa?: string }>>([]);
-  const [equipe, setEquipe] = useState<Array<{ id: string; nome: string }>>([]);
+  const [usuarios, setUsuarios] = useState<Array<{ id: string; nome: string }>>([]);
   const [prioridadeFilter, setPrioridadeFilter] = useState<"" | TicketPrioridade>("");
   const [statusFilter, setStatusFilter] = useState<"" | TicketStatus>("");
   const [categoriaFilter, setCategoriaFilter] = useState<"" | TicketCategoria>("");
@@ -66,6 +78,10 @@ export default function SuportePage() {
   }, [operacaoView]);
 
   useEffect(() => {
+    if (!podeCriarTicket) {
+      setPrimaryAction(null);
+      return;
+    }
     setPrimaryAction({
       label: "Novo Ticket",
       showPlusIcon: true,
@@ -75,7 +91,7 @@ export default function SuportePage() {
       },
     });
     return () => setPrimaryAction(null);
-  }, [setPrimaryAction]);
+  }, [setPrimaryAction, podeCriarTicket]);
 
   useEffect(() => {
     let active = true;
@@ -83,20 +99,20 @@ export default function SuportePage() {
       try {
         const res = await fetch("/api/suporte/bootstrap", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as { data?: { tickets?: Ticket[] } };
+        const data = (await res.json()) as {
+          data?: { tickets?: Ticket[]; usuarios?: Array<{ id: string; nome: string }> };
+        };
         if (!active) return;
         setTickets(data?.data?.tickets ?? []);
-        const [clientesRes, equipeRes] = await Promise.all([
-          fetch("/api/clientes/bootstrap", { cache: "no-store" }),
-          fetch("/api/tarefas/bootstrap", { cache: "no-store" }),
-        ]);
-        if (clientesRes.ok) {
-          const c = (await clientesRes.json()) as { data?: { clientes?: Array<{ id: string; nome: string; empresa?: string }> } };
-          if (active) setClientes(c?.data?.clientes ?? []);
-        }
-        if (equipeRes.ok) {
-          const u = (await equipeRes.json()) as { data?: { usuarios?: Array<{ id: string; nome: string }> } };
-          if (active) setEquipe(u?.data?.usuarios ?? []);
+        setUsuarios(data?.data?.usuarios ?? []);
+        if (podeVerClientes) {
+          const clientesRes = await fetch("/api/clientes/bootstrap", { cache: "no-store" });
+          if (clientesRes.ok) {
+            const c = (await clientesRes.json()) as {
+              data?: { clientes?: Array<{ id: string; nome: string; empresa?: string }> };
+            };
+            if (active) setClientes(c?.data?.clientes ?? []);
+          }
         }
       } catch {
         // no-op
@@ -105,7 +121,7 @@ export default function SuportePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [podeVerClientes]);
 
   useEffect(() => {
     let active = true;
@@ -184,6 +200,16 @@ export default function SuportePage() {
   }, [ticketsOperacionais, searchTerm, prioridadeFilter, statusFilter, categoriaFilter, slaFilter]);
 
   const handleSaveTicket = useCallback((data: TicketFormPayload) => {
+    if (selectedTicket && !podeEditarTicket) {
+      setToastMessage("Sem permissão para editar tickets.");
+      setToastVisible(true);
+      return;
+    }
+    if (!selectedTicket && !podeCriarTicket) {
+      setToastMessage("Sem permissão para criar tickets.");
+      setToastVisible(true);
+      return;
+    }
     const now = new Date();
     if (selectedTicket) {
       let updatedTicket: Ticket | null = null;
@@ -260,7 +286,7 @@ export default function SuportePage() {
     }
     setIsSheetOpen(false);
     setSelectedTicket(null);
-  }, [selectedTicket, saveTicket, session.userName]);
+  }, [selectedTicket, saveTicket, session.userName, podeEditarTicket, podeCriarTicket]);
 
   const handleCloseSheet = useCallback(() => {
     setIsSheetOpen(false);
@@ -283,6 +309,8 @@ export default function SuportePage() {
 
   const filterInputClass =
     "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
+
+  if (!podeVer) return null;
 
   return (
     <section className="w-full min-w-0 space-y-6">
@@ -349,7 +377,7 @@ export default function SuportePage() {
         onClose={handleCloseSheet}
         onSave={handleSaveTicket}
         clientes={clientes}
-        equipe={equipe}
+        usuarios={usuarios}
         usuarioAtual={{ id: session.userId ?? "usuario-atual", nome: session.userName ?? "Usuário" }}
         initialTicket={selectedTicket}
         title={

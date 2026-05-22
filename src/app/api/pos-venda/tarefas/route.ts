@@ -5,6 +5,7 @@ import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { COOKIE_NAME, decodeSession } from "@/lib/auth";
 import type { Prisma } from "@prisma/client";
+import { posvendaAccessGate } from "@/lib/server/posvenda-access";
 
 function mapStatus(status: TarefaRegua["status"]) {
   if (status === "concluida") return "concluido" as const;
@@ -34,6 +35,9 @@ async function proximoCodigoTarefa(tx: TxTarefaCompat, ano: number): Promise<str
 }
 
 export async function POST(req: Request) {
+  const gate = await posvendaAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   const cookieHeader = req.headers.get("cookie") || "";
   const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
   const session = decodeSession(match?.[1]?.trim());
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   const users = await prisma.usuario.findMany({ where: { ativo: true }, take: 1, orderBy: { createdAt: "asc" } });
-  const responsavelId = pickResponsavelId(users);
+  const responsavelId = gate.userId ?? pickResponsavelId(users);
   if (!responsavelId) return fail("BAD_REQUEST", "Sem usuário ativo para responsável.", 400);
 
   const dataFim = new Date(`${tarefa.dataAgendada}T12:00:00.000Z`);

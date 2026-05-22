@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapColaborador } from "../_shared";
 import { fail, ok } from "@/lib/server/api-response";
+import { filterColaboradoresForSession, rhColaboradoresAccessGate } from "@/lib/server/rh-access";
 
 /** Evita `SELECT *` em colunas que podem não existir no banco até migrar (ex.: contatosFornecedor). */
 const colaboradorRhSelectBase = {
@@ -109,7 +110,10 @@ async function loadColaboradoresRh() {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await rhColaboradoresAccessGate(req, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     const [colaboradores, usuarios] = await Promise.all([loadColaboradoresRh(), loadUsuariosRhVinculo()]);
 
@@ -121,7 +125,14 @@ export async function GET() {
         return null;
       }
     });
-    const lista = mappedColaboradores.filter((x): x is NonNullable<typeof x> => x != null);
+    const listaMapped = mappedColaboradores.filter((x): x is NonNullable<typeof x> => x != null);
+    const allowed = await filterColaboradoresForSession(
+      listaMapped.map((c) => ({ id: c.id })),
+      gate.userId,
+      gate.scope
+    );
+    const allowedIds = new Set(allowed.map((c) => c.id));
+    const lista = listaMapped.filter((c) => allowedIds.has(c.id));
 
     const mappedUsuarios = usuarios.map((u) => ({
       id: u.id,

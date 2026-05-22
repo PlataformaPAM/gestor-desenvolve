@@ -2,8 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { encodeDescricao, mapSolucao, type SolucaoFront } from "./_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
+import { solucoesAccessGate } from "@/lib/server/solucoes-access";
 
 export async function POST(req: Request) {
+  const gate = await solucoesAccessGate(req, "criar");
+  if (!gate.ok) return gate.response;
+
   const body = await parseJsonSafe<{ solucao?: SolucaoFront }>(req);
   if (!body.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const s = body.value.solucao;

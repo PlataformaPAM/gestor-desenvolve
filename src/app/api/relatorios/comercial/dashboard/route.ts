@@ -1,3 +1,5 @@
+import { relatoriosAccessGate, RELATORIOS_COMERCIAL_RESOURCE } from "@/lib/server/relatorios-access";
+import { filterRelatorioLeads } from "@/lib/server/relatorio-scope";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/server/api-response";
 
@@ -8,13 +10,23 @@ function monthBounds() {
   return { now, start, end };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await relatoriosAccessGate(req, RELATORIOS_COMERCIAL_RESOURCE, "ver");
+  if (!gate.ok) return gate.response;
+
+
   try {
     const { now, start, end } = monthBounds();
-    const leads = await prisma.lead.findMany({
+    const leadsRaw = await prisma.lead.findMany({
       where: { createdAt: { gte: start, lte: end }, registroLead: "oportunidade" },
       orderBy: { createdAt: "asc" },
     });
+    const leads = await filterRelatorioLeads(
+      leadsRaw,
+      gate.session,
+      gate.userId,
+      RELATORIOS_COMERCIAL_RESOURCE
+    );
 
     const ganhos = leads.filter((x) => x.stageId === "fechado");
     const perdidos = leads.filter((x) => x.stageId === "perdido");

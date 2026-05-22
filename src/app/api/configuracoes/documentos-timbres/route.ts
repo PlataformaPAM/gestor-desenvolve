@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fail, ok } from "@/lib/server/api-response";
+import { CONFIG_RESOURCES, configuracoesAccessGate } from "@/lib/server/configuracoes-access";
 import {
   getDocumentoTimbresConfig,
   saveDocumentoTimbresConfig,
@@ -33,7 +34,10 @@ function normalizeLegacyUploadUrl(raw: string): string {
   return v;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.papeisTimbrados, "ver");
+  if (!gate.ok) return gate.response;
+
   try {
     const config = await getDocumentoTimbresConfig();
     const timbres = config.items.map((item) => ({
@@ -51,6 +55,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const gate = await configuracoesAccessGate(req, CONFIG_RESOURCES.papeisTimbrados, "criar");
+  if (!gate.ok) return gate.response;
+
   try {
     const form = await req.formData();
     const file = form.get("arquivo");

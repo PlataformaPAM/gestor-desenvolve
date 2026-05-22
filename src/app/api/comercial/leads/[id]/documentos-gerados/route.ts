@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/server/api-response";
+import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 
 type DocumentoGeradoItem = {
   id: string;
@@ -23,8 +24,10 @@ function parseDocFromInteraction(newValue: unknown): DocumentoGeradoItem["modelo
   return { id, nome, tipo, versao, assunto };
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id: leadId } = await ctx.params;
+  const gate = await comercialAccessGate(req, "ver", leadId);
+  if (!gate.ok) return gate.response;
   const rows = await prisma.leadInteraction.findMany({
     where: {
       leadId,
