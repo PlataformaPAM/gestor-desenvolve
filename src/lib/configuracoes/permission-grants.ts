@@ -63,6 +63,19 @@ export function grantsFromLegacyPermissoes(
       };
     }
   }
+  const algumModuloLegado = PERMISSION_RESOURCES.some((r) => {
+    const legadoKey = r.extraModuloKey ?? r.moduloLegado;
+    return legadoKey && permissoes[legadoKey] === true;
+  });
+  if (algumModuloLegado && grants["central.dashboard"]) {
+    grants["central.dashboard"] = {
+      ver: true,
+      criar: false,
+      editar: false,
+      excluir: false,
+      verTodos: true,
+    };
+  }
   return grants;
 }
 

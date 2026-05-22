@@ -1,11 +1,11 @@
 import type { SessionPayload } from "@/lib/auth";
 import { authorize, isSessionAdmin } from "@/lib/server/authorize";
-import { mapLeadFromDb } from "@/app/api/comercial/_shared";
-import { filterLeadsForSession } from "@/lib/server/comercial-lead-access";
 import { filterClientesForSession } from "@/lib/server/cliente-access";
 import { filterLancamentosForSession } from "@/lib/server/financeiro-access";
 import { filterHelpdeskTicketsForScope } from "@/lib/server/helpdesk-access";
+import { filterLeadIdsForResourceScope } from "@/lib/server/lead-access";
 import { filterRelatorioTarefasRaw } from "@/lib/server/relatorio-scope";
+import { isPrismaSchemaDriftError } from "@/lib/server/prisma-schema";
 import {
   getFinanceiroDefaultHref,
   hasAnyFinanceiroSubmodule,
@@ -31,6 +31,26 @@ export type DashboardVisibility = {
   helpdeskScope: "todos" | "vinculados";
   tarefasScope: "todos" | "vinculados";
 };
+
+function hasAnyDashboardModule(flags: {
+  comercial: boolean;
+  financeiro: boolean;
+  financeiroNav: boolean;
+  clientes: boolean;
+  helpdesk: boolean;
+  tarefas: boolean;
+  posVenda: boolean;
+}): boolean {
+  return (
+    flags.comercial ||
+    flags.financeiro ||
+    flags.financeiroNav ||
+    flags.clientes ||
+    flags.helpdesk ||
+    flags.tarefas ||
+    flags.posVenda
+  );
+}
 
 export function getDashboardVisibility(
   session: SessionPayload,
@@ -61,15 +81,22 @@ export function getDashboardVisibility(
   const clientes = authorize(session, "clientes.cadastro", "ver");
   const helpdesk = authorize(session, "helpdesk.tickets", "ver");
   const tarefas = authorize(session, "tarefas.internas", "ver");
-  return {
-    central: central.allowed,
+  const posVenda = authorize(session, "posvenda.tarefas", "ver").allowed;
+  const financeiroNav = hasAnyFinanceiroSubmodule(session);
+
+  const modules = {
     comercial: comercial.allowed,
     financeiro: financeiro.allowed,
-    financeiroNav: hasAnyFinanceiroSubmodule(session),
+    financeiroNav,
     clientes: clientes.allowed,
     helpdesk: helpdesk.allowed,
     tarefas: tarefas.allowed,
-    posVenda: authorize(session, "posvenda.tarefas", "ver").allowed,
+    posVenda,
+  };
+
+  return {
+    central: central.allowed || hasAnyDashboardModule(modules),
+    ...modules,
     financeiroHref: getFinanceiroDefaultHref({
       isSystemAdmin: session.isSystemAdmin,
       perfilNome: session.perfilNome,
@@ -84,41 +111,60 @@ export function getDashboardVisibility(
   };
 }
 
-/** `mapLeadFromDb` exige o mesmo include do bootstrap comercial. */
-const LEAD_DASHBOARD_INCLUDE = {
-  criadoPor: { select: { nomeExibicao: true } },
-  atualizadoPor: { select: { nomeExibicao: true } },
-  solucoes: { include: { solucaoCatalogo: true } },
-  contatos: { include: { papeis: true } },
-  checklistItems: true,
-  contratoChecklist: true,
-  contratoArquivos: true,
-  financeiroFluxo: true,
-  interactions: { include: { user: true, anexos: true }, orderBy: { date: "asc" as const } },
+export type DashboardLeadRow = {
+  id: string;
+  stageId: string;
+  priority: string;
+  previsaoFechamento: Date | null;
+  company: string | null;
+  name: string;
+};
+
+const DASHBOARD_LEAD_SELECT = {
+  id: true,
+  stageId: true,
+  priority: true,
+  previsaoFechamento: true,
+  company: true,
+  name: true,
 } as const;
+
+async function queryDashboardLeads(): Promise<DashboardLeadRow[]> {
+  try {
+    return await prisma.lead.findMany({
+      where: { registroLead: "oportunidade" },
+      select: DASHBOARD_LEAD_SELECT,
+    });
+  } catch (error) {
+    if (!isPrismaSchemaDriftError(error, "registroLead")) throw error;
+    console.warn("[dashboard] coluna registroLead ausente — carregando todos os leads da Central.");
+    return prisma.lead.findMany({ select: DASHBOARD_LEAD_SELECT });
+  }
+}
 
 export async function loadDashboardLeads(
   session: SessionPayload,
   userId: string | null,
   visibility: DashboardVisibility
-) {
+): Promise<DashboardLeadRow[]> {
   if (!visibility.comercial) return [];
-  const rows = await prisma.lead.findMany({
-    where: { registroLead: "oportunidade" },
-    include: LEAD_DASHBOARD_INCLUDE,
-  });
-  const mapped = rows.flatMap((r) => {
-    try {
-      return [mapLeadFromDb(r as never)];
-    } catch (e) {
-      console.warn("[dashboard] lead ignorado no map:", r.id, e);
-      return [];
+  try {
+    const rows = await queryDashboardLeads();
+    if (isSessionAdmin(session) || visibility.comercialScope === "todos") {
+      return rows;
     }
-  });
-  if (isSessionAdmin(session) || visibility.comercialScope === "todos") {
-    return mapped;
+    const allowed = await filterLeadIdsForResourceScope(
+      rows.map((r) => ({ id: r.id })),
+      session,
+      userId,
+      "comercial.pipeline"
+    );
+    const allowedIds = new Set(allowed.map((r) => r.id));
+    return rows.filter((r) => allowedIds.has(r.id));
+  } catch (error) {
+    console.error("[dashboard] falha ao carregar leads:", error);
+    return [];
   }
-  return filterLeadsForSession(mapped, session, userId);
 }
 
 export async function loadDashboardLancamentos(
@@ -127,11 +173,16 @@ export async function loadDashboardLancamentos(
   visibility: DashboardVisibility
 ): Promise<Lancamento[]> {
   if (!visibility.financeiro) return [];
-  const rows = await prisma.lancamento.findMany();
-  if (isSessionAdmin(session) || visibility.financeiroScope === "todos") {
-    return rows;
+  try {
+    const rows = await prisma.lancamento.findMany();
+    if (isSessionAdmin(session) || visibility.financeiroScope === "todos") {
+      return rows;
+    }
+    return filterLancamentosForSession(rows, userId, visibility.financeiroScope);
+  } catch (error) {
+    console.error("[dashboard] falha ao carregar lançamentos:", error);
+    return [];
   }
-  return filterLancamentosForSession(rows, userId, visibility.financeiroScope);
 }
 
 export type DashboardClienteRow = {
@@ -152,7 +203,8 @@ export async function loadDashboardClientes(
     });
     if (isSessionAdmin(session) || visibility.clientesScope === "todos") return rows;
     return filterClientesForSession(rows, userId, visibility.clientesScope);
-  } catch {
+  } catch (error) {
+    console.error("[dashboard] falha ao carregar clientes:", error);
     return [];
   }
 }
@@ -187,7 +239,8 @@ export async function loadDashboardTickets(
     });
     if (isSessionAdmin(session) || visibility.helpdeskScope === "todos") return rows;
     return filterHelpdeskTicketsForScope(rows, userId, visibility.helpdeskScope);
-  } catch {
+  } catch (error) {
+    console.error("[dashboard] falha ao carregar tickets:", error);
     return [];
   }
 }
@@ -220,7 +273,8 @@ export async function loadDashboardTarefas(
     });
     if (isSessionAdmin(session) || visibility.tarefasScope === "todos") return rows;
     return filterRelatorioTarefasRaw(rows, userId, visibility.tarefasScope);
-  } catch {
+  } catch (error) {
+    console.error("[dashboard] falha ao carregar tarefas:", error);
     return [];
   }
 }

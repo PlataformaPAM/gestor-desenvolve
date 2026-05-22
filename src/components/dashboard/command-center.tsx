@@ -349,11 +349,20 @@ export function CommandCenter() {
         const res = await fetch("/api/dashboard/bootstrap", { cache: "no-store" });
         if (!res.ok) {
           if (active) {
-            setBootstrapError(
-              res.status === 401
-                ? "Sessão expirada. Faça login novamente."
-                : "Não foi possível carregar os dados da Central."
-            );
+            let message = "Não foi possível carregar os dados da Central.";
+            if (res.status === 401) {
+              message = "Sessão expirada. Faça login novamente.";
+            } else {
+              try {
+                const errJson = (await res.json()) as {
+                  error?: { code?: string; message?: string };
+                };
+                if (errJson.error?.message) message = errJson.error.message;
+              } catch {
+                /* mantém mensagem padrão */
+              }
+            }
+            setBootstrapError(message);
           }
           return;
         }

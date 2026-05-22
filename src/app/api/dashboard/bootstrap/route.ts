@@ -210,10 +210,11 @@ export async function GET(req: Request) {
         .sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())
         .slice(0, 4)
         .forEach((l) => {
+          const desc = (l.descricao ?? "").trim() || "Lançamento";
           upcoming.push({
             id: `lan-${l.id}`,
             tipo: l.tipo === "entrada" ? "Receita" : "Despesa",
-            titulo: l.descricao.slice(0, 48) + (l.descricao.length > 48 ? "…" : ""),
+            titulo: desc.slice(0, 48) + (desc.length > 48 ? "…" : ""),
             when: l.vencimento.toISOString(),
             href: vis.financeiroHref,
             accent: l.tipo === "entrada" ? "#10b981" : "#f43f5e",
@@ -247,10 +248,11 @@ export async function GET(req: Request) {
         .sort((a, b) => a.previsaoConclusao.getTime() - b.previsaoConclusao.getTime())
         .slice(0, 3)
         .forEach((t) => {
+          const assunto = (t.assunto ?? "").trim() || "Chamado";
           upcoming.push({
             id: `tk-${t.id}`,
             tipo: "Ticket",
-            titulo: `${t.codigo} · ${t.assunto.slice(0, 36)}`,
+            titulo: `${t.codigo} · ${assunto.slice(0, 36)}`,
             when: t.previsaoConclusao.toISOString(),
             href: "/suporte",
             accent: "#0ea5e9",
@@ -277,7 +279,7 @@ export async function GET(req: Request) {
           upcoming.push({
             id: `lead-${l.id}`,
             tipo: "Fechamento",
-            titulo: l.company || l.name,
+            titulo: (l.company || l.name || "Oportunidade").trim(),
             when: new Date(l.previsaoFechamento!).toISOString(),
             href: "/comercial",
             accent: "#d946ef",
@@ -436,6 +438,18 @@ export async function GET(req: Request) {
     return ok(payload);
   } catch (error) {
     console.error("[dashboard/bootstrap]", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    const migrationHint =
+      msg.includes("registroLead") ||
+      msg.includes("permissoesGranulares") ||
+      msg.includes("does not exist");
+    if (migrationHint) {
+      return fail(
+        "MIGRATION_REQUIRED",
+        "Banco desatualizado em relação ao app. Rode `npx prisma migrate deploy` no ambiente de produção.",
+        503
+      );
+    }
     return fail("INTERNAL_ERROR", "Falha ao carregar dashboard.", 500);
   }
 }
