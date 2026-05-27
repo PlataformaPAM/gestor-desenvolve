@@ -15,16 +15,17 @@ export const COMERCIAL_BOOTSTRAP_LEAD_INCLUDE = {
   interactions: { include: { user: true, anexos: true }, orderBy: { date: "asc" as const } },
 } as const;
 
-/** Funil Comercial: tudo exceto venda direta do Financeiro (inclui legado sem registroLead). */
+/** Mesmo critério que funcionava antes: somente oportunidades do funil Comercial. */
 export async function loadComercialBootstrapLeadsRaw() {
   try {
     return await prisma.lead.findMany({
-      where: { NOT: { registroLead: "venda_direta_financeiro" } },
+      where: { registroLead: "oportunidade" },
       include: COMERCIAL_BOOTSTRAP_LEAD_INCLUDE,
       orderBy: { createdAt: "desc" },
     });
   } catch (error) {
     if (!isPrismaSchemaDriftError(error, "registroLead")) throw error;
+    console.warn("[comercial-bootstrap] coluna registroLead indisponível — carregando leads sem filtro.");
     return prisma.lead.findMany({
       include: COMERCIAL_BOOTSTRAP_LEAD_INCLUDE,
       orderBy: { createdAt: "desc" },
@@ -38,7 +39,9 @@ export function mapComercialBootstrapLeads(
   const mapped: Lead[] = [];
   for (const row of rows) {
     try {
-      mapped.push(mapLeadFromDb(row as never));
+      const lead = mapLeadFromDb(row as never);
+      if (lead.registroLead && lead.registroLead !== "oportunidade") continue;
+      mapped.push(lead);
     } catch (err) {
       console.error("[comercial-bootstrap] mapLeadFromDb failed", row.id, err);
     }
@@ -56,27 +59,39 @@ export async function leadIdsExplicitlyLinkedToUser(
   const name = userName?.trim();
 
   if (uid) {
-    const byCreator = await prisma.lead.findMany({
-      where: { criadoPorId: uid, NOT: { registroLead: "venda_direta_financeiro" } },
-      select: { id: true },
-    });
-    for (const row of byCreator) ids.add(row.id);
+    try {
+      const byCreator = await prisma.lead.findMany({
+        where: { criadoPorId: uid },
+        select: { id: true },
+      });
+      for (const row of byCreator) ids.add(row.id);
+    } catch (err) {
+      console.error("[comercial-bootstrap] leadIds by criadoPorId failed", err);
+    }
 
-    const byInteractionUser = await prisma.leadInteraction.findMany({
-      where: { userId: uid },
-      select: { leadId: true },
-      distinct: ["leadId"],
-    });
-    for (const row of byInteractionUser) ids.add(row.leadId);
+    try {
+      const byInteractionUser = await prisma.leadInteraction.findMany({
+        where: { userId: uid },
+        select: { leadId: true },
+        distinct: ["leadId"],
+      });
+      for (const row of byInteractionUser) ids.add(row.leadId);
+    } catch (err) {
+      console.error("[comercial-bootstrap] leadIds by userId failed", err);
+    }
   }
 
   if (name) {
-    const byAutor = await prisma.leadInteraction.findMany({
-      where: { autorNome: { equals: name, mode: "insensitive" } },
-      select: { leadId: true },
-      distinct: ["leadId"],
-    });
-    for (const row of byAutor) ids.add(row.leadId);
+    try {
+      const byAutor = await prisma.leadInteraction.findMany({
+        where: { autorNome: { equals: name, mode: "insensitive" } },
+        select: { leadId: true },
+        distinct: ["leadId"],
+      });
+      for (const row of byAutor) ids.add(row.leadId);
+    } catch (err) {
+      console.error("[comercial-bootstrap] leadIds by autorNome failed", err);
+    }
   }
 
   return ids;

@@ -38,23 +38,15 @@ async function loadLead(id: string) {
 
 async function ensureLeadOportunidadeFlags(db: typeof prisma, leadId: string, criadoPorId?: string) {
   try {
-    await db.$executeRaw`
-      UPDATE "Lead"
-      SET "registroLead" = 'oportunidade'::"LeadRegistro"
-      WHERE "id" = ${leadId}
-    `;
+    await db.lead.update({
+      where: { id: leadId },
+      data: {
+        registroLead: "oportunidade",
+        ...(criadoPorId ? { criadoPorId } : {}),
+      },
+    });
   } catch (err) {
-    console.error("[POST /api/comercial/leads] ensureLeadOportunidadeFlags registroLead failed", err);
-  }
-  if (!criadoPorId) return;
-  try {
-    await db.$executeRaw`
-      UPDATE "Lead"
-      SET "criadoPorId" = ${criadoPorId}
-      WHERE "id" = ${leadId}
-    `;
-  } catch (err) {
-    console.error("[POST /api/comercial/leads] ensureLeadOportunidadeFlags criadoPorId failed", err);
+    console.error("[POST /api/comercial/leads] ensureLeadOportunidadeFlags failed", err);
   }
 }
 
@@ -111,7 +103,6 @@ async function createLeadWithSchemaFallback(
         "priority",
         "enteredStageAt",
         "origem",
-        "registroLead",
         "createdAt",
         "updatedAt"
       )
@@ -124,7 +115,6 @@ async function createLeadWithSchemaFallback(
         ${lead.priority},
         ${enteredAt},
         ${lead.origem},
-        'oportunidade'::"LeadRegistro",
         NOW(),
         NOW()
       )
@@ -144,7 +134,6 @@ async function createLeadWithSchemaFallback(
       "priority",
       "enteredStageAt",
       "origem",
-      "registroLead",
       "createdAt",
       "updatedAt"
     )
@@ -156,7 +145,6 @@ async function createLeadWithSchemaFallback(
       ${lead.priority},
       ${enteredAt},
       ${lead.origem},
-      'oportunidade'::"LeadRegistro",
       NOW(),
       NOW()
     )
