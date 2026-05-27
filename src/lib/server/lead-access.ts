@@ -27,13 +27,25 @@ export function isLeadVisibleToUser(
   const normalizedUserName = normalizeName(userName);
   const ownership = getLeadOwnership(lead);
   if (userId) {
+    if (lead.criadoPorId === userId) return true;
     if (ownership.responsavelId === userId) return true;
     if ((ownership.colaboradores ?? []).some((c) => c.id === userId)) return true;
+    if ((lead.interactions ?? []).some((i) => i.userId === userId)) return true;
   }
   if (!normalizedUserName) return false;
   if (normalizeName(ownership.responsavelNome) === normalizedUserName) return true;
   if (normalizeName(lead.registroCriadoPorNome) === normalizedUserName) return true;
   if ((lead.interactions ?? []).some((i) => normalizeName(i.user) === normalizedUserName)) return true;
+  if (
+    (lead.interactions ?? []).some(
+      (i) =>
+        i.type === "sistema" &&
+        (i.fieldKey === "ownership" || i.field === "ownership") &&
+        normalizeName(i.user) === normalizedUserName
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -49,7 +61,7 @@ export async function userCanAccessLeadId(
     include: LEAD_INCLUDE_FOR_ACCESS,
   });
   if (!row) return false;
-  return isLeadVisibleToUser(mapLeadFromDb(row as never), userId);
+  return isLeadVisibleToUser(mapLeadFromDb(row as never), userId, undefined);
 }
 
 /** Conjunto de leadIds visíveis entre os informados (escopo vinculados). */
@@ -67,7 +79,7 @@ export async function accessibleLeadIdsAmong(
   });
   const allowed = new Set<string>();
   for (const row of rows) {
-    if (isLeadVisibleToUser(mapLeadFromDb(row as never), userId)) {
+    if (isLeadVisibleToUser(mapLeadFromDb(row as never), userId, undefined)) {
       allowed.add(row.id);
     }
   }
@@ -88,12 +100,23 @@ export function filterLeadsForResourceScope(
   leads: Lead[],
   session: SessionPayload,
   userId: string | null | undefined,
-  resourceId: string
+  resourceId: string,
+  extraVisibleIds?: Set<string>
 ): Lead[] {
   const view = authorize(session, resourceId, "ver");
   if (!view.allowed) return [];
   if (view.scope === "todos") return leads;
-  return leads.filter((lead) => isLeadVisibleToUser(lead, userId, session.userName));
+  const filtered = leads.filter((lead) => isLeadVisibleToUser(lead, userId, session.userName));
+  if (!extraVisibleIds?.size) return filtered;
+  const seen = new Set(filtered.map((l) => l.id));
+  const merged = [...filtered];
+  for (const lead of leads) {
+    if (extraVisibleIds.has(lead.id) && !seen.has(lead.id)) {
+      merged.push(lead);
+      seen.add(lead.id);
+    }
+  }
+  return merged;
 }
 
 /** Filtra linhas `{ id }` pelo escopo Ver de um recurso (ex.: relatórios). */

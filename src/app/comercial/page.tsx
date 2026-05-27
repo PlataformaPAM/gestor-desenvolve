@@ -202,10 +202,14 @@ function ComercialPageContent() {
   }, []);
 
   const loadBootstrap = useCallback(async () => {
-    const res = await fetch("/api/comercial/bootstrap", { cache: "no-store" });
+    const res = await fetch("/api/comercial/bootstrap?debug=1", { cache: "no-store" });
     const text = await res.text();
     const trimmed = text.trim();
-    let body: { success?: boolean; data?: unknown; error?: { message?: string } };
+    let body: {
+      success?: boolean;
+      data?: unknown;
+      error?: { message?: string };
+    };
     try {
       const parsed: unknown = trimmed ? JSON.parse(trimmed) : {};
       body =
@@ -213,10 +217,10 @@ function ComercialPageContent() {
           ? (parsed as typeof body)
           : {};
     } catch {
-      throw new Error("Resposta inválida do servidor.");
+      throw new Error(`Resposta inválida do servidor (HTTP ${res.status}). Corpo: ${trimmed.slice(0, 300)}`);
     }
     if (!res.ok) {
-      throw new Error(body?.error?.message ?? `Erro ${res.status}`);
+      throw new Error(body?.error?.message ?? `Erro ${res.status} ao carregar kanban.`);
     }
     if (body.success === false) {
       throw new Error(body.error?.message ?? "Bootstrap comercial indisponível.");
@@ -224,13 +228,23 @@ function ComercialPageContent() {
     const root = (body.data ?? {}) as {
       leads?: unknown;
       clientes?: unknown;
-      data?: { leads?: unknown; clientes?: unknown };
+      meta?: {
+        scope?: string;
+        totalDb?: number;
+        totalVisible?: number;
+        totalHidden?: number;
+        userId?: string | null;
+        userName?: string | null;
+        hiddenSample?: Array<{ id: string; name: string }>;
+      };
+      data?: { leads?: unknown; clientes?: unknown; meta?: typeof root.meta };
     };
     const leadsRaw = root.leads ?? root.data?.leads;
     const clientesRaw = root.clientes ?? root.data?.clientes;
+    const meta = root.meta ?? root.data?.meta;
     const leads = Array.isArray(leadsRaw) ? (leadsRaw as Lead[]) : [];
     const clientes = Array.isArray(clientesRaw) ? (clientesRaw as Cliente[]) : [];
-    return { leads, clientes };
+    return { leads, clientes, meta };
   }, []);
 
   const persistOrder = useCallback((state: ColumnsState) => {
@@ -391,10 +405,27 @@ function ComercialPageContent() {
         if (!active) return;
         setColumns(applyPersistedOrder(columnsFromLeads(data.leads ?? [])));
         setClientes(data.clientes ?? []);
-      } catch {
+        const meta = data.meta;
+        if (meta && (meta.totalHidden ?? 0) > 0) {
+          const sample = (meta.hiddenSample ?? [])
+            .map((h) => h.name)
+            .filter(Boolean)
+            .join(", ");
+          showErrorToast(
+            `Kanban ocultou ${meta.totalHidden} lead(s) pelo escopo "${meta.scope ?? "vinculados"}". ` +
+              `No banco: ${meta.totalDb ?? "?"}, visíveis: ${meta.totalVisible ?? "?"}. ` +
+              `Usuário: ${meta.userName ?? meta.userId ?? "?"}. ` +
+              (sample ? `Ex.: ${sample}. ` : "") +
+              `Veja logs no Railway: filtro [comercial/bootstrap].`,
+            20000
+          );
+        }
+      } catch (err) {
         if (!active) return;
         setColumns(getEmptyColumns());
         setClientes([]);
+        const msg = err instanceof Error ? err.message : "Falha ao carregar o funil comercial.";
+        showErrorToast(msg, 20000);
       } finally {
         if (active) setLoading(false);
       }
@@ -402,7 +433,7 @@ function ComercialPageContent() {
     return () => {
       active = false;
     };
-  }, [loadBootstrap, applyPersistedOrder]);
+  }, [loadBootstrap, applyPersistedOrder, showErrorToast]);
 
   useEffect(() => {
     if (loading) return;
@@ -670,6 +701,25 @@ function ComercialPageContent() {
         });
         pulseLeadCard(lead.id);
         await createLead(lead);
+        try {
+          const refreshed = await loadBootstrap();
+          setColumns(applyPersistedOrder(columnsFromLeads(refreshed.leads ?? [])));
+          setClientes(refreshed.clientes ?? []);
+          const found = (refreshed.leads ?? []).some((l) => String(l.id) === String(lead.id));
+          if (!found) {
+            showErrorToast(
+              `Lead salvo no servidor, mas não apareceu no kanban após recarregar. ` +
+                `Escopo: ${refreshed.meta?.scope ?? "?"}. ` +
+                `DB: ${refreshed.meta?.totalDb ?? "?"}, visíveis: ${refreshed.meta?.totalVisible ?? "?"}. ` +
+                `Abra Railway → serviço → Logs e busque [comercial/bootstrap] ou [POST /api/comercial/leads].`,
+              25000
+            );
+          }
+        } catch (refreshErr) {
+          const msg =
+            refreshErr instanceof Error ? refreshErr.message : "Falha ao recarregar kanban após salvar.";
+          showErrorToast(`Lead salvo, mas erro ao recarregar kanban: ${msg}`, 20000);
+        }
         void recomputePendingAlerts(leadsFromColumns(columnsRef.current));
         setToastSave({ visible: true, message: "Lead salvo com sucesso!" });
         setNovoLeadOpen(false);
@@ -689,6 +739,8 @@ function ComercialPageContent() {
       currentUserName,
       session.userId,
       createLead,
+      loadBootstrap,
+      applyPersistedOrder,
       rollbackFromServer,
       showErrorToast,
       pulseLeadCard,

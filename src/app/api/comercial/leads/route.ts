@@ -36,11 +36,34 @@ async function loadLead(id: string) {
   });
 }
 
+async function ensureLeadOportunidadeFlags(db: typeof prisma, leadId: string, criadoPorId?: string) {
+  try {
+    await db.$executeRaw`
+      UPDATE "Lead"
+      SET "registroLead" = 'oportunidade'::"LeadRegistro"
+      WHERE "id" = ${leadId}
+    `;
+  } catch (err) {
+    console.error("[POST /api/comercial/leads] ensureLeadOportunidadeFlags registroLead failed", err);
+  }
+  if (!criadoPorId) return;
+  try {
+    await db.$executeRaw`
+      UPDATE "Lead"
+      SET "criadoPorId" = ${criadoPorId}
+      WHERE "id" = ${leadId}
+    `;
+  } catch (err) {
+    console.error("[POST /api/comercial/leads] ensureLeadOportunidadeFlags criadoPorId failed", err);
+  }
+}
+
 async function createLeadWithSchemaFallback(
   db: typeof prisma,
   lead: Lead,
   sessionUserId: string | undefined
 ) {
+  const registroLead = lead.registroLead ?? "oportunidade";
   try {
     await db.lead.create({
       data: {
@@ -52,6 +75,7 @@ async function createLeadWithSchemaFallback(
         priority: lead.priority,
         enteredStageAt: toDateOrUndefined(lead.enteredStageAt) ?? new Date(),
         origem: lead.origem,
+        registroLead,
         propostaGeradaEm: toDateOrUndefined(lead.propostaGeradaEm),
         previsaoFechamento: toDateOrUndefined(lead.previsaoFechamento),
         cpf: lead.cpf,
@@ -68,6 +92,7 @@ async function createLeadWithSchemaFallback(
         clienteId: lead.clienteId ?? null,
       },
     });
+    await ensureLeadOportunidadeFlags(db, lead.id, sessionUserId);
     return;
   } catch (err) {
     console.error("[POST /api/comercial/leads] full create failed, trying fallback", err);
@@ -86,6 +111,7 @@ async function createLeadWithSchemaFallback(
         "priority",
         "enteredStageAt",
         "origem",
+        "registroLead",
         "createdAt",
         "updatedAt"
       )
@@ -98,10 +124,12 @@ async function createLeadWithSchemaFallback(
         ${lead.priority},
         ${enteredAt},
         ${lead.origem},
+        'oportunidade'::"LeadRegistro",
         NOW(),
         NOW()
       )
     `;
+    await ensureLeadOportunidadeFlags(db, lead.id, sessionUserId);
     return;
   } catch (err) {
     console.error("[POST /api/comercial/leads] SQL fallback with valorTotal failed", err);
@@ -116,6 +144,7 @@ async function createLeadWithSchemaFallback(
       "priority",
       "enteredStageAt",
       "origem",
+      "registroLead",
       "createdAt",
       "updatedAt"
     )
@@ -127,10 +156,12 @@ async function createLeadWithSchemaFallback(
       ${lead.priority},
       ${enteredAt},
       ${lead.origem},
+      'oportunidade'::"LeadRegistro",
       NOW(),
       NOW()
     )
   `;
+  await ensureLeadOportunidadeFlags(db, lead.id, sessionUserId);
 }
 
 export async function POST(req: Request) {

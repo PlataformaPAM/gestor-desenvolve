@@ -32,9 +32,16 @@ const LEAD_INCLUDE = {
 export function filterLeadsForSession(
   leads: Lead[],
   session: SessionPayload,
-  userId: string | null | undefined
+  userId: string | null | undefined,
+  extraVisibleIds?: Set<string>
 ): Lead[] {
-  return filterLeadsForResourceScope(leads, session, userId, COMERCIAL_PIPELINE_RESOURCE);
+  return filterLeadsForResourceScope(
+    leads,
+    session,
+    userId,
+    COMERCIAL_PIPELINE_RESOURCE,
+    extraVisibleIds
+  );
 }
 
 type AccessGateOk = {
