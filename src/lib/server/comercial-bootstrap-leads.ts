@@ -15,6 +15,17 @@ export const COMERCIAL_BOOTSTRAP_LEAD_INCLUDE = {
   interactions: { include: { user: true, anexos: true }, orderBy: { date: "asc" as const } },
 } as const;
 
+/** Include mínimo para banco de produção atrasado (sem colunas de audit/vínculo). */
+const COMERCIAL_BOOTSTRAP_LEAD_INCLUDE_LEGACY = {
+  solucoes: { include: { solucaoCatalogo: true } },
+  contatos: { include: { papeis: true } },
+  checklistItems: true,
+  contratoChecklist: true,
+  contratoArquivos: true,
+  financeiroFluxo: true,
+  interactions: { include: { anexos: true }, orderBy: { date: "asc" as const } },
+} as const;
+
 /** Mesmo critério que funcionava antes: somente oportunidades do funil Comercial. */
 export async function loadComercialBootstrapLeadsRaw() {
   try {
@@ -24,12 +35,18 @@ export async function loadComercialBootstrapLeadsRaw() {
       orderBy: { createdAt: "desc" },
     });
   } catch (error) {
-    if (!isPrismaSchemaDriftError(error, "registroLead")) throw error;
-    console.warn("[comercial-bootstrap] coluna registroLead indisponível — carregando leads sem filtro.");
-    return prisma.lead.findMany({
-      include: COMERCIAL_BOOTSTRAP_LEAD_INCLUDE,
-      orderBy: { createdAt: "desc" },
-    });
+    if (!isPrismaSchemaDriftError(error)) throw error;
+    console.warn("[comercial-bootstrap] schema drift — tentando include legado.", error);
+    try {
+      return await prisma.lead.findMany({
+        include: COMERCIAL_BOOTSTRAP_LEAD_INCLUDE_LEGACY,
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (legacyError) {
+      if (!isPrismaSchemaDriftError(legacyError)) throw legacyError;
+      console.warn("[comercial-bootstrap] include legado falhou — carregando leads sem relações.", legacyError);
+      return prisma.lead.findMany({ orderBy: { createdAt: "desc" } });
+    }
   }
 }
 
