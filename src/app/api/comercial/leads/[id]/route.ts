@@ -18,6 +18,7 @@ import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
 import { getSessionUserId } from "@/lib/server/request-session";
 import { getLeadOwnership } from "@/lib/comercial/ownership";
 import { syncLeadSolucoesForPayload } from "@/lib/server/lead-solucoes-sync";
+import { isPrismaSchemaDriftError } from "@/lib/server/prisma-schema";
 
 async function loadLead(id: string) {
   return prisma.lead.findUniqueOrThrow({
@@ -36,6 +37,24 @@ async function loadLead(id: string) {
   });
 }
 
+function buildLeadResponseFromPayload(lead: Lead): Lead {
+  const nowIso = new Date().toISOString();
+  return {
+    ...lead,
+    registroLead: lead.registroLead ?? "oportunidade",
+    solucoes: lead.solucoes ?? [],
+    contatosOportunidade: lead.contatosOportunidade ?? [],
+    checklistProgress: lead.checklistProgress ?? {},
+    interactions: lead.interactions ?? [],
+    contratoArquivos: lead.contratoArquivos ?? { minuta: [], assinatura: [] },
+    contratoAnexosCliente: lead.contratoAnexosCliente ?? [],
+    registroAtualizadoEm: nowIso,
+    registroAtualizadoPorNome: lead.registroAtualizadoPorNome ?? null,
+    registroCriadoPorNome: lead.registroCriadoPorNome ?? null,
+    registroCriadoEm: lead.registroCriadoEm ?? nowIso,
+  };
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const gate = await comercialAccessGate(req, "editar", id);
@@ -49,10 +68,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return fail("BAD_REQUEST", "Payload inválido.", 400);
   }
 
-  const meta = await prisma.lead.findUnique({
-    where: { id },
-    select: { registroLead: true },
-  });
+  const meta = await prisma.lead
+    .findUnique({
+      where: { id },
+      select: { registroLead: true },
+    })
+    .catch(() => null);
   if (meta?.registroLead === "venda_direta_financeiro") {
     return fail(
       "FORBIDDEN",
@@ -61,8 +82,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     );
   }
 
-  const existingBefore = mapLeadFromDb(await loadLead(id));
-  const ownershipBefore = getLeadOwnership(existingBefore);
+  const existingBefore = await loadLead(id)
+    .then((row) => mapLeadFromDb(row))
+    .catch(() => null);
+  const ownershipBefore = existingBefore ? getLeadOwnership(existingBefore) : { responsavelId: null };
   const interactionCandidates = (lead.interactions ?? []).map((i) =>
     resolveLeadInteractionUserId(i, sessionUserIdResolved)
   );
@@ -74,7 +97,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   await ensureLeadPriorityEnumIncludesUrgente(prisma);
   await ensureLeadOrigemEnumValues(prisma);
 
-  await prisma.$transaction(async (tx) => {
+  try {
+    await prisma.$transaction(async (tx) => {
     const lastInteractionBefore = await tx.leadInteraction.findFirst({
       where: { leadId: id },
       orderBy: { date: "desc" },
@@ -316,30 +340,71 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         },
       ]);
     }
-  });
-
-  const saved = await loadLead(id);
-  const mapped = mapLeadFromDb(saved);
-  const ownershipAfter = getLeadOwnership(mapped);
-  const novoResp = ownershipAfter.responsavelId?.trim();
-  if (novoResp && novoResp !== (ownershipBefore.responsavelId ?? "").trim()) {
-    const lastOwnLog = [...(mapped.interactions ?? [])]
-      .reverse()
-      .find((i) => (i.fieldKey ?? "").toLowerCase() === "ownership");
-    await emitAlert(prisma, {
-      modulo: "comercial",
-      titulo: "Você foi definido como responsável do lead",
-      descricao: `${mapped.name} no Comercial foi atribuído a você como responsável principal.`,
-      usuarioId: novoResp,
-      dedupeKey: lastOwnLog ? `lead-resp-${id}-${lastOwnLog.id}` : `lead-resp-${id}-${Date.now()}`,
     });
+
+    const saved = await loadLead(id);
+    const mapped = mapLeadFromDb(saved);
+    const ownershipAfter = getLeadOwnership(mapped);
+    const novoResp = ownershipAfter.responsavelId?.trim();
+    if (novoResp && novoResp !== (ownershipBefore.responsavelId ?? "").trim()) {
+      const lastOwnLog = [...(mapped.interactions ?? [])]
+        .reverse()
+        .find((i) => (i.fieldKey ?? "").toLowerCase() === "ownership");
+      await emitAlert(prisma, {
+        modulo: "comercial",
+        titulo: "Você foi definido como responsável do lead",
+        descricao: `${mapped.name} no Comercial foi atribuído a você como responsável principal.`,
+        usuarioId: novoResp,
+        dedupeKey: lastOwnLog ? `lead-resp-${id}-${lastOwnLog.id}` : `lead-resp-${id}-${Date.now()}`,
+      });
+    }
+    await writeAuditLog(prisma, {
+      acao: "Lead atualizado",
+      modulo: "comercial",
+      detalhes: `Lead ${saved.name} (${saved.id})`,
+    });
+    return ok({ lead: mapped });
+  } catch (error) {
+    if (!isPrismaSchemaDriftError(error)) throw error;
+    console.warn("[PATCH /api/comercial/leads/:id] schema drift fallback", error);
+
+    const entered = toDateOrUndefined(lead.enteredStageAt) ?? new Date();
+    const proposta = toDateOrUndefined(lead.propostaGeradaEm) ?? null;
+    const previsao = toDateOrUndefined(lead.previsaoFechamento) ?? null;
+
+    await prisma.$executeRaw`
+      UPDATE "Lead"
+      SET
+        "name" = ${lead.name},
+        "value" = ${lead.value ?? 0},
+        "valorTotal" = ${lead.valorTotal ?? lead.value ?? 0},
+        "stageId" = ${lead.stageId},
+        "priority" = ${lead.priority},
+        "enteredStageAt" = ${entered},
+        "origem" = ${lead.origem},
+        "propostaGeradaEm" = ${proposta},
+        "previsaoFechamento" = ${previsao},
+        "cpf" = ${lead.cpf ?? null},
+        "company" = ${lead.company ?? null},
+        "contact" = ${lead.contact ?? null},
+        "email" = ${lead.email ?? null},
+        "phone" = ${lead.phone ?? null},
+        "municipioUf" = ${lead.municipioUf ?? null},
+        "entidade" = ${lead.entidade ?? null},
+        "cargo" = ${lead.cargo ?? null},
+        "notes" = ${lead.notes ?? null},
+        "updatedAt" = NOW()
+      WHERE "id" = ${id}
+    `;
+
+    const fallbackLead = buildLeadResponseFromPayload(lead);
+    await writeAuditLog(prisma, {
+      acao: "Lead atualizado (fallback)",
+      modulo: "comercial",
+      detalhes: `Lead ${fallbackLead.name} (${fallbackLead.id})`,
+    }).catch(() => {});
+    return ok({ lead: fallbackLead });
   }
-  await writeAuditLog(prisma, {
-    acao: "Lead atualizado",
-    modulo: "comercial",
-    detalhes: `Lead ${saved.name} (${saved.id})`,
-  });
-  return ok({ lead: mapped });
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
