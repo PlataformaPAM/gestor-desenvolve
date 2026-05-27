@@ -21,8 +21,6 @@ type LeadDetailPanelProps = {
   usuarios?: UsuarioSistema[];
   /** Sem permissão Editar no pipeline: visualização apenas. */
   readOnly?: boolean;
-  onDeleteLead?: () => void;
-  podeExcluir?: boolean;
 };
 
 export function LeadDetailPanel({
@@ -39,8 +37,6 @@ export function LeadDetailPanel({
   onAtualizarContatosCliente = () => {},
   usuarios = [],
   readOnly = false,
-  onDeleteLead,
-  podeExcluir = false,
 }: LeadDetailPanelProps) {
   if (!lead) return null;
 
@@ -66,8 +62,6 @@ export function LeadDetailPanel({
         onAtualizarContatosCliente={onAtualizarContatosCliente}
         usuarios={usuarios}
         readOnly={readOnly}
-        onDeleteLead={onDeleteLead}
-        podeExcluir={podeExcluir}
       />
     </DrawerSheet>
   );

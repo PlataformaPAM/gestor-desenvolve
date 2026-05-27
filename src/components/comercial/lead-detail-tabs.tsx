@@ -50,8 +50,6 @@ type LeadDetailTabsProps = {
   onAtualizarContatosCliente?: (clienteId: string, contatos: Contato[]) => void;
   usuarios?: UsuarioSistema[];
   onClose?: () => void;
-  onDeleteLead?: () => void;
-  podeExcluir?: boolean;
   readOnly?: boolean;
 };
 
@@ -67,8 +65,6 @@ export function LeadDetailTabs({
   onAtualizarContatosCliente = () => {},
   usuarios = [],
   onClose,
-  onDeleteLead,
-  podeExcluir = false,
   readOnly = false,
 }: LeadDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<LeadDetailTabId>("dados");
@@ -197,8 +193,6 @@ export function LeadDetailTabs({
             onMudarEtapa={mudarEtapa}
             readOnly={readOnly}
             onSolicitarLiberacaoFinanceiro={onSolicitarLiberacaoFinanceiro}
-            onDeleteLead={onDeleteLead}
-            podeExcluir={podeExcluir}
           />
         </div>
       )}
