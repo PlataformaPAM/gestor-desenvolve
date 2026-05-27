@@ -36,12 +36,12 @@ async function loadLead(id: string) {
 }
 
 async function createLeadWithSchemaFallback(
-  tx: Prisma.TransactionClient,
+  db: typeof prisma,
   lead: Lead,
   sessionUserId: string | undefined
 ) {
   try {
-    await tx.lead.create({
+    await db.lead.create({
       data: {
         id: lead.id,
         name: lead.name,
@@ -75,7 +75,7 @@ async function createLeadWithSchemaFallback(
   // Fallback para ambientes com schema legado: tenta insert SQL mínimo, ignorando colunas novas.
   const enteredAt = toDateOrUndefined(lead.enteredStageAt) ?? new Date();
   try {
-    await tx.$executeRaw`
+    await db.$executeRaw`
       INSERT INTO "Lead" (
         "id",
         "name",
@@ -106,7 +106,7 @@ async function createLeadWithSchemaFallback(
     console.error("[POST /api/comercial/leads] SQL fallback with valorTotal failed", err);
   }
 
-  await tx.$executeRaw`
+  await db.$executeRaw`
     INSERT INTO "Lead" (
       "id",
       "name",
@@ -155,59 +155,60 @@ export async function POST(req: Request) {
     await ensureLeadPriorityEnumIncludesUrgente(prisma);
     await ensureLeadOrigemEnumValues(prisma);
 
-    await prisma.$transaction(async (tx) => {
-      await createLeadWithSchemaFallback(tx, lead, sessionUserId);
+    await createLeadWithSchemaFallback(prisma, lead, sessionUserId);
 
-      try {
+    try {
+      await prisma.$transaction(async (tx) => {
         await syncLeadSolucoesForPayload(tx, lead.id, lead.solucoes);
-      } catch (err) {
-        console.error("[POST /api/comercial/leads] syncLeadSolucoesForPayload failed", err);
-      }
+      });
+    } catch (err) {
+      console.error("[POST /api/comercial/leads] syncLeadSolucoesForPayload failed", err);
+    }
 
-      if (lead.contatosOportunidade?.length) {
+    if (lead.contatosOportunidade?.length) {
+      for (const c of lead.contatosOportunidade) {
         try {
-          for (const c of lead.contatosOportunidade) {
-            await tx.leadContato.create({
-              data: {
-                leadId: lead.id,
-                nome: c.nome,
-                cargo: c.cargo ?? null,
-                setor: c.setor ?? null,
-                telefone: c.telefone,
-                email: c.email,
-                papeis: { create: (c.papeis ?? []).map((p) => ({ papel: p })) },
-              },
-            });
-          }
-        } catch (err) {
-          console.error("[POST /api/comercial/leads] contatos create failed", err);
-        }
-      }
-
-      const checklist = Object.entries(lead.checklistProgress ?? {});
-      if (checklist.length) {
-        try {
-          await tx.leadChecklistItem.createMany({
-            data: checklist.map(([taskKey, done]) => ({
+          await prisma.leadContato.create({
+            data: {
               leadId: lead.id,
-              stageId: lead.stageId,
-              taskKey,
-              taskLabel: taskKey,
-              done: Boolean(done),
-            })),
+              nome: c.nome,
+              cargo: c.cargo ?? null,
+              setor: c.setor ?? null,
+              telefone: c.telefone,
+              email: c.email,
+              papeis: { create: (c.papeis ?? []).map((p) => ({ papel: p })) },
+            },
           });
         } catch (err) {
-          console.error("[POST /api/comercial/leads] checklist create failed", err);
+          console.error("[POST /api/comercial/leads] contato create failed", err);
         }
       }
+    }
 
-      if (lead.contratoChecklist) {
-        try {
-          await tx.leadContratoChecklist.create({ data: { leadId: lead.id, ...lead.contratoChecklist } });
-        } catch (err) {
-          console.error("[POST /api/comercial/leads] contratoChecklist create failed", err);
-        }
+    const checklist = Object.entries(lead.checklistProgress ?? {});
+    if (checklist.length) {
+      try {
+        await prisma.leadChecklistItem.createMany({
+          data: checklist.map(([taskKey, done]) => ({
+            leadId: lead.id,
+            stageId: lead.stageId,
+            taskKey,
+            taskLabel: taskKey,
+            done: Boolean(done),
+          })),
+        });
+      } catch (err) {
+        console.error("[POST /api/comercial/leads] checklist create failed", err);
       }
+    }
+
+    if (lead.contratoChecklist) {
+      try {
+        await prisma.leadContratoChecklist.create({ data: { leadId: lead.id, ...lead.contratoChecklist } });
+      } catch (err) {
+        console.error("[POST /api/comercial/leads] contratoChecklist create failed", err);
+      }
+    }
 
     const min = lead.contratoArquivos?.minuta ?? [];
     const ass = lead.contratoArquivos?.assinatura ?? [];
@@ -227,68 +228,68 @@ export async function POST(req: Request) {
         createdAt: toDateOrUndefined(a.anexadoEm) ?? new Date(),
       })),
     ];
-      if (contratoRows.length) {
-        try {
-          await tx.leadContratoArquivo.createMany({ data: contratoRows });
-        } catch (err) {
-          console.error("[POST /api/comercial/leads] contratoArquivos create failed", err);
-        }
+    if (contratoRows.length) {
+      try {
+        await prisma.leadContratoArquivo.createMany({ data: contratoRows });
+      } catch (err) {
+        console.error("[POST /api/comercial/leads] contratoArquivos create failed", err);
       }
+    }
 
-      if (lead.financeiroFluxo) {
+    if (lead.financeiroFluxo) {
+      try {
+        await prisma.leadFinanceiroFluxo.create({
+          data: {
+            leadId: lead.id,
+            status: lead.financeiroFluxo.status,
+            bloqueadoEdicao: lead.financeiroFluxo.bloqueadoEdicao,
+            solicitadoEm: toDateOrUndefined(lead.financeiroFluxo.solicitadoEm),
+            aprovadoEm: toDateOrUndefined(lead.financeiroFluxo.aprovadoEm),
+            devolvidoEm: toDateOrUndefined(lead.financeiroFluxo.devolvidoEm),
+            motivoDevolucao: lead.financeiroFluxo.motivoDevolucao ?? null,
+            liberacaoSolicitadaEm: toDateOrUndefined(lead.financeiroFluxo.liberacaoSolicitadaEm),
+            motivoSolicitacaoLiberacao: lead.financeiroFluxo.motivoSolicitacaoLiberacao ?? null,
+          },
+        });
+      } catch (err) {
+        console.error("[POST /api/comercial/leads] financeiroFluxo create failed", err);
+      }
+    }
+
+    if (lead.interactions?.length) {
+      for (const i of lead.interactions) {
         try {
-          await tx.leadFinanceiroFluxo.create({
+          const uidRaw = resolveLeadInteractionUserId(i, sessionUserId);
+          const userId = uidRaw && validInteractionUserIds.has(uidRaw) ? uidRaw : null;
+          await prisma.leadInteraction.create({
             data: {
+              id: i.id,
               leadId: lead.id,
-              status: lead.financeiroFluxo.status,
-              bloqueadoEdicao: lead.financeiroFluxo.bloqueadoEdicao,
-              solicitadoEm: toDateOrUndefined(lead.financeiroFluxo.solicitadoEm),
-              aprovadoEm: toDateOrUndefined(lead.financeiroFluxo.aprovadoEm),
-              devolvidoEm: toDateOrUndefined(lead.financeiroFluxo.devolvidoEm),
-              motivoDevolucao: lead.financeiroFluxo.motivoDevolucao ?? null,
-              liberacaoSolicitadaEm: toDateOrUndefined(lead.financeiroFluxo.liberacaoSolicitadaEm),
-              motivoSolicitacaoLiberacao: lead.financeiroFluxo.motivoSolicitacaoLiberacao ?? null,
+              date: toDateOrUndefined(i.date) ?? new Date(),
+              type: i.type,
+              description: i.description,
+              action: i.action ?? null,
+              field: i.field ?? null,
+              fieldKey: i.fieldKey ?? null,
+              oldValue: i.oldValue ?? Prisma.JsonNull,
+              newValue: i.newValue ?? Prisma.JsonNull,
+              userId,
+              autorNome: i.user?.trim() || null,
+              anexos: {
+                create: (i.anexos ?? []).map((a) =>
+                  typeof a === "string" ? { nome: a, url: null } : { nome: a.name, url: a.url || null }
+                ),
+              },
             },
           });
         } catch (err) {
-          console.error("[POST /api/comercial/leads] financeiroFluxo create failed", err);
+          console.error("[POST /api/comercial/leads] interaction create failed", err);
         }
       }
+    }
 
-      if (lead.interactions?.length) {
-        try {
-          for (const i of lead.interactions) {
-            const uidRaw = resolveLeadInteractionUserId(i, sessionUserId);
-            const userId =
-              uidRaw && validInteractionUserIds.has(uidRaw) ? uidRaw : null;
-            await tx.leadInteraction.create({
-              data: {
-                id: i.id,
-                leadId: lead.id,
-                date: toDateOrUndefined(i.date) ?? new Date(),
-                type: i.type,
-                description: i.description,
-                action: i.action ?? null,
-                field: i.field ?? null,
-                fieldKey: i.fieldKey ?? null,
-                oldValue: i.oldValue ?? Prisma.JsonNull,
-                newValue: i.newValue ?? Prisma.JsonNull,
-                userId,
-                autorNome: i.user?.trim() || null,
-                anexos: {
-                  create: (i.anexos ?? []).map((a) =>
-                    typeof a === "string" ? { nome: a, url: null } : { nome: a.name, url: a.url || null }
-                  ),
-                },
-              },
-            });
-          }
-        } catch (err) {
-          console.error("[POST /api/comercial/leads] interactions create failed", err);
-        }
-      }
-
-      try {
+    try {
+      await prisma.$transaction(async (tx) => {
         await syncContratoOnLeadFechado(tx, {
           leadId: lead.id,
           clienteId: lead.clienteId,
@@ -298,10 +299,10 @@ export async function POST(req: Request) {
           previousStageId: null,
           newStageId: lead.stageId as PipelineStageId,
         });
-      } catch (err) {
-        console.error("[POST /api/comercial/leads] syncContratoOnLeadFechado failed", err);
-      }
-    });
+      });
+    } catch (err) {
+      console.error("[POST /api/comercial/leads] syncContratoOnLeadFechado failed", err);
+    }
 
     const saved = await loadLead(lead.id).catch(() => null);
     const savedLead = saved ? mapLeadFromDb(saved) : lead;
