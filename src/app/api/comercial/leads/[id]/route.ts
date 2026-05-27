@@ -342,3 +342,51 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return ok({ lead: mapped });
 }
 
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const gate = await comercialAccessGate(req, "excluir", id);
+  if (!gate.ok) return gate.response;
+
+  const existing = await prisma.lead.findUnique({
+    where: { id },
+    select: { id: true, name: true, registroLead: true, stageId: true },
+  });
+  if (!existing) return fail("NOT_FOUND", "Lead não encontrado.", 404);
+
+  if (existing.registroLead === "venda_direta_financeiro") {
+    return fail(
+      "FORBIDDEN",
+      "Registros de venda direta do Financeiro não podem ser excluídos pelo Comercial.",
+      403
+    );
+  }
+
+  if (existing.stageId === "fechado") {
+    const lancamento = await prisma.lancamento.findFirst({
+      where: { leadIdOrigem: id },
+      select: { id: true },
+    });
+    if (lancamento) {
+      return fail(
+        "FORBIDDEN",
+        "Lead fechado com lançamento financeiro vinculado não pode ser excluído.",
+        403
+      );
+    }
+  }
+
+  try {
+    await prisma.lead.delete({ where: { id } });
+  } catch (error) {
+    console.error("[DELETE /api/comercial/leads/:id]", error);
+    return fail("INTERNAL_ERROR", "Não foi possível excluir o lead.", 500);
+  }
+
+  await writeAuditLog(prisma, {
+    acao: "Lead excluído",
+    modulo: "comercial",
+    detalhes: `Lead ${existing.name} (${existing.id})`,
+  });
+  return ok({ deleted: true, id });
+}
+

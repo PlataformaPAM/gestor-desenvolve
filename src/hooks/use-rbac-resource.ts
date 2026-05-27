@@ -59,6 +59,7 @@ export function useComercialRbac() {
       podeVer: canViewResourceClient(session, COMERCIAL_PIPELINE_RESOURCE),
       podeCriar: canCreateResourceClient(session, COMERCIAL_PIPELINE_RESOURCE),
       podeEditar: canEditResourceClient(session, COMERCIAL_PIPELINE_RESOURCE),
+      podeExcluir: canDeleteResourceClient(session, COMERCIAL_PIPELINE_RESOURCE),
     }),
     [session]
   );

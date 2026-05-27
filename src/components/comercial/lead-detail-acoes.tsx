@@ -6,6 +6,7 @@ import {
   ArrowRightCircle,
   CheckCircle2,
   Send,
+  Trash2,
   X,
   XCircle,
 } from "lucide-react";
@@ -19,6 +20,8 @@ type LeadDetailAcoesProps = {
   stages: PipelineStage[];
   onMudarEtapa: (stageId: PipelineStageId, options?: { motivoPerda?: string }) => void;
   onSolicitarLiberacaoFinanceiro?: (motivo: string) => void;
+  onDeleteLead?: () => void;
+  podeExcluir?: boolean;
   readOnly?: boolean;
 };
 
@@ -27,10 +30,13 @@ export function LeadDetailAcoes({
   stages,
   onMudarEtapa,
   onSolicitarLiberacaoFinanceiro = () => {},
+  onDeleteLead,
+  podeExcluir = false,
   readOnly = false,
 }: LeadDetailAcoesProps) {
   const [motivoPerda, setMotivoPerda] = useState("");
   const [perdidoModalOpen, setPerdidoModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [motivoLiberacao, setMotivoLiberacao] = useState("");
   const linearOrder: PipelineStageId[] = ["prospecao", "qualificacao", "proposta", "contratacao"];
   const currentIdx = linearOrder.indexOf(lead.stageId);
@@ -59,6 +65,19 @@ export function LeadDetailAcoes({
       document.body.style.overflow = "";
     };
   }, [perdidoModalOpen]);
+
+  useEffect(() => {
+    if (!deleteModalOpen) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDeleteModalOpen(false);
+    };
+    document.addEventListener("keydown", onEsc);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onEsc);
+      document.body.style.overflow = "";
+    };
+  }, [deleteModalOpen]);
 
   const perdidoModal =
     perdidoModalOpen && typeof document !== "undefined"
@@ -125,6 +144,54 @@ export function LeadDetailAcoes({
                       <AlertTriangle className="h-4 w-4" />
                       Marcar como Perdido
                     </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  const deleteModal =
+    deleteModalOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="fixed inset-0 z-[70]">
+            <div
+              className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
+              onMouseDown={() => setDeleteModalOpen(false)}
+              aria-hidden
+            />
+            <div className="absolute inset-0 flex items-center justify-center p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-lead-modal-title"
+                className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+                  <p id="delete-lead-modal-title" className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-100">
+                    <Trash2 className="h-5 w-5 text-red-500" />
+                    Excluir lead
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Esta ação remove permanentemente &quot;{lead.name}&quot; e todo o histórico vinculado.
+                  </p>
+                </div>
+                <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
+                  <button type="button" onClick={() => setDeleteModalOpen(false)} className={formModalCancelButtonClass}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteLead?.();
+                      setDeleteModalOpen(false);
+                    }}
+                    className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  >
+                    Excluir lead
                   </button>
                 </div>
               </div>
@@ -232,7 +299,25 @@ export function LeadDetailAcoes({
         )}
       </div>
 
+      {podeExcluir && onDeleteLead && !readOnly && (
+        <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+          <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">Zona de perigo</h3>
+          <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+            Exclui este lead e todos os dados associados (interações, checklist, contatos).
+          </p>
+          <button
+            type="button"
+            onClick={() => setDeleteModalOpen(true)}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+          >
+            <Trash2 className="h-4 w-4" />
+            Excluir lead
+          </button>
+        </div>
+      )}
+
       {perdidoModal}
+      {deleteModal}
     </div>
   );
 }

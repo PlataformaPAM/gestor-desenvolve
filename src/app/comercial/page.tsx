@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "rea
 import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import type { DropResult } from "@hello-pangea/dnd";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, Trash2, X } from "lucide-react";
 import { TabsView, type ViewMode } from "@/components/comercial/tabs-view";
 import { LeadList } from "@/components/comercial/lead-list";
 import { LeadDetailPanel } from "@/components/comercial/lead-detail-panel";
@@ -88,7 +88,8 @@ function ComercialPageContent() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
   const podeVerComercial = useComercialPageGuard();
-  const { podeCriar: podeCriarLead, podeEditar: podeEditarLead } = useComercialRbac();
+  const { podeCriar: podeCriarLead, podeEditar: podeEditarLead, podeExcluir: podeExcluirLead } =
+    useComercialRbac();
   const currentUserName = session.userName ?? "Usuário";
   const searchParams = useSearchParams();
 
@@ -126,6 +127,7 @@ function ComercialPageContent() {
     leadName: string;
   } | null>(null);
   const [kanbanMotivoPerda, setKanbanMotivoPerda] = useState("");
+  const [limparLeadsModalOpen, setLimparLeadsModalOpen] = useState(false);
   const orderKey = useMemo(() => `pam.comercial.order.${session.userId ?? session.userName ?? "user"}`, [session.userId, session.userName]);
 
   const showErrorToast = useCallback((message: string, duration = 12000) => {
@@ -180,6 +182,44 @@ function ComercialPageContent() {
         return columnsFromLeads(nextList);
       });
     }
+  }, []);
+
+  const deleteLead = useCallback(
+    async (leadId: string) => {
+      const res = await fetch(`/api/comercial/leads/${leadId}`, { method: "DELETE" });
+      const json = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: { message?: string };
+      };
+      if (!res.ok || json.success === false) {
+        throw new Error(json.error?.message ?? `Falha ao excluir lead (${res.status}).`);
+      }
+      setColumns((prev) => {
+        const all = leadsFromColumns(prev).filter((l) => String(l.id) !== String(leadId));
+        return columnsFromLeads(all);
+      });
+      if (selectedLeadId === leadId) {
+        setSelectedLeadId(null);
+        setDetailOpen(false);
+      }
+    },
+    [selectedLeadId]
+  );
+
+  const deleteAllLeads = useCallback(async () => {
+    const res = await fetch("/api/comercial/leads", { method: "DELETE" });
+    const json = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      data?: { deleted?: number };
+      error?: { message?: string };
+    };
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error?.message ?? `Falha ao limpar leads (${res.status}).`);
+    }
+    setColumns(getEmptyColumns());
+    setSelectedLeadId(null);
+    setDetailOpen(false);
+    return json.data?.deleted ?? 0;
   }, []);
 
   const createCliente = useCallback(async (cliente: Omit<Cliente, "id"> & { contatos?: Contato[] }) => {
@@ -1065,6 +1105,16 @@ function ComercialPageContent() {
   return (
     <section className="w-full min-w-0 space-y-6">
       <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end sm:gap-3">
+        {podeExcluirLead && leads.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setLimparLeadsModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/40"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar todos os leads
+          </button>
+        ) : null}
         <TabsView value={viewMode} onChange={setViewMode} />
       </div>
 
@@ -1113,6 +1163,20 @@ function ComercialPageContent() {
         onSolicitarLiberacaoFinanceiro={handleSolicitarLiberacaoFinanceiro}
         usuarios={usuarios}
         readOnly={!podeEditarLead}
+        podeExcluir={podeExcluirLead}
+        onDeleteLead={
+          selectedLead
+            ? () => {
+                void deleteLead(selectedLead.id)
+                  .then(() => {
+                    setToastSave({ visible: true, message: "Lead excluído com sucesso." });
+                  })
+                  .catch((err) => {
+                    showErrorToast(err instanceof Error ? err.message : "Não foi possível excluir o lead.");
+                  });
+              }
+            : undefined
+        }
       />
 
       <NovoLeadPanel
@@ -1129,6 +1193,61 @@ function ComercialPageContent() {
         onVincularExistente={handleQualificarComExistente}
         onCadastrarEVincular={handleQualificarComNovo}
       />
+
+      {limparLeadsModalOpen ? (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/40 px-4"
+          onMouseDown={() => setLimparLeadsModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-5 shadow-2xl dark:border-red-500/40 dark:bg-slate-900"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start gap-2">
+              <Trash2 className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" />
+              <div>
+                <h3 className="text-base font-semibold text-red-700 dark:text-red-300">
+                  Limpar todos os leads
+                </h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Remove permanentemente os {leads.length} lead(s) do funil Comercial. Clientes e
+                  cadastros não são apagados.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col-reverse gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setLimparLeadsModalOpen(false)}
+                className={formModalCancelButtonClass}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void deleteAllLeads()
+                    .then((count) => {
+                      setLimparLeadsModalOpen(false);
+                      setToastSave({
+                        visible: true,
+                        message: `${count} lead(s) removido(s) do funil.`,
+                      });
+                    })
+                    .catch((err) => {
+                      showErrorToast(
+                        err instanceof Error ? err.message : "Não foi possível limpar os leads."
+                      );
+                    });
+                }}
+                className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Excluir todos
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {kanbanPerdaModal ? (
         <div

@@ -16,7 +16,8 @@ import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
 import { syncLeadSolucoesForPayload } from "@/lib/server/lead-solucoes-sync";
 import { emitAlert } from "@/lib/server/alerts";
-import { comercialAccessGate } from "@/lib/server/comercial-lead-access";
+import { comercialAccessGate, COMERCIAL_PIPELINE_RESOURCE } from "@/lib/server/comercial-lead-access";
+import { authorize } from "@/lib/server/authorize";
 import { getSessionUserId } from "@/lib/server/request-session";
 
 async function loadLead(id: string) {
@@ -393,3 +394,34 @@ export async function POST(req: Request) {
   }
 }
 
+/** Remove todos os leads do funil Comercial (oportunidades). Requer permissão Excluir + Ver de todos. */
+export async function DELETE(req: Request) {
+  const gate = await comercialAccessGate(req, "excluir");
+  if (!gate.ok) return gate.response;
+
+  const auth = authorize(gate.session, COMERCIAL_PIPELINE_RESOURCE, "excluir");
+  if (auth.scope !== "todos") {
+    return fail(
+      "FORBIDDEN",
+      "Somente usuários com permissão para ver todos os leads podem limpar o funil.",
+      403
+    );
+  }
+
+  let deleted = 0;
+  try {
+    const result = await prisma.lead.deleteMany({ where: { registroLead: "oportunidade" } });
+    deleted = result.count;
+  } catch (error) {
+    console.warn("[DELETE /api/comercial/leads] fallback deleteMany sem filtro", error);
+    const result = await prisma.lead.deleteMany({});
+    deleted = result.count;
+  }
+
+  await writeAuditLog(prisma, {
+    acao: "Leads excluídos em lote",
+    modulo: "comercial",
+    detalhes: `${deleted} lead(s) removido(s) do funil Comercial`,
+  });
+  return ok({ deleted });
+}

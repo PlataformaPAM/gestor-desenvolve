@@ -238,13 +238,8 @@ export function ComercialKanban({
                                     >
                                       <div className="relative min-h-0">
                                         <p
-                                          className="pr-6 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
-                                          style={{
-                                            display: "-webkit-box",
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: "vertical",
-                                            overflow: "hidden",
-                                          }}
+                                          className="line-clamp-4 pr-6 text-sm font-medium leading-5 text-slate-900 dark:text-slate-100"
+                                          title={lead.name}
                                         >
                                           {lead.name}
                                         </p>
