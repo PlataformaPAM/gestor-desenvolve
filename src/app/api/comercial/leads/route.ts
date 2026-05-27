@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma, type PipelineStageId } from "@prisma/client";
 import type { Lead } from "@/lib/comercial/types";
+import { randomUUID } from "node:crypto";
 import {
   ensureLeadOrigemEnumValues,
   ensureLeadPriorityEnumIncludesUrgente,
@@ -143,7 +144,9 @@ export async function POST(req: Request) {
     if (!lead?.id) {
       return fail("BAD_REQUEST", "Lead inválido.", 400);
     }
-    const sessionUserId = await resolveUsuarioIdForPrismaFk(prisma, getSessionUserId(req));
+    const sessionUserIdRaw = getSessionUserId(req);
+    const sessionUserName = gate.session.userName?.trim() || "Usuário";
+    const sessionUserId = await resolveUsuarioIdForPrismaFk(prisma, sessionUserIdRaw);
     const interactionCandidates = (lead.interactions ?? []).map((i) =>
       resolveLeadInteractionUserId(i, sessionUserId)
     );
@@ -285,6 +288,34 @@ export async function POST(req: Request) {
         } catch (err) {
           console.error("[POST /api/comercial/leads] interaction create failed", err);
         }
+      }
+    }
+
+    // Garante ownership persistido para escopo "vinculados" mesmo quando FK de usuário não resolve no ambiente.
+    if (sessionUserIdRaw) {
+      try {
+        await prisma.leadInteraction.create({
+          data: {
+            id: randomUUID(),
+            leadId: lead.id,
+            date: new Date(),
+            type: "sistema",
+            description: `Responsável inicial: ${sessionUserName}`,
+            action: "CREATE",
+            field: "ownership",
+            fieldKey: "ownership",
+            oldValue: Prisma.JsonNull,
+            newValue: {
+              responsavelId: sessionUserIdRaw,
+              responsavelNome: sessionUserName,
+              colaboradores: [],
+            },
+            userId: sessionUserId ?? null,
+            autorNome: sessionUserName,
+          },
+        });
+      } catch (err) {
+        console.error("[POST /api/comercial/leads] ownership interaction fallback failed", err);
       }
     }
 
