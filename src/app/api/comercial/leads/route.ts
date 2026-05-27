@@ -35,6 +35,103 @@ async function loadLead(id: string) {
   });
 }
 
+async function createLeadWithSchemaFallback(
+  tx: Prisma.TransactionClient,
+  lead: Lead,
+  sessionUserId: string | undefined
+) {
+  try {
+    await tx.lead.create({
+      data: {
+        id: lead.id,
+        name: lead.name,
+        value: lead.value ?? 0,
+        valorTotal: lead.valorTotal ?? lead.value ?? 0,
+        stageId: lead.stageId,
+        priority: lead.priority,
+        enteredStageAt: toDateOrUndefined(lead.enteredStageAt) ?? new Date(),
+        origem: lead.origem,
+        propostaGeradaEm: toDateOrUndefined(lead.propostaGeradaEm),
+        previsaoFechamento: toDateOrUndefined(lead.previsaoFechamento),
+        cpf: lead.cpf,
+        company: lead.company,
+        contact: lead.contact,
+        email: lead.email,
+        phone: lead.phone,
+        municipioUf: lead.municipioUf,
+        entidade: lead.entidade,
+        cargo: lead.cargo,
+        notes: lead.notes,
+        criadoPorId: sessionUserId ?? undefined,
+        atualizadoPorId: sessionUserId ?? undefined,
+        clienteId: lead.clienteId ?? null,
+      },
+    });
+    return;
+  } catch (err) {
+    console.error("[POST /api/comercial/leads] full create failed, trying fallback", err);
+  }
+
+  // Fallback para ambientes com schema legado: tenta insert SQL mínimo, ignorando colunas novas.
+  const enteredAt = toDateOrUndefined(lead.enteredStageAt) ?? new Date();
+  try {
+    await tx.$executeRaw`
+      INSERT INTO "Lead" (
+        "id",
+        "name",
+        "value",
+        "valorTotal",
+        "stageId",
+        "priority",
+        "enteredStageAt",
+        "origem",
+        "createdAt",
+        "updatedAt"
+      )
+      VALUES (
+        ${lead.id},
+        ${lead.name},
+        ${lead.value ?? 0},
+        ${lead.valorTotal ?? lead.value ?? 0},
+        ${lead.stageId},
+        ${lead.priority},
+        ${enteredAt},
+        ${lead.origem},
+        NOW(),
+        NOW()
+      )
+    `;
+    return;
+  } catch (err) {
+    console.error("[POST /api/comercial/leads] SQL fallback with valorTotal failed", err);
+  }
+
+  await tx.$executeRaw`
+    INSERT INTO "Lead" (
+      "id",
+      "name",
+      "value",
+      "stageId",
+      "priority",
+      "enteredStageAt",
+      "origem",
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES (
+      ${lead.id},
+      ${lead.name},
+      ${lead.value ?? 0},
+      ${lead.stageId},
+      ${lead.priority},
+      ${enteredAt},
+      ${lead.origem},
+      NOW(),
+      NOW()
+    )
+  `;
+}
+
 export async function POST(req: Request) {
   const gate = await comercialAccessGate(req, "criar");
   if (!gate.ok) return gate.response;
@@ -59,32 +156,7 @@ export async function POST(req: Request) {
     await ensureLeadOrigemEnumValues(prisma);
 
     await prisma.$transaction(async (tx) => {
-      await tx.lead.create({
-        data: {
-          id: lead.id,
-          name: lead.name,
-          value: lead.value ?? 0,
-          valorTotal: lead.valorTotal ?? lead.value ?? 0,
-          stageId: lead.stageId,
-          priority: lead.priority,
-          enteredStageAt: toDateOrUndefined(lead.enteredStageAt) ?? new Date(),
-          origem: lead.origem,
-          propostaGeradaEm: toDateOrUndefined(lead.propostaGeradaEm),
-          previsaoFechamento: toDateOrUndefined(lead.previsaoFechamento),
-          cpf: lead.cpf,
-          company: lead.company,
-          contact: lead.contact,
-          email: lead.email,
-          phone: lead.phone,
-          municipioUf: lead.municipioUf,
-          entidade: lead.entidade,
-          cargo: lead.cargo,
-          notes: lead.notes,
-          criadoPorId: sessionUserId ?? undefined,
-          atualizadoPorId: sessionUserId ?? undefined,
-          clienteId: lead.clienteId ?? null,
-        },
-      });
+      await createLeadWithSchemaFallback(tx, lead, sessionUserId);
 
       try {
         await syncLeadSolucoesForPayload(tx, lead.id, lead.solucoes);
@@ -251,9 +323,17 @@ export async function POST(req: Request) {
     return ok({ lead: savedLead }, 201);
   } catch (e) {
     console.error("[POST /api/comercial/leads]", e);
+    const detail =
+      e instanceof Error
+        ? e.message
+        : typeof e === "object" && e && "code" in e
+          ? String((e as { code?: unknown }).code ?? "")
+          : "";
     return fail(
       "INTERNAL_ERROR",
-      "Não foi possível salvar o lead. Verifique sua sessão e tente novamente.",
+      detail
+        ? `Não foi possível salvar o lead. Detalhe técnico: ${detail}`
+        : "Não foi possível salvar o lead. Verifique sua sessão e tente novamente.",
       500
     );
   }
