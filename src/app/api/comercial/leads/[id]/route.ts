@@ -3,8 +3,10 @@ import { Prisma, type PipelineStageId } from "@prisma/client";
 import type { Lead } from "@/lib/comercial/types";
 import {
   ensureLeadPriorityEnumIncludesUrgente,
+  filterUsuarioIdsExisting,
   mapLeadFromDb,
   resolveLeadInteractionUserId,
+  resolveUsuarioIdForPrismaFk,
   toDateOrUndefined,
 } from "../../_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
@@ -38,6 +40,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const gate = await comercialAccessGate(req, "editar", id);
   if (!gate.ok) return gate.response;
   const sessionUserId = getSessionUserId(req);
+  const sessionUserIdResolved = await resolveUsuarioIdForPrismaFk(prisma, sessionUserId);
   const parsed = await parseJsonSafe<{ lead?: Lead }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
   const lead = parsed.value.lead;
@@ -59,6 +62,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const existingBefore = mapLeadFromDb(await loadLead(id));
   const ownershipBefore = getLeadOwnership(existingBefore);
+  const interactionCandidates = (lead.interactions ?? []).map((i) =>
+    resolveLeadInteractionUserId(i, sessionUserIdResolved)
+  );
+  const validInteractionUserIds = await filterUsuarioIdsExisting(
+    prisma,
+    interactionCandidates.filter((x): x is string => Boolean(x))
+  );
 
   await ensureLeadPriorityEnumIncludesUrgente(prisma);
 
@@ -95,7 +105,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         cargo: lead.cargo ?? null,
         notes: lead.notes ?? null,
         ...(sessionUserId
-          ? { atualizadoPor: { connect: { id: sessionUserId } } }
+          ? sessionUserIdResolved
+            ? { atualizadoPor: { connect: { id: sessionUserIdResolved } } }
+            : {}
           : {}),
         cliente: lead.clienteId ? { connect: { id: lead.clienteId } } : { disconnect: true },
       },
@@ -210,7 +222,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           fieldKey: i.fieldKey ?? null,
           oldValue: i.oldValue ?? Prisma.JsonNull,
           newValue: i.newValue ?? Prisma.JsonNull,
-          userId: resolveLeadInteractionUserId(i, sessionUserId),
+          userId: (() => {
+            const uid = resolveLeadInteractionUserId(i, sessionUserIdResolved);
+            return uid && validInteractionUserIds.has(uid) ? uid : null;
+          })(),
           autorNome: i.user?.trim() || null,
           anexos: {
             create: (i.anexos ?? []).map((a) =>
@@ -270,7 +285,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       solucoes: lead.solucoes ?? [],
       previousStageId: anterior?.stageId ?? null,
       newStageId: lead.stageId as PipelineStageId,
-      criadoPorId: sessionUserId,
+      criadoPorId: sessionUserIdResolved,
     });
 
     if (anterior?.stageId !== "fechado" && lead.stageId === "fechado") {
