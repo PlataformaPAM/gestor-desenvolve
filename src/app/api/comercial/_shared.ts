@@ -66,6 +66,60 @@ $enum$;
   }
 }
 
+/**
+ * Garante valores modernos do enum `LeadOrigem` em bases com migração parcial.
+ * Evita falhas de criação/edição quando o payload usa origem como `evento`.
+ */
+export async function ensureLeadOrigemEnumValues(
+  db: Pick<PrismaClient, "$executeRawUnsafe">
+): Promise<void> {
+  try {
+    await db.$executeRawUnsafe(`
+DO $enum$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_enum e
+    INNER JOIN pg_catalog.pg_type t ON e.enumtypid = t.oid
+    INNER JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+    WHERE n.nspname = current_schema()
+      AND t.typname = 'LeadOrigem'
+      AND e.enumlabel = 'email_marketing'
+  ) THEN
+    ALTER TYPE "LeadOrigem" ADD VALUE 'email_marketing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_enum e
+    INNER JOIN pg_catalog.pg_type t ON e.enumtypid = t.oid
+    INNER JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+    WHERE n.nspname = current_schema()
+      AND t.typname = 'LeadOrigem'
+      AND e.enumlabel = 'evento'
+  ) THEN
+    ALTER TYPE "LeadOrigem" ADD VALUE 'evento';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_enum e
+    INNER JOIN pg_catalog.pg_type t ON e.enumtypid = t.oid
+    INNER JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+    WHERE n.nspname = current_schema()
+      AND t.typname = 'LeadOrigem'
+      AND e.enumlabel = 'indicacao'
+  ) THEN
+    ALTER TYPE "LeadOrigem" ADD VALUE 'indicacao';
+  END IF;
+END
+$enum$;
+`);
+  } catch (err) {
+    console.warn("[comercial] ensureLeadOrigemEnumValues:", err);
+  }
+}
+
 export async function filterUsuarioIdsExisting(
   prisma: Pick<PrismaClient, "usuario">,
   ids: string[]

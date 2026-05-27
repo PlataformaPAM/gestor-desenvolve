@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma, type PipelineStageId } from "@prisma/client";
 import type { Lead } from "@/lib/comercial/types";
 import {
+  ensureLeadOrigemEnumValues,
   ensureLeadPriorityEnumIncludesUrgente,
   filterUsuarioIdsExisting,
   mapLeadFromDb,
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
     );
 
     await ensureLeadPriorityEnumIncludesUrgente(prisma);
+    await ensureLeadOrigemEnumValues(prisma);
 
     await prisma.$transaction(async (tx) => {
     await tx.lead.create({
