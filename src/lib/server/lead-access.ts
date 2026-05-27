@@ -15,11 +15,25 @@ export const LEAD_INCLUDE_FOR_ACCESS = {
   },
 } as const;
 
-export function isLeadVisibleToUser(lead: Lead, userId: string | null | undefined): boolean {
-  if (!userId) return false;
+function normalizeName(value: string | null | undefined): string {
+  return (value ?? "").trim().toLocaleLowerCase("pt-BR");
+}
+
+export function isLeadVisibleToUser(
+  lead: Lead,
+  userId: string | null | undefined,
+  userName?: string | null
+): boolean {
+  const normalizedUserName = normalizeName(userName);
   const ownership = getLeadOwnership(lead);
-  if (ownership.responsavelId === userId) return true;
-  return (ownership.colaboradores ?? []).some((c) => c.id === userId);
+  if (userId) {
+    if (ownership.responsavelId === userId) return true;
+    if ((ownership.colaboradores ?? []).some((c) => c.id === userId)) return true;
+  }
+  if (!normalizedUserName) return false;
+  if (normalizeName(ownership.responsavelNome) === normalizedUserName) return true;
+  if (normalizeName(lead.registroCriadoPorNome) === normalizedUserName) return true;
+  return false;
 }
 
 export async function userCanAccessLeadId(
@@ -78,7 +92,7 @@ export function filterLeadsForResourceScope(
   const view = authorize(session, resourceId, "ver");
   if (!view.allowed) return [];
   if (view.scope === "todos") return leads;
-  return leads.filter((lead) => isLeadVisibleToUser(lead, userId));
+  return leads.filter((lead) => isLeadVisibleToUser(lead, userId, session.userName));
 }
 
 /** Filtra linhas `{ id }` pelo escopo Ver de um recurso (ex.: relatórios). */
