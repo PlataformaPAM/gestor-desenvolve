@@ -26,6 +26,105 @@ const COMERCIAL_BOOTSTRAP_LEAD_INCLUDE_LEGACY = {
   interactions: { include: { anexos: true }, orderBy: { date: "asc" as const } },
 } as const;
 
+type LegacyLeadRow = {
+  id: string;
+  name: string;
+  value: number;
+  valorTotal: number;
+  stageId: Lead["stageId"];
+  priority: Lead["priority"];
+  enteredStageAt: Date | string;
+  origem: Lead["origem"];
+  clienteId: string | null;
+  propostaGeradaEm: Date | string | null;
+  previsaoFechamento: Date | string | null;
+  cpf: string | null;
+  company: string | null;
+  contact: string | null;
+  email: string | null;
+  phone: string | null;
+  municipioUf: string | null;
+  entidade: string | null;
+  cargo: string | null;
+  notes: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
+function toIso(value: Date | string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function mapLegacyLeadRow(row: LegacyLeadRow): Lead {
+  return {
+    id: row.id,
+    name: row.name,
+    value: Number(row.value ?? 0),
+    valorTotal: Number(row.valorTotal ?? row.value ?? 0),
+    stageId: row.stageId,
+    priority: row.priority,
+    enteredStageAt: toIso(row.enteredStageAt) ?? new Date().toISOString(),
+    origem: row.origem,
+    registroLead: "oportunidade",
+    clienteId: row.clienteId,
+    solucoes: [],
+    contatosOportunidade: [],
+    checklistProgress: {},
+    contratoArquivos: { minuta: [], assinatura: [] },
+    contratoAnexosCliente: [],
+    propostaGeradaEm: toIso(row.propostaGeradaEm),
+    previsaoFechamento: toIso(row.previsaoFechamento)?.slice(0, 10),
+    cpf: row.cpf ?? undefined,
+    company: row.company ?? undefined,
+    contact: row.contact ?? undefined,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    municipioUf: row.municipioUf ?? undefined,
+    entidade: row.entidade ?? undefined,
+    cargo: row.cargo ?? undefined,
+    notes: row.notes ?? undefined,
+    interactions: [],
+    criadoPorId: null,
+    registroCriadoPorNome: null,
+    registroAtualizadoPorNome: null,
+    registroCriadoEm: toIso(row.createdAt),
+    registroAtualizadoEm: toIso(row.updatedAt),
+  };
+}
+
+async function loadComercialBootstrapLeadsLegacySql(): Promise<Lead[]> {
+  const rows = await prisma.$queryRaw<LegacyLeadRow[]>`
+    SELECT
+      "id",
+      "name",
+      "value",
+      "valorTotal",
+      "stageId",
+      "priority",
+      "enteredStageAt",
+      "origem",
+      "clienteId",
+      "propostaGeradaEm",
+      "previsaoFechamento",
+      "cpf",
+      "company",
+      "contact",
+      "email",
+      "phone",
+      "municipioUf",
+      "entidade",
+      "cargo",
+      "notes",
+      "createdAt",
+      "updatedAt"
+    FROM "Lead"
+    ORDER BY "createdAt" DESC
+  `;
+  return rows.map(mapLegacyLeadRow);
+}
+
 /** Mesmo critério que funcionava antes: somente oportunidades do funil Comercial. */
 export async function loadComercialBootstrapLeadsRaw() {
   try {
@@ -44,8 +143,8 @@ export async function loadComercialBootstrapLeadsRaw() {
       });
     } catch (legacyError) {
       if (!isPrismaSchemaDriftError(legacyError)) throw legacyError;
-      console.warn("[comercial-bootstrap] include legado falhou — carregando leads sem relações.", legacyError);
-      return prisma.lead.findMany({ orderBy: { createdAt: "desc" } });
+      console.warn("[comercial-bootstrap] include legado falhou — usando SQL legado.", legacyError);
+      return loadComercialBootstrapLeadsLegacySql();
     }
   }
 }
@@ -53,10 +152,25 @@ export async function loadComercialBootstrapLeadsRaw() {
 export function mapComercialBootstrapLeads(
   rows: Awaited<ReturnType<typeof loadComercialBootstrapLeadsRaw>>
 ): Lead[] {
+  if (!rows.length) return [];
+  // Fallback SQL já retorna no formato final de Lead.
+  if ("checklistProgress" in (rows[0] as object)) {
+    return rows as Lead[];
+  }
+
   const mapped: Lead[] = [];
   for (const row of rows) {
     try {
-      const lead = mapLeadFromDb(row as never);
+      const normalized = {
+        ...row,
+        registroLead: (row as { registroLead?: Lead["registroLead"] }).registroLead ?? "oportunidade",
+        solucoes: (row as { solucoes?: unknown[] }).solucoes ?? [],
+        contatos: (row as { contatos?: unknown[] }).contatos ?? [],
+        checklistItems: (row as { checklistItems?: unknown[] }).checklistItems ?? [],
+        contratoArquivos: (row as { contratoArquivos?: unknown[] }).contratoArquivos ?? [],
+        interactions: (row as { interactions?: unknown[] }).interactions ?? [],
+      };
+      const lead = mapLeadFromDb(normalized as never);
       if (lead.registroLead && lead.registroLead !== "oportunidade") continue;
       mapped.push(lead);
     } catch (err) {
