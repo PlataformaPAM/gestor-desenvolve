@@ -33,6 +33,7 @@ export function isLeadVisibleToUser(
   if (!normalizedUserName) return false;
   if (normalizeName(ownership.responsavelNome) === normalizedUserName) return true;
   if (normalizeName(lead.registroCriadoPorNome) === normalizedUserName) return true;
+  if ((lead.interactions ?? []).some((i) => normalizeName(i.user) === normalizedUserName)) return true;
   return false;
 }
 

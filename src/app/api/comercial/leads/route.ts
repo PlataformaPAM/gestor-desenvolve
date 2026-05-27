@@ -145,7 +145,10 @@ export async function POST(req: Request) {
       return fail("BAD_REQUEST", "Lead inválido.", 400);
     }
     const sessionUserIdRaw = getSessionUserId(req);
-    const sessionUserName = gate.session.userName?.trim() || "Usuário";
+    const sessionUserName =
+      gate.session.userName?.trim() ||
+      lead.interactions?.find((i) => i.user?.trim())?.user?.trim() ||
+      "Usuário";
     const sessionUserId = await resolveUsuarioIdForPrismaFk(prisma, sessionUserIdRaw);
     const interactionCandidates = (lead.interactions ?? []).map((i) =>
       resolveLeadInteractionUserId(i, sessionUserId)
@@ -292,7 +295,7 @@ export async function POST(req: Request) {
     }
 
     // Garante ownership persistido para escopo "vinculados" mesmo quando FK de usuário não resolve no ambiente.
-    if (sessionUserIdRaw) {
+    if (sessionUserIdRaw || sessionUserName !== "Usuário") {
       try {
         await prisma.leadInteraction.create({
           data: {
@@ -306,7 +309,7 @@ export async function POST(req: Request) {
             fieldKey: "ownership",
             oldValue: Prisma.JsonNull,
             newValue: {
-              responsavelId: sessionUserIdRaw,
+              responsavelId: sessionUserIdRaw || undefined,
               responsavelNome: sessionUserName,
               colaboradores: [],
             },
