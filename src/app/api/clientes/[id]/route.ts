@@ -5,6 +5,7 @@ import { mapClienteFromDb, toDateOrUndefined } from "@/app/api/comercial/_shared
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { clientesAccessGate } from "@/lib/server/clientes-access";
+import { normalizeClienteForPersistence } from "@/lib/server/normalize-cliente-for-db";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -18,44 +19,45 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   try {
+    const normalized = await normalizeClienteForPersistence(prisma, cliente);
     await prisma.$transaction(async (tx) => {
       await tx.cliente.update({
         where: { id },
         data: {
-          nome: cliente.nome,
-          empresa: cliente.empresa,
-          cpfCnpj: cliente.cpfCnpj,
-          status: cliente.status,
-          valorMensal: cliente.valorMensal,
-          segmento: cliente.segmento,
-          email: cliente.email ?? null,
-          telefone: cliente.telefone ?? null,
-          urlSiteOficial: cliente.urlSiteOficial ?? null,
-          dataFechamento: toDateOrUndefined(cliente.dataFechamento),
+          nome: normalized.nome,
+          empresa: normalized.empresa,
+          cpfCnpj: normalized.cpfCnpj,
+          status: normalized.status,
+          valorMensal: normalized.valorMensal,
+          segmento: normalized.segmento,
+          email: normalized.email ?? null,
+          telefone: normalized.telefone ?? null,
+          urlSiteOficial: normalized.urlSiteOficial ?? null,
+          dataFechamento: toDateOrUndefined(normalized.dataFechamento),
         },
       });
 
-      if (cliente.endereco) {
+      if (normalized.endereco) {
         await tx.clienteEndereco.upsert({
           where: { clienteId: id },
           create: {
             clienteId: id,
-            logradouro: cliente.endereco.logradouro,
-            numero: cliente.endereco.numero,
-            complemento: cliente.endereco.complemento ?? null,
-            bairro: cliente.endereco.bairro,
-            cidade: cliente.endereco.cidade,
-            uf: cliente.endereco.uf,
-            cep: cliente.endereco.cep,
+            logradouro: normalized.endereco.logradouro,
+            numero: normalized.endereco.numero,
+            complemento: normalized.endereco.complemento ?? null,
+            bairro: normalized.endereco.bairro,
+            cidade: normalized.endereco.cidade,
+            uf: normalized.endereco.uf,
+            cep: normalized.endereco.cep,
           },
           update: {
-            logradouro: cliente.endereco.logradouro,
-            numero: cliente.endereco.numero,
-            complemento: cliente.endereco.complemento ?? null,
-            bairro: cliente.endereco.bairro,
-            cidade: cliente.endereco.cidade,
-            uf: cliente.endereco.uf,
-            cep: cliente.endereco.cep,
+            logradouro: normalized.endereco.logradouro,
+            numero: normalized.endereco.numero,
+            complemento: normalized.endereco.complemento ?? null,
+            bairro: normalized.endereco.bairro,
+            cidade: normalized.endereco.cidade,
+            uf: normalized.endereco.uf,
+            cep: normalized.endereco.cep,
           },
         });
       } else {
@@ -64,7 +66,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
       await tx.clienteContatoPapel.deleteMany({ where: { clienteContato: { clienteId: id } } });
       await tx.clienteContato.deleteMany({ where: { clienteId: id } });
-      for (const c of cliente.contatos ?? []) {
+      for (const c of normalized.contatos ?? []) {
         await tx.clienteContato.create({
           data: {
             id: c.id,

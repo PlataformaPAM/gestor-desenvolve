@@ -6,7 +6,8 @@
     "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
-    "start": "prisma migrate deploy && next start",
+    "start": "prisma migrate deploy && npm run db:normalize-clientes && next start",
+    "db:normalize-clientes": "tsx scripts/normalize-clientes-existentes.ts",
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -46,6 +47,7 @@
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.6.1",
     "framer-motion": "^12.37.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
@@ -56,7 +58,9 @@
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.5",
     "recharts": "^2.15.4",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "tsx": "^4.22.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

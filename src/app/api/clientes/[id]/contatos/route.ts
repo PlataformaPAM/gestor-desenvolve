@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { clientesAccessGate } from "@/lib/server/clientes-access";
+import { normalizeContato } from "@/lib/clientes/normalize-cliente";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const gate = await clientesAccessGate(req, "editar");
@@ -11,7 +12,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const parsed = await parseJsonSafe<{ contatos?: Contato[] }>(req);
   if (!parsed.ok) return fail("BAD_REQUEST", "JSON inválido.", 400);
-  const contatos = parsed.value.contatos ?? [];
+  const contatos = (parsed.value.contatos ?? []).map(normalizeContato);
 
   const existing = await prisma.cliente.findUnique({ where: { id }, select: { id: true, nome: true } });
   if (!existing) return fail("NOT_FOUND", "Cliente não encontrado.", 404);

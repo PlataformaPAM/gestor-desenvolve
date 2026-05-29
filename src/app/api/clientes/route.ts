@@ -5,6 +5,7 @@ import { mapClienteFromDb, toDateOrUndefined } from "../comercial/_shared";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { clientesAccessGate } from "@/lib/server/clientes-access";
+import { normalizeClienteForPersistence } from "@/lib/server/normalize-cliente-for-db";
 
 type CreateClientePayload = Omit<Cliente, "id"> & { contatos?: Contato[] };
 
@@ -20,33 +21,34 @@ export async function POST(req: Request) {
   }
 
   try {
+    const normalized = await normalizeClienteForPersistence(prisma, cliente);
     const created = await prisma.cliente.create({
       data: {
-        nome: cliente.nome,
-        empresa: cliente.empresa,
-        cpfCnpj: cliente.cpfCnpj,
-        status: cliente.status,
-        valorMensal: cliente.valorMensal,
-        segmento: cliente.segmento,
-        email: cliente.email ?? null,
-        telefone: cliente.telefone ?? null,
-        urlSiteOficial: cliente.urlSiteOficial ?? null,
-        dataFechamento: toDateOrUndefined(cliente.dataFechamento),
-        endereco: cliente.endereco
+        nome: normalized.nome,
+        empresa: normalized.empresa,
+        cpfCnpj: normalized.cpfCnpj,
+        status: normalized.status,
+        valorMensal: normalized.valorMensal,
+        segmento: normalized.segmento,
+        email: normalized.email ?? null,
+        telefone: normalized.telefone ?? null,
+        urlSiteOficial: normalized.urlSiteOficial ?? null,
+        dataFechamento: toDateOrUndefined(normalized.dataFechamento),
+        endereco: normalized.endereco
           ? {
               create: {
-                logradouro: cliente.endereco.logradouro,
-                numero: cliente.endereco.numero,
-                complemento: cliente.endereco.complemento ?? null,
-                bairro: cliente.endereco.bairro,
-                cidade: cliente.endereco.cidade,
-                uf: cliente.endereco.uf,
-                cep: cliente.endereco.cep,
+                logradouro: normalized.endereco.logradouro,
+                numero: normalized.endereco.numero,
+                complemento: normalized.endereco.complemento ?? null,
+                bairro: normalized.endereco.bairro,
+                cidade: normalized.endereco.cidade,
+                uf: normalized.endereco.uf,
+                cep: normalized.endereco.cep,
               },
             }
           : undefined,
         contatos: {
-          create: (cliente.contatos ?? []).map((c) => ({
+          create: (normalized.contatos ?? []).map((c) => ({
             nome: c.nome,
             email: c.email,
             telefone: c.telefone,

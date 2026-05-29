@@ -38,6 +38,11 @@ import { fetchCnpjBrasilApi } from "@/lib/clientes/brasilapi-cnpj";
 import { fetchViaCep } from "@/lib/clientes/viacep";
 import { PAPEIS_CONTATO_CLIENTE, STATUS_LABELS } from "@/lib/clientes/constants";
 import { formatBrazilianPhoneInput } from "@/lib/comercial/phone-input";
+import {
+  normalizeClienteFieldValue,
+  normalizeClienteTextFields,
+} from "@/lib/clientes/normalize-cliente";
+import { normalizeEmail } from "@/lib/text/portuguese-text";
 
 const defaultEndereco: ClienteEndereco = {
   logradouro: "",
@@ -263,7 +268,7 @@ export function ClienteFormSheet({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (readOnly) return;
-    const cliente: Cliente = {
+    const rawCliente: Cliente = {
       id: initialCliente?.id ?? String(Date.now()),
       nome: nome.trim() || empresaTrim,
       empresa: empresaTrim,
@@ -286,6 +291,7 @@ export function ClienteFormSheet({
       faturas: initialCliente?.faturas,
       tickets: initialCliente?.tickets,
     };
+    const cliente = normalizeClienteTextFields(rawCliente);
     onSave(cliente);
     onClose();
   };
@@ -413,6 +419,10 @@ export function ClienteFormSheet({
                     justFilled={flashCnpj}
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
+                    onBlur={() => {
+                      const next = normalizeClienteFieldValue("nome", nome);
+                      if (next !== nome) setNome(next);
+                    }}
                     placeholder="Nome fantasia ou razão social"
                     required
                     className="pl-9"
@@ -440,6 +450,10 @@ export function ClienteFormSheet({
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => {
+                        const next = normalizeEmail(email);
+                        if (next !== email) setEmail(next);
+                      }}
                       placeholder="email@empresa.com"
                       className={`${formInputClass} pl-9`}
                       required
@@ -508,6 +522,12 @@ export function ClienteFormSheet({
                         justFilled={flashCep || flashCnpj}
                         value={endereco.logradouro}
                         onChange={(e) => setEndereco((p) => ({ ...p, logradouro: e.target.value }))}
+                        onBlur={() =>
+                          setEndereco((p) => ({
+                            ...p,
+                            logradouro: normalizeClienteFieldValue("logradouro", p.logradouro),
+                          }))
+                        }
                         required
                         className="pl-9"
                       />
@@ -532,6 +552,14 @@ export function ClienteFormSheet({
                       <input
                         value={endereco.complemento ?? ""}
                         onChange={(e) => setEndereco((p) => ({ ...p, complemento: e.target.value || undefined }))}
+                        onBlur={() =>
+                          setEndereco((p) => ({
+                            ...p,
+                            complemento: p.complemento
+                              ? normalizeClienteFieldValue("complemento", p.complemento)
+                              : p.complemento,
+                          }))
+                        }
                         placeholder="Sala, andar (opcional)"
                         className={`${formInputCompactClass} pl-8`}
                       />
@@ -558,6 +586,12 @@ export function ClienteFormSheet({
                         justFilled={flashCep || flashCnpj}
                         value={endereco.cidade}
                         onChange={(e) => setEndereco((p) => ({ ...p, cidade: e.target.value }))}
+                        onBlur={() =>
+                          setEndereco((p) => ({
+                            ...p,
+                            cidade: normalizeClienteFieldValue("cidade", p.cidade),
+                          }))
+                        }
                         required
                         className="pl-9"
                       />
@@ -623,6 +657,10 @@ export function ClienteFormSheet({
                             type="text"
                             value={c.nome}
                             onChange={(e) => updateContato(c.id, { nome: e.target.value })}
+                            onBlur={() => {
+                              const next = normalizeClienteFieldValue("nome", c.nome);
+                              if (next !== c.nome) updateContato(c.id, { nome: next });
+                            }}
                             placeholder="Nome completo"
                             className={`${formInputClass} pl-9`}
                           />
@@ -637,6 +675,11 @@ export function ClienteFormSheet({
                               type="text"
                               value={c.cargo ?? ""}
                               onChange={(e) => updateContato(c.id, { cargo: e.target.value })}
+                              onBlur={() => {
+                                const raw = c.cargo ?? "";
+                                const next = normalizeClienteFieldValue("cargo", raw);
+                                if (next !== raw) updateContato(c.id, { cargo: next });
+                              }}
                               placeholder="Ex: Diretor"
                               className={`${formInputClass} pl-9`}
                             />
@@ -650,6 +693,11 @@ export function ClienteFormSheet({
                               type="text"
                               value={c.setor ?? ""}
                               onChange={(e) => updateContato(c.id, { setor: e.target.value })}
+                              onBlur={() => {
+                                const raw = c.setor ?? "";
+                                const next = normalizeClienteFieldValue("setor", raw);
+                                if (next !== raw) updateContato(c.id, { setor: next });
+                              }}
                               placeholder="Ex: Comercial"
                               className={`${formInputClass} pl-9`}
                             />
@@ -680,6 +728,10 @@ export function ClienteFormSheet({
                               type="email"
                               value={c.email}
                               onChange={(e) => updateContato(c.id, { email: e.target.value })}
+                              onBlur={() => {
+                                const next = normalizeEmail(c.email);
+                                if (next !== c.email) updateContato(c.id, { email: next });
+                              }}
                               placeholder="email@empresa.com"
                               className={`${formInputClass} pl-9`}
                             />
