@@ -140,6 +140,10 @@ export type Lead = {
     motivoSolicitacaoLiberacao?: string;
   };
   interactions?: LeadInteraction[];
+  /** Responsável principal persistido no Lead (fonte primária para o kanban após F5). */
+  responsavelPrincipalId?: string | null;
+  responsavelPrincipalNome?: string | null;
+  colaboradores?: Array<{ id: string; nome: string }>;
   /** Quem criou o lead no banco (somente leitura); usado como responsável padrão quando não há transferência. */
   criadoPorId?: string | null;
   /** Metadados de auditoria (quem criou / datas; somente leitura na UI). */

@@ -1,16 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import { Prisma, type PipelineStageId } from "@prisma/client";
+import type { PipelineStageId } from "@prisma/client";
 import type { Lead } from "@/lib/comercial/types";
-import { randomUUID } from "node:crypto";
 import {
   ensureLeadOrigemEnumValues,
   ensureLeadPriorityEnumIncludesUrgente,
   filterUsuarioIdsExisting,
   mapLeadFromDb,
+  replaceLeadInteractions,
   resolveLeadInteractionUserId,
   resolveUsuarioIdForPrismaFk,
   toDateOrUndefined,
 } from "../_shared";
+import { ownershipColumnsFromLead } from "@/lib/comercial/lead-ownership-db";
+import { createInitialOwnershipInteraction } from "@/lib/comercial/ownership";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
@@ -83,6 +85,10 @@ async function createLeadWithSchemaFallback(
         criadoPorId: sessionUserId ?? undefined,
         atualizadoPorId: sessionUserId ?? undefined,
         clienteId: lead.clienteId ?? null,
+        ...ownershipColumnsFromLead({
+          ...lead,
+          criadoPorId: sessionUserId ?? lead.criadoPorId ?? null,
+        }),
       },
     });
     await ensureLeadOportunidadeFlags(db, lead.id, sessionUserId);
@@ -282,64 +288,39 @@ export async function POST(req: Request) {
       }
     }
 
-    if (lead.interactions?.length) {
-      for (const i of lead.interactions) {
-        try {
-          const uidRaw = resolveLeadInteractionUserId(i, sessionUserId);
-          const userId = uidRaw && validInteractionUserIds.has(uidRaw) ? uidRaw : null;
-          await prisma.leadInteraction.create({
-            data: {
-              id: i.id,
-              leadId: lead.id,
-              date: toDateOrUndefined(i.date) ?? new Date(),
-              type: i.type,
-              description: i.description,
-              action: i.action ?? null,
-              field: i.field ?? null,
-              fieldKey: i.fieldKey ?? null,
-              oldValue: i.oldValue ?? Prisma.JsonNull,
-              newValue: i.newValue ?? Prisma.JsonNull,
-              userId,
-              autorNome: i.user?.trim() || null,
-              anexos: {
-                create: (i.anexos ?? []).map((a) =>
-                  typeof a === "string" ? { nome: a, url: null } : { nome: a.name, url: a.url || null }
-                ),
-              },
-            },
-          });
-        } catch (err) {
-          console.error("[POST /api/comercial/leads] interaction create failed", err);
-        }
-      }
+    const interactionsToSave = [...(lead.interactions ?? [])];
+    const hasOwnershipLog = interactionsToSave.some(
+      (i) => (i.fieldKey ?? i.field ?? "").toLowerCase() === "ownership"
+    );
+    if (!hasOwnershipLog && (sessionUserIdRaw || sessionUserName !== "Usuário")) {
+      interactionsToSave.push(
+        createInitialOwnershipInteraction(sessionUserIdRaw, sessionUserName)
+      );
     }
 
-    // Garante ownership persistido para escopo "vinculados" mesmo quando FK de usuário não resolve no ambiente.
-    if (sessionUserIdRaw || sessionUserName !== "Usuário") {
-      try {
-        await prisma.leadInteraction.create({
-          data: {
-            id: randomUUID(),
-            leadId: lead.id,
-            date: new Date(),
-            type: "sistema",
-            description: `Responsável inicial: ${sessionUserName}`,
-            action: "CREATE",
-            field: "ownership",
-            fieldKey: "ownership",
-            oldValue: Prisma.JsonNull,
-            newValue: {
-              responsavelId: sessionUserIdRaw || undefined,
-              responsavelNome: sessionUserName,
-              colaboradores: [],
-            },
-            userId: sessionUserId ?? null,
-            autorNome: sessionUserName,
-          },
-        });
-      } catch (err) {
-        console.error("[POST /api/comercial/leads] ownership interaction fallback failed", err);
-      }
+    try {
+      await replaceLeadInteractions(
+        prisma,
+        lead.id,
+        interactionsToSave,
+        sessionUserId,
+        validInteractionUserIds
+      );
+    } catch (err) {
+      console.error("[POST /api/comercial/leads] replaceLeadInteractions failed", err);
+    }
+
+    try {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: ownershipColumnsFromLead({
+          ...lead,
+          interactions: interactionsToSave,
+          criadoPorId: sessionUserId ?? lead.criadoPorId ?? null,
+        }),
+      });
+    } catch (err) {
+      console.error("[POST /api/comercial/leads] ownership columns update failed", err);
     }
 
     try {

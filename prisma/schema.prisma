@@ -35,7 +35,9 @@ enum LeadOrigem {
   outro
 }
 
-/** Oportunidade no funil Comercial vs. venda materializada só pelo Financeiro (comissão e histórico). */
+/**
+ * Oportunidade no funil Comercial vs. venda materializada só pelo Financeiro (comissão e histórico).
+ */
 enum LeadRegistro {
   oportunidade
   venda_direta_financeiro
@@ -159,7 +161,9 @@ enum TipoRecorrencia {
   parcelado
 }
 
-/** Como a solução na proposta costuma ser cobrada (Comercial); o Financeiro pode ajustar no lançamento. */
+/**
+ * Como a solução na proposta costuma ser cobrada (Comercial); o Financeiro pode ajustar no lançamento.
+ */
 enum LeadSolucaoRecorrenciaPagamento {
   mensal
   unica
@@ -221,7 +225,9 @@ enum FinanceiroFluxoStatus {
   devolvido
 }
 
-/** Ciclo de vida do contrato comercial (módulo Contratos), após lead em Fechado */
+/**
+ * Ciclo de vida do contrato comercial (módulo Contratos), após lead em Fechado
+ */
 enum ContratoStatus {
   pendente_financeiro
   ativo
@@ -237,106 +243,110 @@ enum ContratoOrigem {
 }
 
 model Usuario {
-  id                     String               @id @default(uuid())
-  cpf                    String               @unique
-  email                  String               @unique
-  nomeExibicao           String?
-  telefone               String?
-  senhaHash              String?
-  perfilId               String
-  ativo                  Boolean              @default(true)
-  vinculacaoTipo         PessoaVinculoTipo?
-  vinculacaoPessoaId     String?
-  vinculos               UsuarioVinculo[]
-  criadoEm               DateTime?
-  atualizadoEmSistema    DateTime?
-  perfil                 PerfilAcesso         @relation(fields: [perfilId], references: [id])
-  logs                   LogSistema[]
-  leadInteractions       LeadInteraction[]
-  helpdeskHistoricos     HelpdeskHistorico[]
-  helpdeskComentarios    HelpdeskComentario[]
-  tarefasResponsavel     Tarefa[]               @relation("TarefaResponsavel")
-  tarefasColaborador     TarefaColaborador[]
-  helpdeskResponsavel    HelpdeskTicketResponsavel[]
-  tarefasHistorico       TarefaHistorico[]
-  alertas                Alerta[]
-  leadsCriados           Lead[]               @relation("LeadCriadoPor")
-  leadsAtualizados       Lead[]               @relation("LeadAtualizadoPor")
-  clientesCriados        Cliente[]            @relation("ClienteCriadoPor")
-  clientesAtualizados    Cliente[]            @relation("ClienteAtualizadoPor")
-  lancamentosCriados     Lancamento[]         @relation("LancamentoCriadoPor")
-  lancamentosAtualizados Lancamento[]         @relation("LancamentoAtualizadoPor")
-  contratosCriados       Contrato[]           @relation("ContratoCriadoPor")
-  contratosAtualizados   Contrato[]           @relation("ContratoAtualizadoPor")
-  tarefasCriadas         Tarefa[]             @relation("TarefaCriadoPor")
-  tarefasAtualizadas     Tarefa[]             @relation("TarefaAtualizadoPor")
-  ticketsCriados         HelpdeskTicket[]     @relation("TicketCriadoPor")
-  ticketsAtualizados     HelpdeskTicket[]     @relation("TicketAtualizadoPor")
-  contratoAditivos       ContratoAditivo[]    @relation("AditivoRegistradoPor")
-  comissaoLotesCriados   ComissaoLotePagamento[] @relation("ComissaoLoteCriadoPor")
-  comissaoLotesAtualizados ComissaoLotePagamento[] @relation("ComissaoLoteAtualizadoPor")
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  id                       String                      @id @default(uuid())
+  cpf                      String                      @unique
+  email                    String                      @unique
+  nomeExibicao             String?
+  telefone                 String?
+  senhaHash                String?
+  perfilId                 String
+  ativo                    Boolean                     @default(true)
+  vinculacaoTipo           PessoaVinculoTipo?
+  vinculacaoPessoaId       String?
+  vinculos                 UsuarioVinculo[]
+  criadoEm                 DateTime?
+  atualizadoEmSistema      DateTime?
+  perfil                   PerfilAcesso                @relation(fields: [perfilId], references: [id])
+  logs                     LogSistema[]
+  leadInteractions         LeadInteraction[]
+  helpdeskHistoricos       HelpdeskHistorico[]
+  helpdeskComentarios      HelpdeskComentario[]
+  tarefasResponsavel       Tarefa[]                    @relation("TarefaResponsavel")
+  tarefasColaborador       TarefaColaborador[]
+  helpdeskResponsavel      HelpdeskTicketResponsavel[]
+  tarefasHistorico         TarefaHistorico[]
+  alertas                  Alerta[]
+  leadsCriados             Lead[]                      @relation("LeadCriadoPor")
+  leadsAtualizados         Lead[]                      @relation("LeadAtualizadoPor")
+  clientesCriados          Cliente[]                   @relation("ClienteCriadoPor")
+  clientesAtualizados      Cliente[]                   @relation("ClienteAtualizadoPor")
+  lancamentosCriados       Lancamento[]                @relation("LancamentoCriadoPor")
+  lancamentosAtualizados   Lancamento[]                @relation("LancamentoAtualizadoPor")
+  contratosCriados         Contrato[]                  @relation("ContratoCriadoPor")
+  contratosAtualizados     Contrato[]                  @relation("ContratoAtualizadoPor")
+  tarefasCriadas           Tarefa[]                    @relation("TarefaCriadoPor")
+  tarefasAtualizadas       Tarefa[]                    @relation("TarefaAtualizadoPor")
+  ticketsCriados           HelpdeskTicket[]            @relation("TicketCriadoPor")
+  ticketsAtualizados       HelpdeskTicket[]            @relation("TicketAtualizadoPor")
+  contratoAditivos         ContratoAditivo[]           @relation("AditivoRegistradoPor")
+  comissaoLotesCriados     ComissaoLotePagamento[]     @relation("ComissaoLoteCriadoPor")
+  comissaoLotesAtualizados ComissaoLotePagamento[]     @relation("ComissaoLoteAtualizadoPor")
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
 }
 
 model UsuarioVinculo {
-  id                 String           @id @default(uuid())
-  usuarioId          String
-  tipo               PessoaVinculoTipo
-  pessoaId           String
-  usuario            Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  id        String            @id @default(uuid())
+  usuarioId String
+  tipo      PessoaVinculoTipo
+  pessoaId  String
+  usuario   Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@unique([usuarioId, tipo, pessoaId])
 }
 
 model PerfilAcesso {
-  id                    String                 @id @default(uuid())
-  nome                  String
-  descricao             String?
+  id                   String            @id @default(uuid())
+  nome                 String
+  descricao            String?
   /// Matriz JSON: { [resourceId]: { ver, criar, editar, excluir, verTodos } }
-  permissoesGranulares  Json?
-  permissoes            PerfilPermissao[]
-  usuarios              Usuario[]
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  permissoesGranulares Json?
+  permissoes           PerfilPermissao[]
+  usuarios             Usuario[]
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 }
 
 model PerfilPermissao {
-  id                 String                 @id @default(uuid())
-  perfilId           String
-  modulo             ModuloPermissao
-  permitido          Boolean                @default(false)
-  perfil             PerfilAcesso           @relation(fields: [perfilId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String          @id @default(uuid())
+  perfilId  String
+  modulo    ModuloPermissao
+  permitido Boolean         @default(false)
+  perfil    PerfilAcesso    @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   @@unique([perfilId, modulo])
 }
 
 model LogSistema {
-  id                 String                 @id @default(uuid())
-  data               DateTime
-  usuarioId          String?
-  acao               String
-  modulo             String?
-  detalhes           String?
-  usuario            Usuario?               @relation(fields: [usuarioId], references: [id])
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String   @id @default(uuid())
+  data      DateTime
+  usuarioId String?
+  acao      String
+  modulo    String?
+  detalhes  String?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/** Configurações globais (chave-valor em JSON). */
+/**
+ * Configurações globais (chave-valor em JSON).
+ */
 model ConfiguracaoSistema {
-  id                 String                 @id @default(uuid())
-  chave              String                 @unique
-  valor              Json
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String   @id @default(uuid())
+  chave     String   @unique
+  valor     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/** Modelos reutilizáveis do Construtor de Documentos (Propostas, Ofícios, etc.). */
+/**
+ * Modelos reutilizáveis do Construtor de Documentos (Propostas, Ofícios, etc.).
+ */
 enum DocumentoModeloTipo {
   proposta_comercial
   oficio
@@ -345,244 +355,253 @@ enum DocumentoModeloTipo {
 }
 
 model DocumentoModelo {
-  id             String              @id @default(uuid())
-  nome           String
-  tipo           DocumentoModeloTipo
-  descricao      String              @default("")
-  assunto        String              @default("")
-  /** URL pública da logo (botão “Inserir logo” coloca &lt;img&gt; no cabeçalho). */
-  logoUrl        String              @default("")
-  cabecalhoHtml  String              @default("") @db.Text
-  corpo          String              @db.Text
-  rodapeHtml     String              @default("") @db.Text
-  ativo          Boolean             @default(true)
-  /** Incrementa a cada alteração persistida (auditoria simples). */
-  versao         Int                 @default(1)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id            String              @id @default(uuid())
+  nome          String
+  tipo          DocumentoModeloTipo
+  descricao     String              @default("")
+  assunto       String              @default("")
+  /**
+   * URL pública da logo (botão “Inserir logo” coloca &lt;img&gt; no cabeçalho).
+   */
+  logoUrl       String              @default("")
+  cabecalhoHtml String              @default("") @db.Text
+  corpo         String              @db.Text
+  rodapeHtml    String              @default("") @db.Text
+  ativo         Boolean             @default(true)
+  /**
+   * Incrementa a cada alteração persistida (auditoria simples).
+   */
+  versao        Int                 @default(1)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 }
 
 model Alerta {
-  id                 String                 @id @default(uuid())
-  modulo             String
-  titulo             String
-  descricao          String
-  data               DateTime               @default(now())
-  lida               Boolean                @default(false)
-  usuarioId          String?
-  usuario            Usuario?               @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String   @id @default(uuid())
+  modulo    String
+  titulo    String
+  descricao String
+  data      DateTime @default(now())
+  lida      Boolean  @default(false)
+  usuarioId String?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Cliente {
-  id                 String                 @id @default(uuid())
-  nome               String
-  empresa            String
-  cpfCnpj            String                 @unique
-  status             ClienteStatus
-  valorMensal        Float
-  segmento           ClienteSegmento
-  email              String?
-  telefone           String?
-  urlSiteOficial     String?
-  dataFechamento     DateTime?
-  endereco           ClienteEndereco?
-  contatos           ClienteContato[]
-  propostas          ClienteProposta[]
-  faturas            ClienteFatura[]
-  ticketsResumo      ClienteTicketResumo[]
-  leads              Lead[]
-  contratos          Contrato[]
-  tarefas            Tarefa[]
-  tarefasVinculadas  TarefaCliente[]
-  helpdeskTickets    HelpdeskTicket[]
-  lancamentos        Lancamento[]
-  criadoPorId        String?
-  atualizadoPorId    String?
-  criadoPor          Usuario?               @relation("ClienteCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor      Usuario?               @relation("ClienteAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id                String                @id @default(uuid())
+  nome              String
+  empresa           String
+  cpfCnpj           String                @unique
+  status            ClienteStatus
+  valorMensal       Float
+  segmento          ClienteSegmento
+  email             String?
+  telefone          String?
+  urlSiteOficial    String?
+  dataFechamento    DateTime?
+  endereco          ClienteEndereco?
+  contatos          ClienteContato[]
+  propostas         ClienteProposta[]
+  faturas           ClienteFatura[]
+  ticketsResumo     ClienteTicketResumo[]
+  leads             Lead[]
+  contratos         Contrato[]
+  tarefas           Tarefa[]
+  tarefasVinculadas TarefaCliente[]
+  helpdeskTickets   HelpdeskTicket[]
+  lancamentos       Lancamento[]
+  criadoPorId       String?
+  atualizadoPorId   String?
+  criadoPor         Usuario?              @relation("ClienteCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor     Usuario?              @relation("ClienteAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 }
 
 model ClienteEndereco {
-  id                 String                 @id @default(uuid())
-  clienteId          String                 @unique
-  logradouro         String
-  numero             String
-  complemento        String?
-  bairro             String
-  cidade             String
-  uf                 String
-  cep                String
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String   @id @default(uuid())
+  clienteId   String   @unique
+  logradouro  String
+  numero      String
+  complemento String?
+  bairro      String
+  cidade      String
+  uf          String
+  cep         String
+  cliente     Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model ClienteContato {
-  id                 String                 @id @default(uuid())
-  clienteId          String
-  nome               String
-  email              String
-  telefone           String
-  setor              String?
-  cargo              String?
-  papelLegado        String?
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  papeis             ClienteContatoPapel[]
-  leadVinculos       LeadContato[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id           String                @id @default(uuid())
+  clienteId    String
+  nome         String
+  email        String
+  telefone     String
+  setor        String?
+  cargo        String?
+  papelLegado  String?
+  cliente      Cliente               @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  papeis       ClienteContatoPapel[]
+  leadVinculos LeadContato[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 }
 
 model ClienteContatoPapel {
-  id                 String                 @id @default(uuid())
-  clienteContatoId   String
-  papel              PapelContato
-  clienteContato     ClienteContato         @relation(fields: [clienteContatoId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id               String         @id @default(uuid())
+  clienteContatoId String
+  papel            PapelContato
+  clienteContato   ClienteContato @relation(fields: [clienteContatoId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@unique([clienteContatoId, papel])
 }
 
 model ClienteProposta {
-  id                 String                 @id @default(uuid())
-  clienteId          String
-  titulo             String
-  valor              Float
-  dataProposta       DateTime
-  status             PropostaStatus
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id           String         @id @default(uuid())
+  clienteId    String
+  titulo       String
+  valor        Float
+  dataProposta DateTime
+  status       PropostaStatus
+  cliente      Cliente        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
 
 model ClienteFatura {
-  id                 String                 @id @default(uuid())
-  clienteId          String
-  vencimento         DateTime
-  valor              Float
-  status             FaturaStatus
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id         String       @id @default(uuid())
+  clienteId  String
+  vencimento DateTime
+  valor      Float
+  status     FaturaStatus
+  cliente    Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 }
 
 model ClienteTicketResumo {
-  id                 String                 @id @default(uuid())
-  clienteId          String
-  assunto            String
-  dataAbertura       DateTime
-  status             TicketStatus
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id           String       @id @default(uuid())
+  clienteId    String
+  assunto      String
+  dataAbertura DateTime
+  status       TicketStatus
+  cliente      Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model SolucaoCatalogo {
-  id                 String                 @id @default(uuid())
-  nome               String
-  categoria          String?
-  descricao          String?
-  valorBase          Float?
-  ativa              Boolean                @default(true)
-  leadSolucoes       LeadSolucao[]
-  regrasComissao     ComissaoRegra[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id             String          @id @default(uuid())
+  nome           String
+  categoria      String?
+  descricao      String?
+  valorBase      Float?
+  ativa          Boolean         @default(true)
+  leadSolucoes   LeadSolucao[]
+  regrasComissao ComissaoRegra[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model Lead {
-  id                 String                 @id @default(uuid())
-  name               String
-  value              Float
-  valorTotal         Float
-  stageId            PipelineStageId
-  priority           LeadPriority
-  enteredStageAt     DateTime
-  origem             LeadOrigem
-  /** Leads do funil Comercial vs. registro criado pelo Financeiro para vendas diretas (comissão). */
-  registroLead       LeadRegistro           @default(oportunidade)
-  clienteId          String?
-  propostaGeradaEm   DateTime?
-  previsaoFechamento DateTime?
-  cpf                String?
-  company            String?
-  contact            String?
-  email              String?
-  phone              String?
-  municipioUf        String?
-  entidade           String?
-  cargo              String?
-  notes              String?
-  cliente            Cliente?               @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  solucoes           LeadSolucao[]
-  contatos           LeadContato[]
-  checklistItems     LeadChecklistItem[]
-  contratoChecklist  LeadContratoChecklist?
-  contratoArquivos   LeadContratoArquivo[]
-  interactions       LeadInteraction[]
-  financeiroFluxo    LeadFinanceiroFluxo?
+  id                    String                      @id @default(uuid())
+  name                  String
+  value                 Float
+  valorTotal            Float
+  stageId               PipelineStageId
+  priority              LeadPriority
+  enteredStageAt        DateTime
+  origem                LeadOrigem
+  /**
+   * Leads do funil Comercial vs. registro criado pelo Financeiro para vendas diretas (comissão).
+   */
+  registroLead          LeadRegistro                @default(oportunidade)
+  clienteId             String?
+  propostaGeradaEm      DateTime?
+  previsaoFechamento    DateTime?
+  cpf                   String?
+  company               String?
+  contact               String?
+  email                 String?
+  phone                 String?
+  municipioUf           String?
+  entidade              String?
+  cargo                 String?
+  notes                 String?
+  cliente               Cliente?                    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  solucoes              LeadSolucao[]
+  contatos              LeadContato[]
+  checklistItems        LeadChecklistItem[]
+  contratoChecklist     LeadContratoChecklist?
+  contratoArquivos      LeadContratoArquivo[]
+  interactions          LeadInteraction[]
+  financeiroFluxo       LeadFinanceiroFluxo?
   lancamentosFinanceiro Lancamento[]
-  contrato           Contrato?
+  contrato              Contrato?
   comissaoParticipacoes ComissaoParticipacaoVenda[]
-  comissaoEventos    ComissaoEvento[]
-  criadoPorId        String?
-  atualizadoPorId    String?
-  criadoPor          Usuario?               @relation("LeadCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor      Usuario?               @relation("LeadAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  comissaoEventos       ComissaoEvento[]
+  responsavelPrincipalId   String?
+  responsavelPrincipalNome String?
+  colaboradores            Json?
+  criadoPorId           String?
+  atualizadoPorId       String?
+  criadoPor             Usuario?                    @relation("LeadCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor         Usuario?                    @relation("LeadAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
 
   @@index([registroLead])
 }
 
 model Contrato {
-  id              String         @id @default(uuid())
-  leadId          String?        @unique
+  id              String            @id @default(uuid())
+  leadId          String?           @unique
   clienteId       String
-  status          ContratoStatus @default(pendente_financeiro)
-  origem          ContratoOrigem @default(via_lead)
-  geraPosVenda    Boolean        @default(true)
+  status          ContratoStatus    @default(pendente_financeiro)
+  origem          ContratoOrigem    @default(via_lead)
+  geraPosVenda    Boolean           @default(true)
   titulo          String?
-  valorTotal      Float          @default(0)
+  valorTotal      Float             @default(0)
   dataInicio      DateTime?
   dataFim         DateTime?
   observacoes     String?
   condicoesGerais String?
   criadoPorId     String?
   atualizadoPorId String?
-  lead            Lead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  cliente         Cliente        @relation(fields: [clienteId], references: [id], onDelete: Restrict)
-  criadoPor       Usuario?       @relation("ContratoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor   Usuario?       @relation("ContratoAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  lead            Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  cliente         Cliente           @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  criadoPor       Usuario?          @relation("ContratoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor   Usuario?          @relation("ContratoAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   itens           ContratoItem[]
   aditivos        ContratoAditivo[]
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 }
 
 model ContratoAditivo {
-  id                   String   @id @default(uuid())
-  contratoId           String
-  tipo                 String
-  titulo               String
-  descricao            String?
-  valorAnterior        Float?
-  valorNovo            Float?
-  condicoesAnteriores  String?
-  condicoesNovas       String?
-  dataInicioAnterior   DateTime?
-  dataInicioNova       DateTime?
-  dataFimAnterior      DateTime?
-  dataFimNova          DateTime?
-  registradoPorId      String?
-  contrato             Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
-  registradoPor        Usuario? @relation("AditivoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
-  createdAt            DateTime @default(now())
+  id                  String    @id @default(uuid())
+  contratoId          String
+  tipo                String
+  titulo              String
+  descricao           String?
+  valorAnterior       Float?
+  valorNovo           Float?
+  condicoesAnteriores String?
+  condicoesNovas      String?
+  dataInicioAnterior  DateTime?
+  dataInicioNova      DateTime?
+  dataFimAnterior     DateTime?
+  dataFimNova         DateTime?
+  registradoPorId     String?
+  contrato            Contrato  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  registradoPor       Usuario?  @relation("AditivoRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
+  createdAt           DateTime  @default(now())
 }
 
 model ContratoItem {
@@ -598,137 +617,139 @@ model ContratoItem {
 }
 
 model LeadSolucao {
-  id                     String                         @id @default(uuid())
-  leadId                 String
-  solucaoCatalogoId      String?
-  nome                   String
-  valor                  Float?
-  condicoesPagamento     String?
-  recorrenciaPagamento   LeadSolucaoRecorrenciaPagamento?
-  parcelas               Int?
-  lead                   Lead                           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  solucaoCatalogo        SolucaoCatalogo?               @relation(fields: [solucaoCatalogoId], references: [id], onDelete: SetNull)
-  lancamentosVinculados  Lancamento[]
-  comissaoParticipacoes  ComissaoParticipacaoVenda[]
-  comissaoEventos        ComissaoEvento[]
-  createdAt              DateTime                       @default(now())
-  updatedAt              DateTime                       @updatedAt
+  id                    String                           @id @default(uuid())
+  leadId                String
+  solucaoCatalogoId     String?
+  nome                  String
+  valor                 Float?
+  condicoesPagamento    String?
+  recorrenciaPagamento  LeadSolucaoRecorrenciaPagamento?
+  parcelas              Int?
+  lead                  Lead                             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  solucaoCatalogo       SolucaoCatalogo?                 @relation(fields: [solucaoCatalogoId], references: [id], onDelete: SetNull)
+  lancamentosVinculados Lancamento[]
+  comissaoParticipacoes ComissaoParticipacaoVenda[]
+  comissaoEventos       ComissaoEvento[]
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
 }
 
 model LeadContato {
-  id                 String                 @id @default(uuid())
-  leadId             String
-  clienteContatoId   String?
-  nome               String
-  cargo              String?
-  setor              String?
-  telefone           String
-  email              String
-  lead               Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  clienteContato     ClienteContato?        @relation(fields: [clienteContatoId], references: [id], onDelete: SetNull)
-  papeis             LeadContatoPapel[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id               String             @id @default(uuid())
+  leadId           String
+  clienteContatoId String?
+  nome             String
+  cargo            String?
+  setor            String?
+  telefone         String
+  email            String
+  lead             Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  clienteContato   ClienteContato?    @relation(fields: [clienteContatoId], references: [id], onDelete: SetNull)
+  papeis           LeadContatoPapel[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model LeadContatoPapel {
-  id                 String                 @id @default(uuid())
-  leadContatoId      String
-  papel              PapelContato
-  leadContato        LeadContato            @relation(fields: [leadContatoId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id            String       @id @default(uuid())
+  leadContatoId String
+  papel         PapelContato
+  leadContato   LeadContato  @relation(fields: [leadContatoId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@unique([leadContatoId, papel])
 }
 
 model LeadChecklistItem {
-  id                 String                 @id @default(uuid())
-  leadId             String
-  stageId            PipelineStageId
-  taskKey            String
-  taskLabel          String?
-  done               Boolean                @default(false)
-  lead               Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String          @id @default(uuid())
+  leadId    String
+  stageId   PipelineStageId
+  taskKey   String
+  taskLabel String?
+  done      Boolean         @default(false)
+  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   @@unique([leadId, taskKey])
 }
 
 model LeadContratoChecklist {
-  id                       String           @id @default(uuid())
-  leadId                   String           @unique
-  aprovacaoCliente         Boolean          @default(false)
-  recebimentoDocumentacao  Boolean          @default(false)
-  envioDocumentacao        Boolean          @default(false)
-  ordemCompra              Boolean          @default(false)
-  lead                     Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt                DateTime         @default(now())
-  updatedAt                DateTime         @updatedAt
+  id                      String   @id @default(uuid())
+  leadId                  String   @unique
+  aprovacaoCliente        Boolean  @default(false)
+  recebimentoDocumentacao Boolean  @default(false)
+  envioDocumentacao       Boolean  @default(false)
+  ordemCompra             Boolean  @default(false)
+  lead                    Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model LeadContratoArquivo {
-  id                 String                 @id @default(uuid())
-  leadId             String
-  tipo               String
-  nomeArquivo        String
-  url                String?
-  lead               Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String   @id @default(uuid())
+  leadId      String
+  tipo        String
+  nomeArquivo String
+  url         String?
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model LeadFinanceiroFluxo {
-  id                        String               @id @default(uuid())
-  leadId                    String               @unique
-  status                    FinanceiroFluxoStatus @default(nenhum)
-  bloqueadoEdicao           Boolean              @default(false)
-  solicitadoEm              DateTime?
-  aprovadoEm                DateTime?
-  devolvidoEm               DateTime?
-  motivoDevolucao           String?
-  liberacaoSolicitadaEm     DateTime?
+  id                         String                @id @default(uuid())
+  leadId                     String                @unique
+  status                     FinanceiroFluxoStatus @default(nenhum)
+  bloqueadoEdicao            Boolean               @default(false)
+  solicitadoEm               DateTime?
+  aprovadoEm                 DateTime?
+  devolvidoEm                DateTime?
+  motivoDevolucao            String?
+  liberacaoSolicitadaEm      DateTime?
   motivoSolicitacaoLiberacao String?
-  lead                      Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdAt                 DateTime             @default(now())
-  updatedAt                 DateTime             @updatedAt
+  lead                       Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
 }
 
 model LeadInteraction {
-  id                 String                 @id @default(uuid())
-  leadId             String
-  date               DateTime
-  type               LeadInteractionType
-  description        String
-  /** Nome exibido gravado no momento do registro (fallback quando userId é nulo ou legado). */
-  autorNome          String?
-  userId             String?
-  action             LeadInteractionAction?
-  field              String?
-  fieldKey           String?
-  oldValue           Json?
-  newValue           Json?
-  lead               Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  user               Usuario?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  anexos             LeadInteractionAnexo[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String                 @id @default(uuid())
+  leadId      String
+  date        DateTime
+  type        LeadInteractionType
+  description String
+  /**
+   * Nome exibido gravado no momento do registro (fallback quando userId é nulo ou legado).
+   */
+  autorNome   String?
+  userId      String?
+  action      LeadInteractionAction?
+  field       String?
+  fieldKey    String?
+  oldValue    Json?
+  newValue    Json?
+  lead        Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user        Usuario?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  anexos      LeadInteractionAnexo[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 }
 
 model LeadInteractionAnexo {
-  id                 String                 @id @default(uuid())
-  interactionId      String
-  nome               String
-  url                String?
-  interaction        LeadInteraction        @relation(fields: [interactionId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id            String          @id @default(uuid())
+  interactionId String
+  nome          String
+  url           String?
+  interaction   LeadInteraction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model Tarefa {
-  id                 String                 @id @default(uuid())
-  codigo             String                 @unique
+  id                 String              @id @default(uuid())
+  codigo             String              @unique
   titulo             String
   descricao          String?
   status             TarefaStatus
@@ -740,217 +761,221 @@ model Tarefa {
   responsavelId      String
   criadoPorId        String?
   atualizadoPorId    String?
-  cliente            Cliente?               @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  responsavel        Usuario                @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
-  criadoPor          Usuario?               @relation("TarefaCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor      Usuario?               @relation("TarefaAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  cliente            Cliente?            @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  responsavel        Usuario             @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
+  criadoPor          Usuario?            @relation("TarefaCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor      Usuario?            @relation("TarefaAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   colaboradores      TarefaColaborador[]
   clientesVinculados TarefaCliente[]
   anexos             TarefaAnexo[]
   historico          TarefaHistorico[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model TarefaCliente {
-  id                 String                 @id @default(uuid())
-  tarefaId           String
-  clienteId          String
-  tarefa             Tarefa                 @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String   @id @default(uuid())
+  tarefaId  String
+  clienteId String
+  tarefa    Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tarefaId, clienteId])
 }
 
 model TarefaColaborador {
-  id                 String                 @id @default(uuid())
-  tarefaId           String
-  usuarioId          String
-  tarefa             Tarefa                 @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
-  usuario            Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String   @id @default(uuid())
+  tarefaId  String
+  usuarioId String
+  tarefa    Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tarefaId, usuarioId])
 }
 
 model TarefaAnexo {
-  id                 String                 @id @default(uuid())
-  tarefaId           String
-  nomeArquivo        String
-  url                String?
-  tarefa             Tarefa                 @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String   @id @default(uuid())
+  tarefaId    String
+  nomeArquivo String
+  url         String?
+  tarefa      Tarefa   @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model TarefaHistorico {
-  id                 String                 @id @default(uuid())
-  tarefaId           String
-  data               DateTime
-  acao               String
-  autorId            String?
-  tarefa             Tarefa                 @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
-  autor              Usuario?               @relation(fields: [autorId], references: [id], onDelete: SetNull)
-  anexos             TarefaHistoricoAnexo[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String                 @id @default(uuid())
+  tarefaId  String
+  data      DateTime
+  acao      String
+  autorId   String?
+  tarefa    Tarefa                 @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  autor     Usuario?               @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  anexos    TarefaHistoricoAnexo[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
 }
 
 model TarefaHistoricoAnexo {
-  id                 String                 @id @default(uuid())
-  historicoId        String
-  nomeArquivo        String
-  url                String?
-  historico          TarefaHistorico        @relation(fields: [historicoId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String          @id @default(uuid())
+  historicoId String
+  nomeArquivo String
+  url         String?
+  historico   TarefaHistorico @relation(fields: [historicoId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model HelpdeskTicket {
-  id                 String                 @id @default(uuid())
-  codigo             String                 @unique
-  clienteId          String
-  assunto            String
-  descricao          String
-  status             HelpdeskTicketStatus
-  prioridade         HelpdeskTicketPrioridade
-  categoria          HelpdeskTicketCategoria
-  dataCriacao        DateTime
-  previsaoConclusao  DateTime
-  ultimaAtualizacao  DateTime
-  criadoPorId        String?
-  atualizadoPorId    String?
-  cliente            Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  criadoPor          Usuario?               @relation("TicketCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor      Usuario?               @relation("TicketAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
-  responsaveis       HelpdeskTicketResponsavel[]
-  historico          HelpdeskHistorico[]
-  comentarios        HelpdeskComentario[]
-  anexos             HelpdeskAnexo[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id                String                      @id @default(uuid())
+  codigo            String                      @unique
+  clienteId         String
+  assunto           String
+  descricao         String
+  status            HelpdeskTicketStatus
+  prioridade        HelpdeskTicketPrioridade
+  categoria         HelpdeskTicketCategoria
+  dataCriacao       DateTime
+  previsaoConclusao DateTime
+  ultimaAtualizacao DateTime
+  criadoPorId       String?
+  atualizadoPorId   String?
+  cliente           Cliente                     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  criadoPor         Usuario?                    @relation("TicketCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor     Usuario?                    @relation("TicketAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  responsaveis      HelpdeskTicketResponsavel[]
+  historico         HelpdeskHistorico[]
+  comentarios       HelpdeskComentario[]
+  anexos            HelpdeskAnexo[]
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 }
 
 model HelpdeskTicketResponsavel {
-  id                 String                 @id @default(uuid())
-  ticketId           String
-  usuarioId          String
-  ticket             HelpdeskTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  usuario            Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String         @id @default(uuid())
+  ticketId  String
+  usuarioId String
+  ticket    HelpdeskTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  usuario   Usuario        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   @@unique([ticketId, usuarioId])
 }
 
 model HelpdeskHistorico {
-  id                 String                 @id @default(uuid())
-  ticketId           String
-  data               DateTime
-  acao               String
-  autorId            String?
-  detalhe            String?
-  ticket             HelpdeskTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  autor              Usuario?               @relation(fields: [autorId], references: [id], onDelete: SetNull)
-  anexos             HelpdeskHistoricoAnexo[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id        String                   @id @default(uuid())
+  ticketId  String
+  data      DateTime
+  acao      String
+  autorId   String?
+  detalhe   String?
+  ticket    HelpdeskTicket           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  autor     Usuario?                 @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  anexos    HelpdeskHistoricoAnexo[]
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
 }
 
 model HelpdeskHistoricoAnexo {
-  id                 String                 @id @default(uuid())
-  historicoId        String
-  nomeArquivo        String
-  url                String?
-  historico          HelpdeskHistorico      @relation(fields: [historicoId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String            @id @default(uuid())
+  historicoId String
+  nomeArquivo String
+  url         String?
+  historico   HelpdeskHistorico @relation(fields: [historicoId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 }
 
 model HelpdeskComentario {
-  id                 String                 @id @default(uuid())
-  ticketId           String
-  autorId            String?
-  autorNomeSnapshot  String
-  autorTipo          HelpdeskComentarioAutorTipo
-  texto              String
-  data               DateTime
-  ticket             HelpdeskTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  autor              Usuario?               @relation(fields: [autorId], references: [id], onDelete: SetNull)
-  anexos             HelpdeskComentarioAnexo[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id                String                      @id @default(uuid())
+  ticketId          String
+  autorId           String?
+  autorNomeSnapshot String
+  autorTipo         HelpdeskComentarioAutorTipo
+  texto             String
+  data              DateTime
+  ticket            HelpdeskTicket              @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  autor             Usuario?                    @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  anexos            HelpdeskComentarioAnexo[]
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 }
 
 model HelpdeskComentarioAnexo {
-  id                 String                 @id @default(uuid())
-  comentarioId       String
-  nomeArquivo        String
-  url                String?
-  comentario         HelpdeskComentario     @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id           String             @id @default(uuid())
+  comentarioId String
+  nomeArquivo  String
+  url          String?
+  comentario   HelpdeskComentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 }
 
 model HelpdeskAnexo {
-  id                 String                 @id @default(uuid())
-  ticketId           String
-  nomeArquivo        String
-  url                String?
-  ticket             HelpdeskTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id          String         @id @default(uuid())
+  ticketId    String
+  nomeArquivo String
+  url         String?
+  ticket      HelpdeskTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 }
 
 model ColaboradorRH {
-  id                   String                 @id @default(uuid())
-  nome                 String
-  cargoOuFuncao        String
-  tipoContrato         TipoContrato
-  status               StatusColaborador
-  tipoPessoa           TipoPessoaRH
-  /** Consultores (vendedor_externo): false = pré-cadastro; não usar em vínculos/combobox fora do RH. */
-  cadastroEfetivado    Boolean                @default(true)
-  email                String?
-  telefone             String?
-  cpfCnpj              String?
-  /** Contatos B2B (mesmo formato de Clientes); usado quando tipoPessoa = fornecedor_parceiro */
-  contatosFornecedor   Json?
-  totalVendasMes       Float?
-  ultimoAcesso         DateTime?
-  dadosBancarios       ColaboradorDadosBancarios?
-  documentos           ColaboradorDocumento[]
-  regrasComissao       ComissaoRegra[]
+  id                    String                      @id @default(uuid())
+  nome                  String
+  cargoOuFuncao         String
+  tipoContrato          TipoContrato
+  status                StatusColaborador
+  tipoPessoa            TipoPessoaRH
+  /**
+   * Consultores (vendedor_externo): false = pré-cadastro; não usar em vínculos/combobox fora do RH.
+   */
+  cadastroEfetivado     Boolean                     @default(true)
+  email                 String?
+  telefone              String?
+  cpfCnpj               String?
+  /**
+   * Contatos B2B (mesmo formato de Clientes); usado quando tipoPessoa = fornecedor_parceiro
+   */
+  contatosFornecedor    Json?
+  totalVendasMes        Float?
+  ultimoAcesso          DateTime?
+  dadosBancarios        ColaboradorDadosBancarios?
+  documentos            ColaboradorDocumento[]
+  regrasComissao        ComissaoRegra[]
   participacoesComissao ComissaoParticipacaoVenda[]
-  eventosComissao      ComissaoEvento[]
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  eventosComissao       ComissaoEvento[]
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
 }
 
 model ColaboradorDadosBancarios {
-  id                 String                 @id @default(uuid())
-  colaboradorId      String                 @unique
-  banco              String?
-  agencia            String?
-  conta              String?
-  tipoConta          TipoContaBancaria?
-  pix                String?
-  colaborador        ColaboradorRH          @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id            String             @id @default(uuid())
+  colaboradorId String             @unique
+  banco         String?
+  agencia       String?
+  conta         String?
+  tipoConta     TipoContaBancaria?
+  pix           String?
+  colaborador   ColaboradorRH      @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 }
 
 model ColaboradorDocumento {
-  id                 String                 @id @default(uuid())
-  colaboradorId      String
-  nome               String
-  url                String?
-  colaborador        ColaboradorRH          @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id            String        @id @default(uuid())
+  colaboradorId String
+  nome          String
+  url           String?
+  colaborador   ColaboradorRH @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 enum FinanceiroCategoriaTipo {
@@ -993,36 +1018,36 @@ model FinanceiroMeioPagamento {
 }
 
 model Lancamento {
-  id                 String                   @id @default(uuid())
-  tipo               LancamentoTipo
-  descricao          String
-  clienteId          String?
-  fornecedor         String?
-  vencimento         DateTime
-  valor              Float
-  status             LancamentoStatus
-  dataPagamento      DateTime?
-  tipoRecorrencia    TipoRecorrencia?
-  parcelas           Int?
-  idPai              String?
-  parcelaNumero      Int?
-  leadIdOrigem       String?
-  leadSolucaoId     String?
-  formaPagamento     String?
-  condicoesPagamento String?
-  prazoDias          Int?
-  contaId            String?
-  categoriaId        String?
-  meioPagamentoId    String?
-  criadoPorId        String?
-  atualizadoPorId    String?
-  cliente            Cliente?                 @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  leadOrigem         Lead?                    @relation(fields: [leadIdOrigem], references: [id], onDelete: SetNull)
-  leadSolucao        LeadSolucao?             @relation(fields: [leadSolucaoId], references: [id], onDelete: SetNull)
-  conta              FinanceiroConta?         @relation(fields: [contaId], references: [id], onDelete: SetNull)
-  categoria          FinanceiroCategoria?     @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  meioPagamento      FinanceiroMeioPagamento? @relation(fields: [meioPagamentoId], references: [id], onDelete: SetNull)
-  criadoPor          Usuario?                 @relation("LancamentoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  id                           String                   @id @default(uuid())
+  tipo                         LancamentoTipo
+  descricao                    String
+  clienteId                    String?
+  fornecedor                   String?
+  vencimento                   DateTime
+  valor                        Float
+  status                       LancamentoStatus
+  dataPagamento                DateTime?
+  tipoRecorrencia              TipoRecorrencia?
+  parcelas                     Int?
+  idPai                        String?
+  parcelaNumero                Int?
+  leadIdOrigem                 String?
+  leadSolucaoId                String?
+  formaPagamento               String?
+  condicoesPagamento           String?
+  prazoDias                    Int?
+  contaId                      String?
+  categoriaId                  String?
+  meioPagamentoId              String?
+  criadoPorId                  String?
+  atualizadoPorId              String?
+  cliente                      Cliente?                 @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  leadOrigem                   Lead?                    @relation(fields: [leadIdOrigem], references: [id], onDelete: SetNull)
+  leadSolucao                  LeadSolucao?             @relation(fields: [leadSolucaoId], references: [id], onDelete: SetNull)
+  conta                        FinanceiroConta?         @relation(fields: [contaId], references: [id], onDelete: SetNull)
+  categoria                    FinanceiroCategoria?     @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  meioPagamento                FinanceiroMeioPagamento? @relation(fields: [meioPagamentoId], references: [id], onDelete: SetNull)
+  criadoPor                    Usuario?                 @relation("LancamentoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   atualizadoPor                Usuario?                 @relation("LancamentoAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   comissaoEventosOrigem        ComissaoEvento[]         @relation("ComissaoEventoOrigemRecebimento")
   comissaoEventoPagamentoSaida ComissaoEvento?          @relation("ComissaoEventoPagamentoSaida")
@@ -1044,23 +1069,23 @@ enum ComissaoStatus {
 }
 
 model ComissaoRegra {
-  id                 String                 @id @default(uuid())
+  id                 String              @id @default(uuid())
   consultorId        String
   solucaoCatalogoId  String?
   categoriaSolucao   String?
-  baseCalculo        ComissaoBaseCalculo    @default(bruto)
-  percentualComissao Decimal                @db.Decimal(7, 4)
-  despesaFixa        Decimal?               @db.Decimal(14, 2)
+  baseCalculo        ComissaoBaseCalculo @default(bruto)
+  percentualComissao Decimal             @db.Decimal(7, 4)
+  despesaFixa        Decimal?            @db.Decimal(14, 2)
   vigenciaInicio     DateTime
   vigenciaFim        DateTime?
-  ativo              Boolean                @default(true)
-  prioridade         Int                    @default(0)
+  ativo              Boolean             @default(true)
+  prioridade         Int                 @default(0)
   observacoes        String?
-  consultor          ColaboradorRH          @relation(fields: [consultorId], references: [id], onDelete: Cascade)
-  solucaoCatalogo    SolucaoCatalogo?       @relation(fields: [solucaoCatalogoId], references: [id], onDelete: SetNull)
+  consultor          ColaboradorRH       @relation(fields: [consultorId], references: [id], onDelete: Cascade)
+  solucaoCatalogo    SolucaoCatalogo?    @relation(fields: [solucaoCatalogoId], references: [id], onDelete: SetNull)
   eventos            ComissaoEvento[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@index([consultorId, ativo, vigenciaInicio, vigenciaFim])
   @@index([solucaoCatalogoId])
@@ -1068,19 +1093,19 @@ model ComissaoRegra {
 }
 
 model ComissaoParticipacaoVenda {
-  id                     String                 @id @default(uuid())
+  id                     String           @id @default(uuid())
   leadId                 String
   leadSolucaoId          String?
   consultorId            String
-  percentualParticipacao Decimal                @db.Decimal(7, 4)
-  ativo                  Boolean                @default(true)
+  percentualParticipacao Decimal          @db.Decimal(7, 4)
+  ativo                  Boolean          @default(true)
   observacoes            String?
-  lead                   Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadSolucao            LeadSolucao?           @relation(fields: [leadSolucaoId], references: [id], onDelete: Cascade)
-  consultor              ColaboradorRH          @relation(fields: [consultorId], references: [id], onDelete: Cascade)
+  lead                   Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadSolucao            LeadSolucao?     @relation(fields: [leadSolucaoId], references: [id], onDelete: Cascade)
+  consultor              ColaboradorRH    @relation(fields: [consultorId], references: [id], onDelete: Cascade)
   eventos                ComissaoEvento[]
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @updatedAt
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   @@unique([leadId, leadSolucaoId, consultorId], map: "comissao_participacao_un")
   @@index([leadId, ativo])
@@ -1088,26 +1113,26 @@ model ComissaoParticipacaoVenda {
 }
 
 model ComissaoLotePagamento {
-  id                 String                 @id @default(uuid())
-  competenciaAno     Int
-  competenciaMes     Int
-  observacao         String?
-  referenciaExterna  String?
-  pagoEm             DateTime?
-  criadoPorId        String?
-  atualizadoPorId    String?
-  criadoPor          Usuario?               @relation("ComissaoLoteCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor      Usuario?               @relation("ComissaoLoteAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
-  eventos            ComissaoEvento[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id                String           @id @default(uuid())
+  competenciaAno    Int
+  competenciaMes    Int
+  observacao        String?
+  referenciaExterna String?
+  pagoEm            DateTime?
+  criadoPorId       String?
+  atualizadoPorId   String?
+  criadoPor         Usuario?         @relation("ComissaoLoteCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor     Usuario?         @relation("ComissaoLoteAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  eventos           ComissaoEvento[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@index([competenciaAno, competenciaMes])
 }
 
 model ComissaoEvento {
-  id                     String                   @id @default(uuid())
-  status                 ComissaoStatus           @default(elegivel)
+  id                     String                     @id @default(uuid())
+  status                 ComissaoStatus             @default(elegivel)
   competenciaAno         Int
   competenciaMes         Int
   dataRecebimento        DateTime
@@ -1118,30 +1143,447 @@ model ComissaoEvento {
   regraId                String?
   participacaoId         String?
   lotePagamentoId        String?
-  baseCalculo            ComissaoBaseCalculo      @default(bruto)
-  percentualComissao     Decimal                  @db.Decimal(7, 4)
-  percentualParticipacao Decimal                  @db.Decimal(7, 4)
-  despesaFixa            Decimal?                 @db.Decimal(14, 2)
-  valorBase              Decimal                  @db.Decimal(14, 2)
-  valorComissao          Decimal                  @db.Decimal(14, 2)
+  baseCalculo            ComissaoBaseCalculo        @default(bruto)
+  percentualComissao     Decimal                    @db.Decimal(7, 4)
+  percentualParticipacao Decimal                    @db.Decimal(7, 4)
+  despesaFixa            Decimal?                   @db.Decimal(14, 2)
+  valorBase              Decimal                    @db.Decimal(14, 2)
+  valorComissao          Decimal                    @db.Decimal(14, 2)
   observacao             String?
   aprovadoEm             DateTime?
   pagoEm                 DateTime?
   canceladoEm            DateTime?
-  lancamentoSaidaId      String?                  @unique
-  origemLancamento       Lancamento               @relation("ComissaoEventoOrigemRecebimento", fields: [origemLancamentoId], references: [id], onDelete: Cascade)
-  lancamentoSaida        Lancamento?              @relation("ComissaoEventoPagamentoSaida", fields: [lancamentoSaidaId], references: [id], onDelete: SetNull)
-  lead                   Lead                     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadSolucao            LeadSolucao?             @relation(fields: [leadSolucaoId], references: [id], onDelete: SetNull)
-  consultor              ColaboradorRH            @relation(fields: [consultorId], references: [id], onDelete: Restrict)
-  regra                  ComissaoRegra?           @relation(fields: [regraId], references: [id], onDelete: SetNull)
+  lancamentoSaidaId      String?                    @unique
+  origemLancamento       Lancamento                 @relation("ComissaoEventoOrigemRecebimento", fields: [origemLancamentoId], references: [id], onDelete: Cascade)
+  lancamentoSaida        Lancamento?                @relation("ComissaoEventoPagamentoSaida", fields: [lancamentoSaidaId], references: [id], onDelete: SetNull)
+  lead                   Lead                       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadSolucao            LeadSolucao?               @relation(fields: [leadSolucaoId], references: [id], onDelete: SetNull)
+  consultor              ColaboradorRH              @relation(fields: [consultorId], references: [id], onDelete: Restrict)
+  regra                  ComissaoRegra?             @relation(fields: [regraId], references: [id], onDelete: SetNull)
   participacao           ComissaoParticipacaoVenda? @relation(fields: [participacaoId], references: [id], onDelete: SetNull)
-  lotePagamento          ComissaoLotePagamento?   @relation(fields: [lotePagamentoId], references: [id], onDelete: SetNull)
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
+  lotePagamento          ComissaoLotePagamento?     @relation(fields: [lotePagamentoId], references: [id], onDelete: SetNull)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
   @@unique([origemLancamentoId, consultorId], map: "comissao_evento_lanc_cons_un")
   @@index([competenciaAno, competenciaMes, status])
   @@index([consultorId, status])
   @@index([leadId])
+}
+
+// --- Módulo Extrator (território IBGE; cadastros comerciais em fases futuras) ---
+
+enum ExtratorMunicipioStatus {
+  somente_ibge
+  em_trabalho
+  dados_verificados
+}
+
+model ExtratorTerritorioRegiao {
+  id        Int                    @id
+  sigla     String
+  nome      String
+  ufs       ExtratorTerritorioUf[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+}
+
+model ExtratorTerritorioUf {
+  id             Int                                     @id
+  sigla          String                                  @unique
+  nome           String
+  regiaoId       Int
+  regiao         ExtratorTerritorioRegiao                @relation(fields: [regiaoId], references: [id], onDelete: Restrict)
+  intermediarias ExtratorTerritorioRegiaoIntermediaria[]
+  imediatas      ExtratorTerritorioRegiaoImediata[]
+  municipios     ExtratorMunicipio[]
+  createdAt      DateTime                                @default(now())
+  updatedAt      DateTime                                @updatedAt
+
+  @@index([regiaoId])
+}
+
+model ExtratorTerritorioRegiaoIntermediaria {
+  id         Int                                @id
+  nome       String
+  ufId       Int
+  uf         ExtratorTerritorioUf               @relation(fields: [ufId], references: [id], onDelete: Cascade)
+  imediatas  ExtratorTerritorioRegiaoImediata[]
+  municipios ExtratorMunicipio[]
+  createdAt  DateTime                           @default(now())
+  updatedAt  DateTime                           @updatedAt
+
+  @@index([ufId])
+}
+
+model ExtratorTerritorioRegiaoImediata {
+  id              Int                                   @id
+  nome            String
+  ufId            Int
+  intermediariaId Int
+  uf              ExtratorTerritorioUf                  @relation(fields: [ufId], references: [id], onDelete: Cascade)
+  intermediaria   ExtratorTerritorioRegiaoIntermediaria @relation(fields: [intermediariaId], references: [id], onDelete: Cascade)
+  municipios      ExtratorMunicipio[]
+  createdAt       DateTime                              @default(now())
+  updatedAt       DateTime                              @updatedAt
+
+  @@index([ufId])
+  @@index([intermediariaId])
+}
+
+model ExtratorMunicipio {
+  id                            String                                @id @default(uuid())
+  codigoIbge                    Int                                   @unique
+  nome                          String
+  ufId                          Int
+  intermediariaId               Int
+  imediataId                    Int
+  mesorregiaoNome               String?
+  microrregiaoNome              String?
+  status                        ExtratorMunicipioStatus               @default(somente_ibge)
+  codigoTse                     Int?
+  populacaoCenso                Int?
+  populacaoCensoAno             String?
+  populacaoCensoFonte           String?
+  populacaoCensoAtualizadoEm    DateTime?
+  populacaoEstimada             Int?
+  populacaoEstimadaAno          String?
+  populacaoEstimadaFonte        String?
+  populacaoEstimadaAtualizadoEm DateTime?
+  pibMilReais                   BigInt?
+  pibAno                        String?
+  pibFonte                      String?
+  pibAtualizadoEm               DateTime?
+  idh                           Float?
+  idhAno                        String?
+  idhFonte                      String?
+  idhAtualizadoEm               DateTime?
+  eleitores                     Int?
+  eleitoresAno                  String?
+  eleitoresFonte                String?
+  eleitoresAtualizadoEm         DateTime?
+  pibPerCapita                  Float?
+  pibPerCapitaAno               String?
+  pibPerCapitaFonte             String?
+  pibPerCapitaAtualizadoEm      DateTime?
+  fpmBrutoAnual                 BigInt?
+  fpmBrutoAnualAno              String?
+  fpmBrutoAnualFonte            String?
+  fpmBrutoAnualAtualizadoEm     DateTime?
+  capag                         String?
+  capagAno                      String?
+  capagFonte                    String?
+  capagAtualizadoEm             DateTime?
+  prefeitoNome                  String?
+  prefeitoPartido               String?
+  viceNome                      String?
+  vicePartido                   String?
+  gestaoEleicaoAno              Int?
+  gestaoFonte                   String?
+  gestaoAtualizadoEm            DateTime?
+  uf                            ExtratorTerritorioUf                  @relation(fields: [ufId], references: [id], onDelete: Restrict)
+  intermediaria                 ExtratorTerritorioRegiaoIntermediaria @relation(fields: [intermediariaId], references: [id], onDelete: Restrict)
+  imediata                      ExtratorTerritorioRegiaoImediata      @relation(fields: [imediataId], references: [id], onDelete: Restrict)
+  entidadesSede                 ExtratorEntidade[]
+  dominios                      ExtratorDominio[]
+  estruturaItens                ExtratorEstruturaItem[]
+  contatosProspeccao            ExtratorContatoProspeccao[]
+  createdAt                     DateTime                              @default(now())
+  updatedAt                     DateTime                              @updatedAt
+
+  @@index([ufId])
+  @@index([imediataId])
+  @@index([nome])
+  @@index([codigoTse])
+}
+
+enum ExtratorEntidadeTipo {
+  prefeitura
+  camara
+  associacao
+  federacao
+  consorcio
+  outro
+}
+
+enum ExtratorEntidadeOrigem {
+  siconfi
+  manual
+  descoberta
+}
+
+enum ExtratorEntidadeAbrangencia {
+  municipal
+  regional
+  estadual
+  nacional
+}
+
+enum ExtratorDominioCategoria {
+  oficial
+  ouvidoria
+  turismo
+  e_sic
+  transparencia
+  diario_oficial
+  secretaria
+  sistema
+  legislacao
+  conselho
+  rede_social
+  portal_servico
+  educacao
+  saude
+  licitacao
+  outro
+}
+
+enum ExtratorDominioStatus {
+  sugerido
+  confirmado
+  rejeitado
+  inativo
+}
+
+enum ExtratorDominioOrigem {
+  descoberta
+  manual
+}
+
+enum ExtratorEstruturaTipo {
+  secretaria
+  departamento
+  setor
+  gabinete
+  autarquia
+  fundacao
+  instituto
+  conselho
+  colegiado
+  equipamento
+  diretoria
+  coordenadoria
+  outro
+}
+
+enum ExtratorEstruturaStatus {
+  sugerido
+  confirmado
+  rejeitado
+  inativo
+}
+
+enum ExtratorEstruturaOrigem {
+  descoberta
+  manual
+}
+
+enum ExtratorContatoTipo {
+  email
+  telefone
+  whatsapp
+}
+
+enum ExtratorContatoStatus {
+  sugerido
+  confirmado
+  rejeitado
+  inativo
+}
+
+enum ExtratorContatoOrigem {
+  descoberta
+  manual
+}
+
+model ExtratorDominio {
+  id                  String                   @id @default(uuid())
+  municipioCodigoIbge Int
+  url                 String
+  dominio             String
+  caminho             String?
+  categoria           ExtratorDominioCategoria @default(oficial)
+  status              ExtratorDominioStatus    @default(sugerido)
+  origem              ExtratorDominioOrigem    @default(descoberta)
+  confianca           Int?
+  titulo              String?
+  fonte               String?
+  metodoDescoberta    String?
+  evidencia           String?
+  observacoes         String?
+  verificadoEm        DateTime?
+  municipio           ExtratorMunicipio        @relation(fields: [municipioCodigoIbge], references: [codigoIbge], onDelete: Cascade)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@unique([municipioCodigoIbge, url])
+  @@index([municipioCodigoIbge])
+  @@index([categoria])
+  @@index([status])
+  @@index([dominio])
+  @@index([url])
+}
+
+model ExtratorEstruturaItem {
+  id                  String                      @id @default(uuid())
+  municipioCodigoIbge Int
+  chave               String
+  nome                String
+  tipo                ExtratorEstruturaTipo
+  status              ExtratorEstruturaStatus     @default(sugerido)
+  origem              ExtratorEstruturaOrigem     @default(descoberta)
+  confianca           Int?
+  urlOrigem           String?
+  dominioOrigem       String?
+  tituloPagina        String?
+  evidencia           String?
+  cargoResponsavel    String?
+  nomeResponsavel     String?
+  telefone            String?
+  email               String?
+  endereco            String?
+  observacoes         String?
+  parentId            String?
+  verificadoEm        DateTime?
+  municipio           ExtratorMunicipio           @relation(fields: [municipioCodigoIbge], references: [codigoIbge], onDelete: Cascade)
+  parent              ExtratorEstruturaItem?      @relation("ExtratorEstruturaHierarquia", fields: [parentId], references: [id], onDelete: SetNull)
+  children            ExtratorEstruturaItem[]     @relation("ExtratorEstruturaHierarquia")
+  fontes              ExtratorEstruturaFonte[]
+  contatosProspeccao  ExtratorContatoProspeccao[]
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  @@unique([municipioCodigoIbge, chave])
+  @@index([municipioCodigoIbge])
+  @@index([tipo])
+  @@index([status])
+  @@index([parentId])
+  @@index([nome])
+}
+
+model ExtratorEstruturaFonte {
+  id           String                @id @default(uuid())
+  itemId       String
+  url          String
+  dominio      String?
+  tituloPagina String?
+  evidencia    String
+  confianca    Int?
+  verificadoEm DateTime?
+  item         ExtratorEstruturaItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt    DateTime              @default(now())
+
+  @@unique([itemId, url, evidencia])
+  @@index([itemId])
+  @@index([url])
+}
+
+model ExtratorContatoProspeccao {
+  id                  String                 @id @default(uuid())
+  municipioCodigoIbge Int
+  estruturaItemId     String?
+  chave               String
+  tipo                ExtratorContatoTipo
+  valor               String
+  valorNormalizado    String
+  status              ExtratorContatoStatus  @default(sugerido)
+  origem              ExtratorContatoOrigem  @default(descoberta)
+  confianca           Int?
+  nomePessoa          String?
+  cargo               String?
+  setorArea           String?
+  urlOrigem           String?
+  dominioOrigem       String?
+  tituloPagina        String?
+  evidencia           String?
+  observacoes         String?
+  verificadoEm        DateTime?
+  municipio           ExtratorMunicipio      @relation(fields: [municipioCodigoIbge], references: [codigoIbge], onDelete: Cascade)
+  estruturaItem       ExtratorEstruturaItem? @relation(fields: [estruturaItemId], references: [id], onDelete: SetNull)
+  fontes              ExtratorContatoFonte[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@unique([municipioCodigoIbge, chave])
+  @@index([municipioCodigoIbge])
+  @@index([estruturaItemId])
+  @@index([tipo])
+  @@index([status])
+  @@index([valorNormalizado])
+}
+
+model ExtratorContatoFonte {
+  id           String                    @id @default(uuid())
+  contatoId    String
+  url          String
+  dominio      String?
+  tituloPagina String?
+  evidencia    String
+  confianca    Int?
+  verificadoEm DateTime?
+  contato      ExtratorContatoProspeccao @relation(fields: [contatoId], references: [id], onDelete: Cascade)
+  createdAt    DateTime                  @default(now())
+
+  @@unique([contatoId, url, evidencia])
+  @@index([contatoId])
+  @@index([url])
+}
+
+model ExtratorEntidade {
+  id                      String                      @id @default(uuid())
+  tipo                    ExtratorEntidadeTipo
+  nome                    String
+  nomeEnteSiconfi         String?
+  cnpj                    String?
+  sedeMunicipioCodigoIbge Int
+  abrangencia             ExtratorEntidadeAbrangencia @default(municipal)
+  siteUrl                 String?
+  populacao               Int?
+  exercicioSiconfi        Int?
+  capitalMunicipio        Boolean?
+  razaoSocial             String?
+  cep                     String?
+  logradouro              String?
+  numero                  String?
+  complemento             String?
+  bairro                  String?
+  cidadeEndereco          String?
+  ufEndereco              String?
+  telefone                String?
+  email                   String?
+  dadosCnpjFonte          String?
+  dadosCnpjAtualizadoEm   DateTime?
+  origem                  ExtratorEntidadeOrigem      @default(siconfi)
+  observacoes             String?
+  sedeMunicipio           ExtratorMunicipio           @relation(fields: [sedeMunicipioCodigoIbge], references: [codigoIbge], onDelete: Restrict)
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  @@unique([tipo, sedeMunicipioCodigoIbge])
+  @@index([tipo])
+  @@index([nome])
+  @@index([cnpj])
+  @@index([sedeMunicipioCodigoIbge])
+  @@index([abrangencia])
+}
+
+model ExtratorEntidadesSync {
+  id              String    @id @default("default")
+  lastStartedAt   DateTime?
+  lastFinishedAt  DateTime?
+  lastStatus      String?
+  lastMessage     String?
+  prefeituraCount Int       @default(0)
+  updatedAt       DateTime  @updatedAt
+}
+
+model ExtratorIbgeSync {
+  id             String    @id @default("default")
+  lastStartedAt  DateTime?
+  lastFinishedAt DateTime?
+  lastStatus     String?
+  lastMessage    String?
+  municipioCount Int       @default(0)
+  ufCount        Int       @default(0)
+  updatedAt      DateTime  @updatedAt
 }

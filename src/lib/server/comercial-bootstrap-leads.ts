@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { mapLeadFromDb } from "@/app/api/comercial/_shared";
+import { parseLeadColaboradoresJson } from "@/lib/comercial/lead-ownership-db";
 import { isPrismaSchemaDriftError } from "@/lib/server/prisma-schema";
-import type { Lead } from "@/lib/comercial/types";
+import type { Lead, LeadInteraction } from "@/lib/comercial/types";
 
 export const COMERCIAL_BOOTSTRAP_LEAD_INCLUDE = {
   criadoPor: { select: { nomeExibicao: true } },
@@ -28,6 +29,10 @@ const COMERCIAL_BOOTSTRAP_LEAD_INCLUDE_LEGACY = {
 
 type LegacyLeadRow = {
   id: string;
+  responsavelPrincipalId?: string | null;
+  responsavelPrincipalNome?: string | null;
+  colaboradores?: unknown;
+  criadoPorId?: string | null;
   name: string;
   value: number;
   valorTotal: number;
@@ -57,7 +62,10 @@ function toIso(value: Date | string | null | undefined): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function mapLegacyLeadRow(row: LegacyLeadRow): Lead {
+function mapLegacyLeadRow(
+  row: LegacyLeadRow,
+  interactions: LeadInteraction[] = []
+): Lead {
   return {
     id: row.id,
     name: row.name,
@@ -85,8 +93,11 @@ function mapLegacyLeadRow(row: LegacyLeadRow): Lead {
     entidade: row.entidade ?? undefined,
     cargo: row.cargo ?? undefined,
     notes: row.notes ?? undefined,
-    interactions: [],
-    criadoPorId: null,
+    interactions,
+    responsavelPrincipalId: row.responsavelPrincipalId ?? null,
+    responsavelPrincipalNome: row.responsavelPrincipalNome ?? null,
+    colaboradores: parseLeadColaboradoresJson(row.colaboradores),
+    criadoPorId: row.criadoPorId ?? null,
     registroCriadoPorNome: null,
     registroAtualizadoPorNome: null,
     registroCriadoEm: toIso(row.createdAt),
@@ -94,8 +105,99 @@ function mapLegacyLeadRow(row: LegacyLeadRow): Lead {
   };
 }
 
+function mapDbInteractionToLead(
+  i: {
+    id: string;
+    date: Date;
+    type: string;
+    description: string;
+    action: string | null;
+    field: string | null;
+    fieldKey: string | null;
+    oldValue: unknown;
+    newValue: unknown;
+    userId: string | null;
+    autorNome: string | null;
+    anexos: Array<{ nome: string; url: string | null }>;
+  }
+): LeadInteraction {
+  return {
+    id: i.id,
+    date: i.date.toISOString(),
+    type: i.type as LeadInteraction["type"],
+    description: i.description,
+    userId: i.userId,
+    user: i.autorNome?.trim() || undefined,
+    action: (i.action ?? undefined) as LeadInteraction["action"],
+    field: i.field ?? undefined,
+    fieldKey: i.fieldKey ?? undefined,
+    oldValue: i.oldValue as LeadInteraction["oldValue"],
+    newValue: i.newValue as LeadInteraction["newValue"],
+    anexos: i.anexos.map((a) => ({ name: a.nome, url: a.url ?? "" })),
+  };
+}
+
+async function attachInteractionsToLegacyLeads(leads: Lead[]): Promise<Lead[]> {
+  const ids = leads.map((l) => l.id);
+  if (!ids.length) return leads;
+  try {
+    const rows = await prisma.leadInteraction.findMany({
+      where: { leadId: { in: ids } },
+      include: { anexos: true },
+      orderBy: { date: "asc" },
+    });
+    const byLead = new Map<string, LeadInteraction[]>();
+    for (const row of rows) {
+      const list = byLead.get(row.leadId) ?? [];
+      list.push(mapDbInteractionToLead(row));
+      byLead.set(row.leadId, list);
+    }
+    return leads.map((lead) => ({
+      ...lead,
+      interactions: byLead.get(lead.id) ?? lead.interactions ?? [],
+    }));
+  } catch (err) {
+    console.error("[comercial-bootstrap] legacy interactions load failed", err);
+    return leads;
+  }
+}
+
 async function loadComercialBootstrapLeadsLegacySql(): Promise<Lead[]> {
-  const rows = await prisma.$queryRaw<LegacyLeadRow[]>`
+  let rows: LegacyLeadRow[];
+  try {
+    rows = await prisma.$queryRaw<LegacyLeadRow[]>`
+    SELECT
+      "id",
+      "responsavelPrincipalId",
+      "responsavelPrincipalNome",
+      "colaboradores",
+      "criadoPorId",
+      "name",
+      "value",
+      "valorTotal",
+      "stageId",
+      "priority",
+      "enteredStageAt",
+      "origem",
+      "clienteId",
+      "propostaGeradaEm",
+      "previsaoFechamento",
+      "cpf",
+      "company",
+      "contact",
+      "email",
+      "phone",
+      "municipioUf",
+      "entidade",
+      "cargo",
+      "notes",
+      "createdAt",
+      "updatedAt"
+    FROM "Lead"
+    ORDER BY "createdAt" DESC
+  `;
+  } catch {
+    rows = await prisma.$queryRaw<LegacyLeadRow[]>`
     SELECT
       "id",
       "name",
@@ -122,7 +224,9 @@ async function loadComercialBootstrapLeadsLegacySql(): Promise<Lead[]> {
     FROM "Lead"
     ORDER BY "createdAt" DESC
   `;
-  return rows.map(mapLegacyLeadRow);
+  }
+  const leads = rows.map((row) => mapLegacyLeadRow(row));
+  return attachInteractionsToLegacyLeads(leads);
 }
 
 /** Mesmo critério que funcionava antes: somente oportunidades do funil Comercial. */

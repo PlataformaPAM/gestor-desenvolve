@@ -697,6 +697,9 @@ function ComercialPageContent() {
         enteredStageAt: now,
         registroAtualizadoEm: now,
         criadoPorId: session.userId ?? null,
+        responsavelPrincipalId: session.userId ?? null,
+        responsavelPrincipalNome: currentUserName,
+        colaboradores: [],
         interactions: [
           createLeadCreatedLog({ nome: currentUserName, userId: session.userId }),
           createInitialOwnershipInteraction(session.userId, currentUserName),

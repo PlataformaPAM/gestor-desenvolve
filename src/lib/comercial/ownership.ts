@@ -3,6 +3,15 @@ import type { Lead, LeadInteraction, LeadOwnershipSnapshot } from "./types";
 const OWNERSHIP_FIELD = "ownership";
 
 export function getLeadOwnership(lead: Lead): LeadOwnershipSnapshot {
+  const colaboradoresColuna = lead.colaboradores ?? [];
+  if (lead.responsavelPrincipalId?.trim() || lead.responsavelPrincipalNome?.trim()) {
+    return {
+      responsavelId: lead.responsavelPrincipalId?.trim() || undefined,
+      responsavelNome: lead.responsavelPrincipalNome?.trim() || undefined,
+      colaboradores: colaboradoresColuna,
+    };
+  }
+
   const interactions = lead.interactions ?? [];
   for (let i = interactions.length - 1; i >= 0; i -= 1) {
     const item = interactions[i];

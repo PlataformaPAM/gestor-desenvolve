@@ -6,10 +6,15 @@ import {
   ensureLeadPriorityEnumIncludesUrgente,
   filterUsuarioIdsExisting,
   mapLeadFromDb,
+  replaceLeadInteractions,
   resolveLeadInteractionUserId,
   resolveUsuarioIdForPrismaFk,
   toDateOrUndefined,
 } from "../../_shared";
+import {
+  ownershipColumnsFromLead,
+  parseLeadColaboradoresJson,
+} from "@/lib/comercial/lead-ownership-db";
 import { fail, ok, parseJsonSafe } from "@/lib/server/api-response";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import { syncContratoOnLeadFechado } from "@/lib/server/contratos-sync";
@@ -136,6 +141,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             : {}
           : {}),
         cliente: lead.clienteId ? { connect: { id: lead.clienteId } } : { disconnect: true },
+        ...ownershipColumnsFromLead(lead),
       },
     });
 
@@ -233,34 +239,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       await tx.leadFinanceiroFluxo.deleteMany({ where: { leadId: id } });
     }
 
-    await tx.leadInteractionAnexo.deleteMany({ where: { interaction: { leadId: id } } });
-    await tx.leadInteraction.deleteMany({ where: { leadId: id } });
-    for (const i of lead.interactions ?? []) {
-      await tx.leadInteraction.create({
-        data: {
-          id: i.id,
-          leadId: id,
-          date: toDateOrUndefined(i.date) ?? new Date(),
-          type: i.type,
-          description: i.description,
-          action: i.action ?? null,
-          field: i.field ?? null,
-          fieldKey: i.fieldKey ?? null,
-          oldValue: i.oldValue ?? Prisma.JsonNull,
-          newValue: i.newValue ?? Prisma.JsonNull,
-          userId: (() => {
-            const uid = resolveLeadInteractionUserId(i, sessionUserIdResolved);
-            return uid && validInteractionUserIds.has(uid) ? uid : null;
-          })(),
-          autorNome: i.user?.trim() || null,
-          anexos: {
-            create: (i.anexos ?? []).map((a) =>
-              typeof a === "string" ? { nome: a, url: null } : { nome: a.name, url: a.url || null }
-            ),
-          },
-        },
-      });
-    }
+    await replaceLeadInteractions(
+      tx,
+      id,
+      lead.interactions,
+      sessionUserIdResolved,
+      validInteractionUserIds
+    );
 
     const incomingLatestInteraction = (lead.interactions ?? [])
       .map((i) => toDateOrUndefined(i.date) ?? new Date(0))
@@ -398,12 +383,51 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     `;
 
     const fallbackLead = buildLeadResponseFromPayload(lead);
+    try {
+      await replaceLeadInteractions(
+        prisma,
+        id,
+        lead.interactions,
+        sessionUserIdResolved,
+        validInteractionUserIds
+      );
+    } catch (interactionErr) {
+      console.error("[PATCH /api/comercial/leads/:id] fallback interactions failed", interactionErr);
+    }
+
+    try {
+      await prisma.lead.update({
+        where: { id },
+        data: {
+          clienteId: lead.clienteId ?? null,
+          ...ownershipColumnsFromLead(lead),
+        },
+      });
+    } catch (ownershipErr) {
+      console.error("[PATCH /api/comercial/leads/:id] fallback ownership columns failed", ownershipErr);
+    }
+
+    let mappedFallback = fallbackLead;
+    try {
+      const saved = await loadLead(id);
+      mappedFallback = mapLeadFromDb(saved);
+    } catch {
+      const ownershipCols = ownershipColumnsFromLead(lead);
+      mappedFallback = {
+        ...fallbackLead,
+        responsavelPrincipalId: ownershipCols.responsavelPrincipalId,
+        responsavelPrincipalNome: ownershipCols.responsavelPrincipalNome,
+        colaboradores: parseLeadColaboradoresJson(ownershipCols.colaboradores),
+        interactions: lead.interactions ?? [],
+      };
+    }
+
     await writeAuditLog(prisma, {
       acao: "Lead atualizado (fallback)",
       modulo: "comercial",
-      detalhes: `Lead ${fallbackLead.name} (${fallbackLead.id})`,
+      detalhes: `Lead ${mappedFallback.name} (${mappedFallback.id})`,
     }).catch(() => {});
-    return ok({ lead: fallbackLead });
+    return ok({ lead: mappedFallback });
   }
 }
 

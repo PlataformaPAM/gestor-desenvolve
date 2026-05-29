@@ -17,7 +17,8 @@ import { LeadDadosClienteVinculado } from "./lead-dados-cliente-vinculado";
 import { LeadDadosContatosOportunidade } from "./lead-dados-contatos-oportunidade";
 import { LeadResponsavelEquipe } from "./lead-responsavel-equipe";
 import { useAuth } from "@/contexts/auth-context";
-import { buildOwnershipInteraction, getLeadOwnership } from "@/lib/comercial/ownership";
+import { buildOwnershipInteraction } from "@/lib/comercial/ownership";
+import { ownershipToLeadColumns } from "@/lib/comercial/lead-ownership-db";
 import {
   FormSearchableSelectField,
   FormTextInput,
@@ -393,16 +394,22 @@ export function LeadDetailDados({
             registroCriadoPorNome: formData.registroCriadoPorNome,
           }}
           onApplyOwnership={(previous, next) => {
-            setFormData((prev) => ({
-              ...prev,
-              interactions: buildOwnershipInteraction({
-                base: prev.interactions ?? [],
-                previous,
-                next,
-                userName: usuarioAtual.nome,
-                userId: usuarioAtual.userId ?? null,
-              }),
-            }));
+            const interactions = buildOwnershipInteraction({
+              base: formData.interactions ?? [],
+              previous,
+              next,
+              userName: usuarioAtual.nome,
+              userId: usuarioAtual.userId ?? null,
+            });
+            const ownershipCols = ownershipToLeadColumns(next);
+            const patch: Partial<Lead> = {
+              interactions,
+              responsavelPrincipalId: ownershipCols.responsavelPrincipalId,
+              responsavelPrincipalNome: ownershipCols.responsavelPrincipalNome,
+              colaboradores: ownershipCols.colaboradores as Lead["colaboradores"],
+            };
+            setFormData((prev) => ({ ...prev, ...patch }));
+            onPersistLead(patch, { skipSuccessToast: true });
           }}
         />
       </div>

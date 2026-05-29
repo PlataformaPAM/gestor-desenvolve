@@ -4,8 +4,10 @@ import type {
   PrismaClient,
   SolucaoCatalogo,
 } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { Cliente, Contato } from "@/lib/clientes/types";
-import type { Lead, LeadRecorrenciaPagamento } from "@/lib/comercial/types";
+import type { Lead, LeadInteraction, LeadRecorrenciaPagamento } from "@/lib/comercial/types";
+import { parseLeadColaboradoresJson } from "@/lib/comercial/lead-ownership-db";
 import { mapSolucao } from "@/app/api/solucoes/_shared";
 
 export function toDateOrUndefined(v: string | null | undefined): Date | undefined {
@@ -117,6 +119,43 @@ $enum$;
 `);
   } catch (err) {
     console.warn("[comercial] ensureLeadOrigemEnumValues:", err);
+  }
+}
+
+/** Persiste interações do lead (usado no PATCH normal e no fallback de schema drift). */
+export async function replaceLeadInteractions(
+  db: Pick<PrismaClient, "leadInteraction" | "leadInteractionAnexo">,
+  leadId: string,
+  interactions: LeadInteraction[] | undefined,
+  sessionUserId: string | null | undefined,
+  validUserIds: Set<string>
+): Promise<void> {
+  await db.leadInteractionAnexo.deleteMany({ where: { interaction: { leadId } } });
+  await db.leadInteraction.deleteMany({ where: { leadId } });
+  for (const i of interactions ?? []) {
+    const uidRaw = resolveLeadInteractionUserId(i, sessionUserId);
+    const userId = uidRaw && validUserIds.has(uidRaw) ? uidRaw : null;
+    await db.leadInteraction.create({
+      data: {
+        id: i.id,
+        leadId,
+        date: toDateOrUndefined(i.date) ?? new Date(),
+        type: i.type,
+        description: i.description,
+        action: i.action ?? null,
+        field: i.field ?? null,
+        fieldKey: i.fieldKey ?? null,
+        oldValue: i.oldValue ?? Prisma.JsonNull,
+        newValue: i.newValue ?? Prisma.JsonNull,
+        userId,
+        autorNome: i.user?.trim() || null,
+        anexos: {
+          create: (i.anexos ?? []).map((a) =>
+            typeof a === "string" ? { nome: a, url: null } : { nome: a.name, url: a.url || null }
+          ),
+        },
+      },
+    });
   }
 }
 
@@ -373,6 +412,9 @@ export function mapLeadFromDb(
       newValue: i.newValue as unknown,
       anexos: i.anexos.map((a) => ({ name: a.nome, url: a.url ?? "" })),
     })),
+    responsavelPrincipalId: lead.responsavelPrincipalId ?? null,
+    responsavelPrincipalNome: lead.responsavelPrincipalNome ?? null,
+    colaboradores: parseLeadColaboradoresJson(lead.colaboradores),
     criadoPorId: lead.criadoPorId ?? null,
     registroCriadoPorNome: lead.criadoPor?.nomeExibicao ?? null,
     registroAtualizadoPorNome: lead.atualizadoPor?.nomeExibicao ?? null,
