@@ -188,9 +188,19 @@ function ComercialPageContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cliente }),
     });
-    if (!res.ok) throw new Error("Falha ao criar cliente");
-    const data = (await res.json()) as { cliente: Cliente };
-    return data.cliente;
+    const json = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      data?: { cliente?: Cliente };
+      error?: { message?: string };
+    };
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error?.message ?? "Falha ao criar cliente");
+    }
+    const saved = json.data?.cliente;
+    if (!saved?.id) {
+      throw new Error("Resposta inválida ao criar cliente.");
+    }
+    return saved;
   }, []);
 
   const persistClienteContatos = useCallback(async (clienteId: string, contatos: Contato[]) => {

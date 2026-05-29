@@ -276,21 +276,11 @@ export function LeadDetailDados({
       });
     }
 
-    const ownershipAnterior = getLeadOwnership(snapshotOriginal);
-    const ownershipAtual = getLeadOwnership(merged);
-
-    /** Base no lead do pai (evita perder histórico vindo de outras abas); dedup por id. */
-    const baseInteractions = lead.interactions ?? snapshotOriginal.interactions ?? [];
-    const withOwnership = buildOwnershipInteraction({
-      base: baseInteractions,
-      previous: ownershipAnterior,
-      next: ownershipAtual,
-      userName: usuarioAtual.nome,
-      userId: usuarioAtual.userId ?? null,
-    });
-    const idsNaBase = new Set(withOwnership.map((i) => i.id));
+    /** Usa interações do formulário (inclui ownership aplicado na UI); dedup por id nos logs novos. */
+    const interactionsBase = merged.interactions ?? snapshotOriginal.interactions ?? [];
+    const idsNaBase = new Set(interactionsBase.map((i) => i.id));
     const interactionsFinais = [
-      ...withOwnership,
+      ...interactionsBase,
       ...novosLogs.filter((log) => !idsNaBase.has(log.id)),
     ];
 
@@ -441,6 +431,10 @@ export function LeadDetailDados({
               const newCliente: Cliente = { ...cliente, id: newId };
               setDraftClientes((prev) => [...prev, newCliente]);
               setFormData((prev) => ({ ...prev, clienteId: newId, contatosOportunidade: [] }));
+              onPersistLead(
+                { clienteId: newId, contatosOportunidade: [] },
+                { skipSuccessToast: true }
+              );
               onClienteRegistrado?.(newCliente);
             }}
           />
