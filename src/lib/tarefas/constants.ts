@@ -1,9 +1,10 @@
 import type { Tarefa } from "./types";
+import { TAREFA_KANBAN_COLUMN_ORDER } from "./types";
 
 export type SlaTarefa = "atrasado" | "atencao" | "no_prazo";
 
 export function getSlaTarefa(dataFim: string, status: Tarefa["status"]): SlaTarefa {
-  if (status === "concluido") return "no_prazo";
+  if (status === "concluido" || status === "cancelado") return "no_prazo";
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const d = new Date(dataFim);
@@ -18,9 +19,13 @@ export function getSlaTarefa(dataFim: string, status: Tarefa["status"]): SlaTare
 export const STATUS_LABELS: Record<Tarefa["status"], string> = {
   a_fazer: "A Fazer",
   em_andamento: "Em Andamento",
-  impedimento: "Impedimento",
+  aguardando: "Aguardando",
+  validar: "Validar",
   concluido: "Concluído",
+  cancelado: "Cancelado",
 };
+
+export { TAREFA_KANBAN_COLUMN_ORDER };
 
 export const PRIORIDADE_LABELS: Record<Tarefa["prioridade"], string> = {
   baixa: "Baixa",
@@ -30,3 +35,6 @@ export const PRIORIDADE_LABELS: Record<Tarefa["prioridade"], string> = {
 };
 
 export const CURRENT_USER_ID = "u1";
+
+/** Status considerados encerrados na visão Fechados */
+export const TAREFA_STATUS_FECHADOS: Tarefa["status"][] = ["concluido", "cancelado"];

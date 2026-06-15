@@ -9,7 +9,7 @@ import { posvendaAccessGate } from "@/lib/server/posvenda-access";
 
 function mapStatus(status: TarefaRegua["status"]) {
   if (status === "concluida") return "concluido" as const;
-  if (status === "adiada") return "impedimento" as const;
+  if (status === "adiada") return "aguardando" as const;
   return "a_fazer" as const;
 }
 

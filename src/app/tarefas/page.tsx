@@ -11,13 +11,21 @@ import { NovaTarefaForm } from "@/components/tarefas/nova-tarefa-form";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Toast } from "@/components/ui/toast";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
-import { formLabelClass } from "@/components/ui/field-patterns";
+import { formLabelClass, formModalCancelButtonClass } from "@/components/ui/field-patterns";
 import { usePageHeader } from "@/contexts/page-header-context";
+import {
+  isTarefaNaVisaoAbertos,
+  isTarefaNaVisaoArquivados,
+  isTarefaNaVisaoFechadas,
+  sortTarefasPorDataDesc,
+} from "@/lib/tarefas/arquivamento";
+import type { Tarefa, StatusTarefa, PrioridadeTarefa, UsuarioTarefa, SolucaoTarefa } from "@/lib/tarefas/types";
+import { buildAnexoItens, mergeTarefaPreservandoAnexos, uploadTarefaAnexos } from "@/lib/tarefas/anexos";
 import {
   STATUS_LABELS,
   PRIORIDADE_LABELS,
+  TAREFA_STATUS_FECHADOS,
 } from "@/lib/tarefas/constants";
-import type { Tarefa, StatusTarefa, PrioridadeTarefa, UsuarioTarefa } from "@/lib/tarefas/types";
 import {
   getSituacaoOperacional,
   sortByPriorizacao,
@@ -29,7 +37,7 @@ import { useResourcePageGuard, useResourceRbac } from "@/hooks/use-rbac-resource
 const TAREFAS_RESOURCE = "tarefas.internas";
 import type { Cliente } from "@/lib/clientes/types";
 import type { DropResult } from "@hello-pangea/dnd";
-import { User } from "lucide-react";
+import { User, AlertTriangle, X } from "lucide-react";
 import {
   iconForPrioridade,
   iconForStatus,
@@ -80,6 +88,18 @@ const PRIORIDADE_OPTIONS: { value: "" | PrioridadeTarefa; label: string }[] = [
 ];
 const OPERACAO_VIEW_STORAGE_KEY = "operacao_view_tarefas";
 
+const TAREFAS_VIEW_TOOLTIPS: Partial<Record<OperacaoViewId, string>> = {
+  abertos:
+    "Todas as tarefas em qualquer etapa, exceto concluídas de meses anteriores (que ficam em Arquivados).",
+  minha_fila: "Tarefas em aberto em que você é responsável ou colaborador.",
+  urgentes: "Tarefas em aberto com prioridade urgente.",
+  atrasados: "Tarefas em aberto com prazo final já vencido.",
+  vence_logo: "Tarefas em aberto com prazo nos próximos dias.",
+  fechados: "Tarefas concluídas no mês atual e tarefas canceladas.",
+  arquivados:
+    "Tarefas concluídas em meses anteriores. Ao virar o mês, as concluídas saem de Fechadas e vêm para cá.",
+};
+
 export default function TarefasPage() {
   const { setPrimaryAction } = usePageHeader();
   const { session } = useAuth();
@@ -90,6 +110,7 @@ export default function TarefasPage() {
   const podeExcluirTarefa = rbac.podeExcluir;
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioTarefa[]>([]);
+  const [solucoes, setSolucoes] = useState<SolucaoTarefa[]>([]);
   const [clientes, setClientes] = useState<Pick<Cliente, "id" | "nome" | "empresa">[]>([]);
   const [operacaoView, setOperacaoView] = useState<OperacaoViewId>("abertos");
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
@@ -104,6 +125,13 @@ export default function TarefasPage() {
     message: "",
     variant: "success",
   });
+  const [kanbanCanceladoModal, setKanbanCanceladoModal] = useState<{
+    sourceStatus: StatusTarefa;
+    destStatus: StatusTarefa;
+    tarefaId: string;
+    tarefaTitulo: string;
+  } | null>(null);
+  const [kanbanMotivoCancelado, setKanbanMotivoCancelado] = useState("");
 
   const showToast = useCallback((message: string, variant: "success" | "error" = "success") => {
     setToast({ visible: false, message: "", variant });
@@ -130,6 +158,53 @@ export default function TarefasPage() {
     if (!saved) throw new Error("Resposta inválida ao persistir tarefa");
     return saved;
   }, []);
+
+  const persistTarefa = useCallback(
+    async (
+      tarefa: Tarefa,
+      options?: { isCreate?: boolean; novosArquivos?: File[]; previous?: Tarefa | null }
+    ): Promise<Tarefa> => {
+      const novos = options?.novosArquivos ?? [];
+      const isCreate = options?.isCreate ?? false;
+      let working = tarefa;
+
+      if (isCreate) {
+        const created = await saveTarefa(working, true);
+        working = mergeTarefaPreservandoAnexos(created, working);
+        if (!novos.length) return working;
+
+        const uploaded = await uploadTarefaAnexos(working.id, novos);
+        const anexos = Array.from(
+          new Set([...(working.anexos ?? []), ...novos.map((file) => file.name)])
+        );
+        working = {
+          ...working,
+          anexos,
+          anexoItens: buildAnexoItens(anexos, working.id, uploaded.anexoItens, working.anexoItens),
+          arquivos: novos,
+        };
+        const savedAgain = await saveTarefa(working, false);
+        return mergeTarefaPreservandoAnexos(savedAgain, working);
+      }
+
+      if (novos.length > 0) {
+        const uploaded = await uploadTarefaAnexos(working.id, novos);
+        const anexos = Array.from(
+          new Set([...(working.anexos ?? []), ...novos.map((file) => file.name)])
+        );
+        working = {
+          ...working,
+          anexos,
+          anexoItens: buildAnexoItens(anexos, working.id, uploaded.anexoItens, working.anexoItens),
+          arquivos: novos,
+        };
+      }
+
+      const saved = await saveTarefa(working, false);
+      return mergeTarefaPreservandoAnexos(saved, options?.previous ?? working);
+    },
+    [saveTarefa]
+  );
 
   const deleteTarefa = useCallback(async (tarefaId: string) => {
     const res = await fetch(`/api/tarefas/${tarefaId}`, { method: "DELETE" });
@@ -195,7 +270,7 @@ export default function TarefasPage() {
   useEffect(() => {
     const saved = window.localStorage.getItem(OPERACAO_VIEW_STORAGE_KEY) as OperacaoViewId | null;
     if (!saved) return;
-    if (["minha_fila", "abertos", "urgentes", "atrasados", "vence_logo", "fechados"].includes(saved)) {
+    if (["minha_fila", "abertos", "urgentes", "atrasados", "vence_logo", "fechados", "arquivados"].includes(saved)) {
       setOperacaoView(saved);
     }
   }, []);
@@ -210,10 +285,13 @@ export default function TarefasPage() {
       try {
         const res = await fetch("/api/tarefas/bootstrap", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as { data?: { tarefas?: Tarefa[]; usuarios?: UsuarioTarefa[] } };
+        const data = (await res.json()) as {
+          data?: { tarefas?: Tarefa[]; usuarios?: UsuarioTarefa[]; solucoes?: SolucaoTarefa[] };
+        };
         if (!active) return;
         setTarefas(data?.data?.tarefas ?? []);
         setUsuarios(data?.data?.usuarios ?? []);
+        setSolucoes(data?.data?.solucoes ?? []);
       } catch {
         // keep UI resilient
       }
@@ -257,29 +335,35 @@ export default function TarefasPage() {
           ) ?? t.clienteNome,
       }));
     const now = new Date();
-    const ativas = tarefas.filter((t) => t.status !== "concluido");
     const isMinhaTarefa = (t: Tarefa) =>
       usuarioAtualId
         ? t.responsavel.id === usuarioAtualId || (t.colaboradores ?? []).some((c) => c.id === usuarioAtualId)
         : false;
     let base: Tarefa[] = [];
+    if (operacaoView === "arquivados") {
+      return aplicarResumoClientes(
+        tarefas.filter((t) => isTarefaNaVisaoArquivados(t, now))
+      ).sort(sortTarefasPorDataDesc);
+    }
     if (operacaoView === "fechados") {
-      return aplicarResumoClientes([...tarefas.filter((t) => t.status === "concluido")]).sort((a, b) => {
-        const aTime = new Date(a.updatedAt ?? a.dataFim).getTime();
-        const bTime = new Date(b.updatedAt ?? b.dataFim).getTime();
-        return bTime - aTime;
-      });
+      return aplicarResumoClientes(
+        tarefas.filter((t) => isTarefaNaVisaoFechadas(t, now))
+      ).sort(sortTarefasPorDataDesc);
     }
     if (operacaoView === "minha_fila") {
-      base = ativas.filter(isMinhaTarefa);
+      base = tarefas.filter((t) => isTarefaNaVisaoAbertos(t, now) && isMinhaTarefa(t));
     } else if (operacaoView === "abertos") {
-      base = tarefas;
+      base = tarefas.filter((t) => isTarefaNaVisaoAbertos(t, now));
     } else if (operacaoView === "urgentes") {
-      base = ativas.filter((t) => t.prioridade === "urgente");
+      base = tarefas.filter((t) => isTarefaNaVisaoAbertos(t, now) && t.prioridade === "urgente");
     } else if (operacaoView === "atrasados") {
-      base = ativas.filter((t) => getSituacaoOperacional(t.dataFim, now) === "atrasado");
+      base = tarefas.filter(
+        (t) => isTarefaNaVisaoAbertos(t, now) && getSituacaoOperacional(t.dataFim, now) === "atrasado"
+      );
     } else {
-      base = ativas.filter((t) => getSituacaoOperacional(t.dataFim, now) === "vence_logo");
+      base = tarefas.filter(
+        (t) => isTarefaNaVisaoAbertos(t, now) && getSituacaoOperacional(t.dataFim, now) === "vence_logo"
+      );
     }
     return aplicarResumoClientes(sortByPriorizacao(base, {
       prioridade: (t) => t.prioridade,
@@ -290,10 +374,13 @@ export default function TarefasPage() {
   }, [tarefas, operacaoView, clientes, usuarioAtualId]);
 
   const tarefasFiltradas = useMemo(() => {
+    const visaoComStatusLivre =
+      operacaoView === "fechados" || operacaoView === "arquivados" || operacaoView === "abertos";
+    const visaoComResponsavelLivre = operacaoView === "abertos";
     return tarefasOperacionais.filter((t) => {
-      if (operacaoView !== "fechados" && operacaoView !== "abertos" && statusFilter && t.status !== statusFilter) return false;
+      if (!visaoComStatusLivre && statusFilter && t.status !== statusFilter) return false;
       if (prioridadeFilter && t.prioridade !== prioridadeFilter) return false;
-      if (operacaoView !== "abertos" && responsavelFilter && t.responsavel.id !== responsavelFilter) return false;
+      if (!visaoComResponsavelLivre && responsavelFilter && t.responsavel.id !== responsavelFilter) return false;
       return true;
     });
   }, [tarefasOperacionais, statusFilter, prioridadeFilter, responsavelFilter, operacaoView]);
@@ -304,6 +391,7 @@ export default function TarefasPage() {
     const clienteIds = Array.from(
       new Set((nova.clienteIds?.length ? nova.clienteIds : [nova.clienteId]).filter(Boolean) as string[])
     );
+    const solucaoIds = Array.from(new Set((nova.solucaoIds ?? []).filter(Boolean)));
     const clienteNome = formatClienteResumo(clienteIds, clientes);
     const created: Tarefa = {
       ...nova,
@@ -311,15 +399,21 @@ export default function TarefasPage() {
       clienteId: clienteIds[0] || undefined,
       clienteIds,
       clienteNome,
+      solucaoIds,
+      solucoes: solucoes.filter((s) => solucaoIds.includes(s.id)),
       registroCriadoPorNome: createdBy,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
 
     setTarefas((prev) => [...prev, created]);
-    void saveTarefa(created, true)
-      .then((saved) => {
-        setTarefas((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
+    void persistTarefa(created, {
+      isCreate: true,
+      novosArquivos: created.arquivos ?? [],
+      previous: created,
+    })
+      .then((merged) => {
+        setTarefas((prev) => prev.map((t) => (t.id === created.id ? merged : t)));
         // Garante visibilidade imediata da tarefa recém-criada (independente da visão/filtros anteriores).
         setOperacaoView("abertos");
         setStatusFilter("");
@@ -334,7 +428,7 @@ export default function TarefasPage() {
       });
     setIsSheetOpen(false);
     setSelectedTarefa(null);
-  }, [saveTarefa, usuariosMap, clientes, session.userName, usuarioAtualId, showToast]);
+  }, [persistTarefa, usuariosMap, clientes, solucoes, session.userName, usuarioAtualId, showToast]);
 
   const handleCloseSheet = useCallback(() => {
     setIsSheetOpen(false);
@@ -346,62 +440,113 @@ export default function TarefasPage() {
     setIsSheetOpen(true);
   }, []);
 
-  const handleDragEnd = useCallback((result: DropResult) => {
-    if (!result.destination) return;
-    const sourceStatus = result.source.droppableId as StatusTarefa;
-    const destStatus = result.destination.droppableId as StatusTarefa;
-    if (sourceStatus === destStatus) return;
-    const id = result.draggableId;
-    const historicoEntry = {
-      id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      data: new Date().toISOString(),
-      acao: `Status alterado de ${STATUS_LABELS[sourceStatus]} para ${STATUS_LABELS[destStatus]} via Kanban`,
-      autor: autorEdicao.nome,
-      autorId: autorEdicao.id,
-    };
-    let updatedForPersist: Tarefa | null = null;
-    let previousForRollback: Tarefa | null = null;
-    setTarefas((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        previousForRollback = t;
-        const next = {
+  const applyKanbanMove = useCallback(
+    (params: {
+      sourceStatus: StatusTarefa;
+      destStatus: StatusTarefa;
+      tarefaId: string;
+      motivoCancelado?: string;
+    }) => {
+      const { sourceStatus, destStatus, tarefaId, motivoCancelado } = params;
+      const historicoBase = {
+        id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        data: new Date().toISOString(),
+        autor: autorEdicao.nome,
+        autorId: autorEdicao.id,
+      };
+      const historicoEntry =
+        destStatus === "cancelado" && motivoCancelado?.trim()
+          ? {
+              ...historicoBase,
+              acao: `Tarefa marcada como Cancelada. Motivo: ${motivoCancelado.trim()}`,
+            }
+          : {
+              ...historicoBase,
+              acao: `Status alterado de ${STATUS_LABELS[sourceStatus]} para ${STATUS_LABELS[destStatus]} via Kanban`,
+            };
+      let updatedForPersist: Tarefa | null = null;
+      let previousForRollback: Tarefa | null = null;
+      setTarefas((prev) =>
+        prev.map((t) => {
+          if (t.id !== tarefaId) return t;
+          previousForRollback = t;
+          const next = {
+            ...t,
+            status: destStatus,
+            updatedAt: new Date().toISOString(),
+            historico: [...t.historico, historicoEntry],
+          };
+          updatedForPersist = next;
+          return next;
+        })
+      );
+      setSelectedTarefa((t) => {
+        if (t?.id !== tarefaId) return t;
+        return {
           ...t,
           status: destStatus,
-          updatedAt: new Date().toISOString(),
           historico: [...t.historico, historicoEntry],
         };
-        updatedForPersist = next;
-        return next;
-      })
-    );
-    setSelectedTarefa((t) => {
-      if (t?.id !== id) return t;
-      return {
-        ...t,
-        status: destStatus,
-        historico: [...t.historico, historicoEntry],
-      };
-    });
-    if (updatedForPersist) {
-      void saveTarefa(updatedForPersist)
-        .then((saved) => {
-          setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
-          setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
-          if (destStatus === "concluido" && operacaoView !== "fechados") {
-            setOperacaoView("fechados");
-            setStatusFilter("");
-            showToast("Tarefa concluída e exibida na visão Fechados.", "success");
-          }
-        })
-        .catch((error) => {
-          if (!previousForRollback) return;
-          setTarefas((prev) => prev.map((t) => (t.id === previousForRollback!.id ? previousForRollback! : t)));
-          setSelectedTarefa((prev) => (prev?.id === previousForRollback!.id ? previousForRollback : prev));
-          showToast(error instanceof Error ? error.message : "Falha ao mover tarefa.", "error");
+      });
+      if (updatedForPersist) {
+        void persistTarefa(updatedForPersist, { previous: updatedForPersist })
+          .then((merged) => {
+            setTarefas((prev) => prev.map((t) => (t.id === merged.id ? merged : t)));
+            setSelectedTarefa((prev) => (prev?.id === merged.id ? merged : prev));
+            if (TAREFA_STATUS_FECHADOS.includes(destStatus) && operacaoView !== "fechados") {
+              setOperacaoView("fechados");
+              setStatusFilter("");
+              showToast(
+                destStatus === "cancelado"
+                  ? "Tarefa cancelada e exibida na visão Fechados."
+                  : "Tarefa concluída e exibida na visão Fechados.",
+                "success"
+              );
+            }
+          })
+          .catch((error) => {
+            if (!previousForRollback) return;
+            setTarefas((prev) =>
+              prev.map((t) => (t.id === previousForRollback!.id ? previousForRollback! : t))
+            );
+            setSelectedTarefa((prev) =>
+              prev?.id === previousForRollback!.id ? previousForRollback : prev
+            );
+            showToast(error instanceof Error ? error.message : "Falha ao mover tarefa.", "error");
+          });
+      }
+    },
+    [persistTarefa, autorEdicao, showToast, operacaoView]
+  );
+
+  const handleDragEnd = useCallback(
+    (result: DropResult) => {
+      if (!result.destination) return;
+      const sourceStatus = result.source.droppableId as StatusTarefa;
+      const destStatus = result.destination.droppableId as StatusTarefa;
+      if (sourceStatus === destStatus) return;
+      const tarefaId = result.draggableId;
+      const tarefa = tarefas.find((t) => t.id === tarefaId);
+
+      if (sourceStatus !== destStatus && destStatus === "cancelado" && sourceStatus !== "cancelado") {
+        setKanbanCanceladoModal({
+          sourceStatus,
+          destStatus,
+          tarefaId,
+          tarefaTitulo: tarefa?.titulo ?? "Tarefa",
         });
-    }
-  }, [saveTarefa, autorEdicao, showToast, operacaoView]);
+        setKanbanMotivoCancelado("");
+        showToast(
+          "O cartão volta à coluna de origem até você confirmar. Preencha o motivo do cancelamento na janela para concluir o envio para Cancelado.",
+          "success"
+        );
+        return;
+      }
+
+      applyKanbanMove({ sourceStatus, destStatus, tarefaId });
+    },
+    [tarefas, applyKanbanMove, showToast]
+  );
 
   const handleSalvarTarefa = useCallback(
     (tarefaId: string, payload: TarefaSalvarPayload) => {
@@ -520,6 +665,29 @@ export default function TarefasPage() {
           autorId,
         });
       }
+      const currentSolIds = [...(current.solucaoIds?.length ? current.solucaoIds : [current.solucaoId].filter(Boolean) as string[])].sort().join(",");
+      const nextSolIds = [...(payload.solucaoIds ?? [])].sort().join(",");
+      if (currentSolIds !== nextSolIds) {
+        const nomesAnteriores =
+          (current.solucoes ?? []).map((s) => s.nome).join(", ") ||
+          solucoes
+            .filter((s) => (current.solucaoIds ?? []).includes(s.id))
+            .map((s) => s.nome)
+            .join(", ") ||
+          "Nenhuma";
+        const nomesNovos =
+          solucoes
+            .filter((s) => (payload.solucaoIds ?? []).includes(s.id))
+            .map((s) => s.nome)
+            .join(", ") || "Nenhuma";
+        entries.push({
+          id: `h-${Date.now()}-so`,
+          data: now,
+          acao: `Soluções vinculadas alteradas de ${nomesAnteriores} para ${nomesNovos}`,
+          autor,
+          autorId,
+        });
+      }
       const currentColIds = (current.colaboradores ?? []).map((c) => c.id).sort().join(",");
       const newColIds = [...payload.colaboradorIds].filter((id) => id !== payload.responsavelId).sort().join(",");
       if (currentColIds !== newColIds) {
@@ -535,6 +703,18 @@ export default function TarefasPage() {
 
       const novos = payload.novosArquivos ?? [];
       const anexosAdicionados = novos.map((f) => f.name);
+      const anexosAnteriores = [...(current.anexos ?? [])];
+      const anexosMantidos = payload.anexos ?? anexosAnteriores;
+      const anexosRemovidos = anexosAnteriores.filter((nome) => !anexosMantidos.includes(nome));
+      if (anexosRemovidos.length > 0) {
+        entries.push({
+          id: `h-${Date.now()}-axr`,
+          data: now,
+          acao: `Anexos removidos: ${anexosRemovidos.join(", ")}`,
+          autor,
+          autorId,
+        });
+      }
       if (anexosAdicionados.length > 0) {
         entries.push({
           id: `h-${Date.now()}-ax`,
@@ -545,6 +725,13 @@ export default function TarefasPage() {
           anexos: anexosAdicionados,
         });
       }
+
+      const anexosFinal = [...anexosMantidos, ...anexosAdicionados];
+      const arquivosFinal = [
+        ...(current.arquivos ?? []).filter((f) => anexosMantidos.includes(f.name)),
+        ...novos,
+      ];
+      const anexoItens = buildAnexoItens(anexosFinal, current.id, current.anexoItens);
 
       const updated: Tarefa = {
         ...current,
@@ -564,27 +751,30 @@ export default function TarefasPage() {
             : ([payload.clienteId].filter(Boolean) as string[]),
           clientes
         ),
+        solucaoIds: payload.solucaoIds,
+        solucoes: solucoes.filter((s) => (payload.solucaoIds ?? []).includes(s.id)),
         colaboradores,
         dataInicio: payload.dataInicio,
         dataFim: payload.dataFim,
-        anexos: [...(current.anexos ?? []), ...anexosAdicionados],
-        arquivos: [...(current.arquivos ?? []), ...novos],
+        anexos: anexosFinal,
+        anexoItens,
+        arquivos: arquivosFinal,
         historico: [...current.historico, ...entries],
       };
 
       setTarefas((prev) => prev.map((t) => (t.id === tarefaId ? updated : t)));
       setSelectedTarefa((prev) => (prev?.id === tarefaId ? updated : prev));
-      void saveTarefa(updated)
-        .then((saved) => {
-          setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
-          setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+      void persistTarefa(updated, { novosArquivos: novos, previous: updated })
+        .then((merged) => {
+          setTarefas((prev) => prev.map((t) => (t.id === merged.id ? merged : t)));
+          setSelectedTarefa((prev) => (prev?.id === merged.id ? merged : prev));
           showToast("Tarefa atualizada com sucesso.", "success");
         })
         .catch((error) => {
           showToast(error instanceof Error ? error.message : "Falha ao atualizar a tarefa.", "error");
         });
     },
-    [usuariosMap, selectedTarefa, tarefas, saveTarefa, autorEdicao, clientes, showToast]
+    [usuariosMap, selectedTarefa, tarefas, persistTarefa, autorEdicao, clientes, solucoes, showToast]
   );
 
   const handleExcluirClick = useCallback((t: Tarefa) => {
@@ -611,7 +801,13 @@ export default function TarefasPage() {
 
   return (
     <section className="w-full min-w-0 space-y-6">
-      <OperacaoViews value={operacaoView} onChange={setOperacaoView} closedLabel="Concluídas" />
+      <OperacaoViews
+        value={operacaoView}
+        onChange={setOperacaoView}
+        closedLabel="Fechadas"
+        archivedLabel="Arquivados"
+        viewTooltips={TAREFAS_VIEW_TOOLTIPS}
+      />
       {/* Barra: Filtros + toggle visão (padrão unificado) */}
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3">
         <div className="flex w-full min-w-0 flex-wrap items-end justify-start gap-x-2 gap-y-2 sm:flex-nowrap sm:gap-3 lg:flex-1">
@@ -679,6 +875,7 @@ export default function TarefasPage() {
         open={isSheetOpen}
         onClose={handleCloseSheet}
         title={sheetTitle}
+        scrollBody={false}
         mobileContentPaddingClassName="px-0"
         desktopContentPaddingClassName="px-0"
       >
@@ -688,6 +885,7 @@ export default function TarefasPage() {
               tarefa={selectedTarefa}
               usuariosMap={usuariosMap}
               clientes={clientes}
+              solucoes={solucoes}
               currentUserId={usuarioAtualId}
               onClose={handleCloseSheet}
               onTrocarResponsavel={(t, novoId) => {
@@ -702,34 +900,57 @@ export default function TarefasPage() {
                   x?.id === t.id ? { ...x, responsavel: u } : x
                 );
               }}
-              onAdicionarHistorico={(tarefaId, acao, anexos) => {
+              onAdicionarHistorico={(tarefaId, acao, anexos, novosArquivos) => {
+                const anexosNomes = anexos ?? [];
                 const entry = {
                   id: `h-${Date.now()}`,
                   data: new Date().toISOString(),
                   acao,
                   autor: autorEdicao.nome,
                   autorId: autorEdicao.id,
-                  anexos: anexos?.length ? anexos : undefined,
+                  anexos: anexosNomes.length ? anexosNomes : undefined,
                 };
                 let updatedForPersist: Tarefa | null = null;
                 setTarefas((prev) =>
                   prev.map((x) => {
                     if (x.id !== tarefaId) return x;
-                    const next = { ...x, historico: [...x.historico, entry] };
+                    const anexosMerged = anexosNomes.length
+                      ? Array.from(new Set([...(x.anexos ?? []), ...anexosNomes]))
+                      : x.anexos ?? [];
+                    const next = {
+                      ...x,
+                      anexos: anexosMerged,
+                      anexoItens: anexosNomes.length
+                        ? buildAnexoItens(anexosMerged, x.id, x.anexoItens)
+                        : x.anexoItens,
+                      historico: [...x.historico, entry],
+                    };
                     updatedForPersist = next;
                     return next;
                   })
                 );
-                setSelectedTarefa((x) =>
-                  x?.id === tarefaId
-                    ? { ...x!, historico: [...x.historico, entry] }
-                    : x
-                );
+                setSelectedTarefa((x) => {
+                  if (x?.id !== tarefaId) return x;
+                  const anexosMerged = anexosNomes.length
+                    ? Array.from(new Set([...(x.anexos ?? []), ...anexosNomes]))
+                    : x.anexos ?? [];
+                  return {
+                    ...x,
+                    anexos: anexosMerged,
+                    anexoItens: anexosNomes.length
+                      ? buildAnexoItens(anexosMerged, x.id, x.anexoItens)
+                      : x.anexoItens,
+                    historico: [...x.historico, entry],
+                  };
+                });
                 if (updatedForPersist) {
-                  void saveTarefa(updatedForPersist)
-                    .then((saved) => {
-                      setTarefas((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
-                      setSelectedTarefa((prev) => (prev?.id === saved.id ? saved : prev));
+                  void persistTarefa(updatedForPersist, {
+                    previous: updatedForPersist,
+                    novosArquivos: novosArquivos ?? [],
+                  })
+                    .then((merged) => {
+                      setTarefas((prev) => prev.map((t) => (t.id === merged.id ? merged : t)));
+                      setSelectedTarefa((prev) => (prev?.id === merged.id ? merged : prev));
                     })
                     .catch(() => undefined);
                 }
@@ -740,6 +961,7 @@ export default function TarefasPage() {
             <NovaTarefaForm
               usuarios={usuarios}
               clientes={clientes}
+              solucoes={solucoes}
               currentUserId={usuarioAtualId || "usuario-atual"}
               onSave={handleNovaTarefa}
               onCancel={handleCloseSheet}
@@ -780,6 +1002,83 @@ export default function TarefasPage() {
         variant={toast.variant}
         onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
+
+      {kanbanCanceladoModal ? (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/40 px-4"
+          onMouseDown={() => {
+            setKanbanCanceladoModal(null);
+            setKanbanMotivoCancelado("");
+            showToast("Movimentação para Cancelado cancelada.", "success");
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-rose-200 bg-white p-5 shadow-2xl dark:border-rose-500/40 dark:bg-slate-900"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-rose-600 dark:text-rose-400" />
+              <div>
+                <h3 className="text-base font-semibold text-rose-700 dark:text-rose-300">
+                  Motivo do cancelamento
+                </h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Informe o motivo para mover <strong>{kanbanCanceladoModal.tarefaTitulo}</strong> para
+                  Cancelado.
+                </p>
+              </div>
+            </div>
+
+            <textarea
+              value={kanbanMotivoCancelado}
+              onChange={(e) => setKanbanMotivoCancelado(e.target.value)}
+              rows={4}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none ring-0 transition focus:border-rose-300 focus:ring-2 focus:ring-rose-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-rose-400 dark:focus:ring-rose-900/40"
+              placeholder="Descreva o motivo do cancelamento..."
+            />
+
+            <div className="mt-4 flex flex-col-reverse gap-2 border-t border-slate-200 pt-3 dark:border-slate-700 sm:flex-row sm:justify-end sm:gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setKanbanCanceladoModal(null);
+                  setKanbanMotivoCancelado("");
+                  showToast("Movimentação para Cancelado cancelada.", "success");
+                }}
+                className={formModalCancelButtonClass}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!kanbanMotivoCancelado.trim()) {
+                    showToast("Informe o motivo do cancelamento para mover para Cancelado.", "error");
+                    return;
+                  }
+                  applyKanbanMove({
+                    sourceStatus: kanbanCanceladoModal.sourceStatus,
+                    destStatus: kanbanCanceladoModal.destStatus,
+                    tarefaId: kanbanCanceladoModal.tarefaId,
+                    motivoCancelado: kanbanMotivoCancelado.trim(),
+                  });
+                  setKanbanCanceladoModal(null);
+                  setKanbanMotivoCancelado("");
+                }}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Marcar como Cancelado
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -32,6 +32,12 @@ type SearchableSelectProps = {
   leadingIconClassName?: string;
   /** `id` do botão gatilho (ex.: para `label htmlFor`). */
   triggerButtonId?: string;
+  /** Subtítulo na mesma linha após " / " (fonte menor). Default: abaixo do rótulo. */
+  subtitleInline?: boolean;
+  /** Altura máxima da lista de opções (Tailwind). Default: `max-h-56` (~6 itens). */
+  listMaxHeightClass?: string;
+  /** Evita `truncate` no gatilho e nas opções (texto completo visível). */
+  truncateText?: boolean;
 };
 
 export function SearchableSelect({
@@ -47,6 +53,9 @@ export function SearchableSelect({
   fullWidth = true,
   leadingIconClassName,
   triggerButtonId,
+  subtitleInline = false,
+  listMaxHeightClass = "max-h-56",
+  truncateText = true,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -74,10 +83,16 @@ export function SearchableSelect({
     (!selected && LeadingIcon ? leadingIconClassName : undefined) ??
     "text-slate-400";
 
-  const rootCls = fullWidth ? "relative" : "relative inline-block w-fit max-w-full";
-  const btnCls = fullWidth
-    ? "flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500"
-    : "inline-flex w-auto min-w-[10.5rem] max-w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500";
+  const textClamp = truncateText ? "truncate" : "whitespace-nowrap";
+  const rootCls = fullWidth
+    ? "relative w-full overflow-visible"
+    : "relative inline-block w-fit max-w-full overflow-visible";
+  const btnCls = clsx(
+    "flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-[#6D28D9] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500",
+    fullWidth ? "w-full" : "w-auto"
+  );
+  const popoverCls =
+    "absolute left-0 top-full z-[200] mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900";
 
   return (
     <div ref={rootRef} className={rootCls}>
@@ -91,13 +106,43 @@ export function SearchableSelect({
         <span className="flex min-w-0 flex-1 flex-col items-stretch gap-0.5 text-left">
           <span className="flex min-w-0 items-center gap-2">
             {SelectedIcon ? (
-              <SelectedIcon className={clsx("h-4 w-4 shrink-0", triggerIconClassName)} />
+              <SelectedIcon
+                className={clsx(
+                  "h-4 w-4 shrink-0",
+                  selected?.iconClassName ?? triggerIconClassName ?? "text-slate-400"
+                )}
+              />
             ) : null}
-            <span className={selected ? "truncate" : "truncate text-slate-400 dark:text-slate-500"}>
-              {selected ? selected.label : placeholder}
+            <span
+              className={clsx(
+                "min-w-0",
+                textClamp,
+                !selected && "text-slate-400 dark:text-slate-500"
+              )}
+            >
+              {selected ? (
+                subtitleInline && selected.subtitle ? (
+                  <>
+                    <span className="text-sm text-slate-900 dark:text-slate-100">{selected.label}</span>
+                    <span
+                      className={clsx(
+                        "text-xs",
+                        selected.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
+                      )}
+                    >
+                      {" / "}
+                      {selected.subtitle}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm text-slate-900 dark:text-slate-100">{selected.label}</span>
+                )
+              ) : (
+                placeholder
+              )}
             </span>
           </span>
-          {selected?.subtitle ? (
+          {selected?.subtitle && !subtitleInline ? (
             <span
               className={clsx(
                 "truncate pl-6 text-xs leading-tight",
@@ -112,7 +157,7 @@ export function SearchableSelect({
       </button>
 
       {open ? (
-        <div className="absolute z-[200] mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-600 dark:bg-slate-900">
+        <div className={popoverCls}>
           {searchable ? (
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -127,7 +172,13 @@ export function SearchableSelect({
             </div>
           ) : null}
 
-          <div className={`${searchable ? "mt-2" : ""} max-h-56 overflow-y-auto`}>
+          <div
+            className={clsx(
+              searchable ? "mt-2" : "",
+              listMaxHeightClass,
+              "overflow-y-auto overflow-x-hidden"
+            )}
+          >
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{emptyLabel}</p>
             ) : (
@@ -143,29 +194,49 @@ export function SearchableSelect({
                       setOpen(false);
                       setQuery("");
                     }}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-950/30"
                   >
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2">
+                    <span className={clsx(truncateText ? "min-w-0 flex-1" : "shrink-0")}>
+                      <span
+                        className={clsx(
+                          "flex items-center gap-2",
+                          truncateText ? textClamp : "whitespace-nowrap"
+                        )}
+                      >
                         {OptionIcon ? (
                           <OptionIcon
                             className={clsx("h-4 w-4 shrink-0", opt.iconClassName ?? "text-slate-400")}
                           />
                         ) : null}
-                        <span className="block truncate text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
-                      </span>
-                      {opt.subtitle ? (
-                        <span
-                          className={clsx(
-                            "block truncate text-xs",
-                            opt.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
-                          )}
-                        >
-                          {opt.subtitle}
+                        <span className={clsx(truncateText && "min-w-0", truncateText ? textClamp : "whitespace-nowrap")}>
+                          <span className="text-sm text-slate-900 dark:text-slate-100">{opt.label}</span>
+                          {opt.subtitle ? (
+                            subtitleInline ? (
+                              <span
+                                className={clsx(
+                                  "text-xs",
+                                  opt.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
+                                )}
+                              >
+                                {" / "}
+                                {opt.subtitle}
+                              </span>
+                            ) : (
+                              <span
+                                className={clsx(
+                                  "mt-0.5 block text-xs",
+                                  textClamp,
+                                  opt.subtitleClassName ?? "text-slate-500 dark:text-slate-400"
+                                )}
+                              >
+                                {opt.subtitle}
+                              </span>
+                            )
+                          ) : null}
                         </span>
-                      ) : null}
+                      </span>
                     </span>
-                    {isSelected ? <Check className="h-4 w-4 text-[#6D28D9]" /> : null}
+                    {isSelected ? <Check className="h-4 w-4 shrink-0 text-[#6D28D9]" /> : null}
                   </button>
                 );
               })

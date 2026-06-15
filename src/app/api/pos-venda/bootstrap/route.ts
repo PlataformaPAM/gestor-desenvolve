@@ -27,7 +27,7 @@ function computeHealth(
   const totalTarefas = tarefas.length;
   const pendentes = tarefas.filter((t) => t.status !== "concluido").length;
   const atrasadas = tarefas.filter((t) => t.status !== "concluido" && t.dataFim < hoje).length;
-  const adiadas = tarefas.filter((t) => t.status === "impedimento").length;
+  const adiadas = tarefas.filter((t) => t.status === "aguardando").length;
   const concluidas30d = tarefas.filter((t) => t.status === "concluido" && t.dataFim >= d30).length;
   const concluidasTotal = tarefas.filter((t) => t.status === "concluido").length;
 

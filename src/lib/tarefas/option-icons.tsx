@@ -10,15 +10,14 @@ import {
   Circle,
   CircleDot,
   CircleHelp,
+  CircleX,
+  ClipboardCheck,
   Clock3,
-  GraduationCap,
   Handshake,
-  LayoutTemplate,
   Megaphone,
-  PanelsTopLeft,
+  PauseCircle,
   Settings2,
   ShieldAlert,
-  Users,
   Wallet,
   Wrench,
 } from "lucide-react";
@@ -26,8 +25,6 @@ import type { PrioridadeTarefa, StatusTarefa } from "@/lib/tarefas/types";
 import type { CategoriaTarefa } from "@/lib/tarefas/categorias";
 
 type IconComp = ComponentType<{ className?: string }>;
-
-const softwareIcon: IconComp = ({ className }) => <Settings2 className={`!text-indigo-500 ${className ?? ""}`} />;
 
 const PRIORIDADE_ICON_BY_VALUE: Record<PrioridadeTarefa, IconComp> = {
   baixa: ({ className }) => <Circle className={`!text-slate-500 ${className ?? ""}`} />,
@@ -39,29 +36,23 @@ const PRIORIDADE_ICON_BY_VALUE: Record<PrioridadeTarefa, IconComp> = {
 const STATUS_ICON_BY_VALUE: Record<StatusTarefa, IconComp> = {
   a_fazer: ({ className }) => <Circle className={`!text-slate-500 ${className ?? ""}`} />,
   em_andamento: ({ className }) => <Clock3 className={`!text-blue-500 ${className ?? ""}`} />,
-  impedimento: ({ className }) => <AlertTriangle className={`!text-orange-500 ${className ?? ""}`} />,
+  aguardando: ({ className }) => <PauseCircle className={`!text-orange-500 ${className ?? ""}`} />,
+  validar: ({ className }) => <ClipboardCheck className={`!text-violet-500 ${className ?? ""}`} />,
   concluido: ({ className }) => <CircleDot className={`!text-emerald-500 ${className ?? ""}`} />,
+  cancelado: ({ className }) => <CircleX className={`!text-rose-500 ${className ?? ""}`} />,
 };
 
 const CATEGORIA_ICON_BY_VALUE: Record<CategoriaTarefa, IconComp> = {
   Administrativo: ({ className }) => <BriefcaseBusiness className={`!text-slate-500 ${className ?? ""}`} />,
-  Assessoria: ({ className }) => <Handshake className={`!text-cyan-500 ${className ?? ""}`} />,
-  "Atualizar Indicadores": ({ className }) => <BarChart3 className={`!text-sky-500 ${className ?? ""}`} />,
-  Capacitação: ({ className }) => <GraduationCap className={`!text-teal-500 ${className ?? ""}`} />,
+  "Atualizar indicadores": ({ className }) => <BarChart3 className={`!text-sky-500 ${className ?? ""}`} />,
   Comercial: ({ className }) => <Handshake className={`!text-violet-500 ${className ?? ""}`} />,
-  Consultoria: ({ className }) => <Users className={`!text-violet-500 ${className ?? ""}`} />,
   Dúvida: ({ className }) => <CircleHelp className={`!text-amber-500 ${className ?? ""}`} />,
   Financeiro: ({ className }) => <Wallet className={`!text-emerald-500 ${className ?? ""}`} />,
-  GesConselho: softwareIcon,
-  GesPlanos: softwareIcon,
-  GestorAlerta: softwareIcon,
-  InfoPolis: softwareIcon,
   Marketing: ({ className }) => <Megaphone className={`!text-rose-500 ${className ?? ""}`} />,
-  "Material de Apoio": ({ className }) => <BookOpen className={`!text-blue-500 ${className ?? ""}`} />,
-  Outro: ({ className }) => <Building2 className={`!text-slate-500 ${className ?? ""}`} />,
-  "Painél Regional": ({ className }) => <PanelsTopLeft className={`!text-indigo-500 ${className ?? ""}`} />,
-  "Reformulação Portal": ({ className }) => <LayoutTemplate className={`!text-fuchsia-500 ${className ?? ""}`} />,
-  Suporte: ({ className }) => <ShieldAlert className={`!text-orange-500 ${className ?? ""}`} />,
+  "Material de apoio": ({ className }) => <BookOpen className={`!text-blue-500 ${className ?? ""}`} />,
+  Outra: ({ className }) => <Building2 className={`!text-slate-500 ${className ?? ""}`} />,
+  "Problemas técnicos": ({ className }) => <Wrench className={`!text-orange-600 ${className ?? ""}`} />,
+  Suporte: ({ className }) => <Settings2 className={`!text-indigo-500 ${className ?? ""}`} />,
 };
 
 export function iconForPrioridade(prioridade: PrioridadeTarefa): IconComp {
@@ -73,8 +64,8 @@ export function iconForStatus(status: StatusTarefa): IconComp {
 }
 
 export function iconForCategoria(categoria: string): IconComp {
-  if (categoria === "Reformulação Portais") return CATEGORIA_ICON_BY_VALUE["Reformulação Portal"];
-  return (CATEGORIA_ICON_BY_VALUE as Record<string, IconComp | undefined>)[categoria] ?? Building2;
+  const normalized = categoria.trim();
+  return (CATEGORIA_ICON_BY_VALUE as Record<string, IconComp | undefined>)[normalized] ?? Building2;
 }
 
 export const PRIORIDADE_LEADING_ICON = Wrench;

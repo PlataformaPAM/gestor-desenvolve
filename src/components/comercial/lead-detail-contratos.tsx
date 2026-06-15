@@ -142,7 +142,9 @@ export function LeadDetailContratos({ lead, onUpdateLead, readOnly = false }: Le
         <MultiFileAttachment
           existingFiles={[]}
           newFiles={[]}
-          onNewFilesChange={(files) => {
+          onNewFilesChange={(filesOrUpdater) => {
+            const files =
+              typeof filesOrUpdater === "function" ? filesOrUpdater([]) : filesOrUpdater;
             const now = new Date().toISOString();
             const novos = files.map((f) => ({ nome: f.name, anexadoEm: now }));
             if (!novos.length) return;

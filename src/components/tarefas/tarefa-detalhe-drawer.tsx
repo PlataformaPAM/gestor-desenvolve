@@ -1,11 +1,12 @@
 "use client";
 
 import type { ElementType, RefObject } from "react";
-import { useId, useRef, useState, useEffect } from "react";
+import { useId, useRef, useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { FileText, MessageSquare, Eye, X, Save, Plus, User, Users, Building2, Tags } from "lucide-react";
-import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
-import { STATUS_LABELS } from "@/lib/tarefas/constants";
+import { FileText, MessageSquare, Eye, X, Save, Plus, User, Users, Building2, Tags, Package } from "lucide-react";
+import type { Tarefa, UsuarioTarefa, SolucaoTarefa } from "@/lib/tarefas/types";
+import { buildAnexoItens, tarefaAnexoLeituraUrl } from "@/lib/tarefas/anexos";
+import { STATUS_LABELS, PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
 import { TAREFA_CATEGORIAS } from "@/lib/tarefas/categorias";
 import { MultiFileAttachment } from "@/components/ui/multifile-attachment";
 import { AlertDialog } from "@/components/ui/alert-dialog";
@@ -25,7 +26,9 @@ import {
 } from "@/components/ui/field-patterns";
 import {
   iconForCategoria,
+  iconForPrioridade,
   iconForStatus,
+  PRIORIDADE_LEADING_ICON,
   STATUS_LEADING_ICON,
 } from "@/lib/tarefas/option-icons";
 
@@ -86,10 +89,33 @@ function isoToDateInput(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-function openFilePreview(file: File): void {
-  const url = URL.createObjectURL(file);
-  window.open(url, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(url), 15000);
+function openFilePreview(file?: File, url?: string): void {
+  let blobUrl: string | undefined;
+  let shouldRevoke = false;
+
+  if (file) {
+    blobUrl = URL.createObjectURL(file);
+    shouldRevoke = true;
+  } else if (url) {
+    blobUrl = url;
+  }
+
+  if (!blobUrl) return;
+
+  const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+
+  if (shouldRevoke) {
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl!), 60_000);
+  }
 }
 
 /** Payload enviado ao salvar alterações (apenas campos editáveis) */
@@ -102,9 +128,12 @@ export type TarefaSalvarPayload = {
   responsavelId: string;
   clienteId?: string;
   clienteIds?: string[];
+  solucaoIds?: string[];
   dataInicio: string;
   dataFim: string;
   colaboradorIds: string[];
+  /** Lista final de anexos já salvos (após remoções no formulário) */
+  anexos?: string[];
   /** Novos arquivos adicionados nesta edição (pendentes) */
   novosArquivos?: File[];
 };
@@ -115,10 +144,11 @@ type TarefaDetalheDrawerProps = {
   tarefa: Tarefa | null;
   usuariosMap: Map<string, UsuarioTarefa>;
   clientes?: Array<{ id: string; nome: string; empresa?: string }>;
+  solucoes?: SolucaoTarefa[];
   currentUserId?: string;
   onClose?: () => void;
   onTrocarResponsavel?: (tarefa: Tarefa, novoResponsavelId: string) => void;
-  onAdicionarHistorico?: (tarefaId: string, acao: string, anexos?: string[]) => void;
+  onAdicionarHistorico?: (tarefaId: string, acao: string, anexos?: string[], novosArquivos?: File[]) => void;
   /** Chamado ao clicar Salvar na aba Detalhes com os valores atuais do formulário */
   onSalvar?: (tarefaId: string, payload: TarefaSalvarPayload) => void;
 };
@@ -127,6 +157,7 @@ export function TarefaDetalheDrawer({
   tarefa,
   usuariosMap,
   clientes = [],
+  solucoes = [],
   currentUserId = "",
   onClose,
   onTrocarResponsavel,
@@ -155,9 +186,11 @@ export function TarefaDetalheDrawer({
   const [prioridade, setPrioridade] = useState<Tarefa["prioridade"]>("media");
   const [responsavelId, setResponsavelId] = useState("");
   const [clienteIds, setClienteIds] = useState<string[]>([]);
+  const [solucaoIds, setSolucaoIds] = useState<string[]>([]);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
+  const [anexosSalvos, setAnexosSalvos] = useState<string[]>([]);
   // EXACT COPY (Helpdesk-style): 'arquivos' representa NOVOS arquivos selecionados (pendentes).
   const [arquivos, setArquivos] = useState<File[]>([]);
   /** Após tentar salvar com dados incompletos, destaca os campos que faltam */
@@ -172,13 +205,27 @@ export function TarefaDetalheDrawer({
     setPrioridade(tarefa.prioridade);
     setResponsavelId(tarefa.responsavel.id);
     setClienteIds(tarefa.clienteIds?.length ? tarefa.clienteIds : (tarefa.clienteId ? [tarefa.clienteId] : []));
+    setSolucaoIds(
+      tarefa.solucaoIds?.length
+        ? tarefa.solucaoIds
+        : tarefa.solucaoId
+          ? [tarefa.solucaoId]
+          : (tarefa.solucoes ?? []).map((s) => s.id)
+    );
     setDataInicio(isoToDateInput(tarefa.dataInicio));
     setDataFim(isoToDateInput(tarefa.dataFim));
     setColaboradorIds(tarefa.colaboradores?.map((c) => c.id) ?? []);
+    setAnexosSalvos(tarefa.anexos ?? []);
     setArquivosComentario([]);
     setArquivos([]);
     setSubmitAttempted(false);
   }, [tarefa?.id]);
+
+  /** Sincroniza anexos quando o pai atualiza a tarefa (ex.: após salvar), sem resetar o formulário inteiro. */
+  useEffect(() => {
+    if (!tarefa) return;
+    setAnexosSalvos(tarefa.anexos ?? []);
+  }, [tarefa?.id, tarefa?.anexos?.join("\0")]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -213,7 +260,12 @@ export function TarefaDetalheDrawer({
         return next;
       });
     }
-    onAdicionarHistorico?.(tarefa.id, textoComentario, anexos);
+    onAdicionarHistorico?.(
+      tarefa.id,
+      textoComentario,
+      anexos,
+      arquivosComentario.length ? [...arquivosComentario] : undefined
+    );
     setComentario("");
     setArquivosComentario([]);
   };
@@ -248,6 +300,10 @@ export function TarefaDetalheDrawer({
       : tarefa.dataInicio;
     const dataFimIso = new Date(`${dataFim.trim()}T23:59:59`).toISOString();
     setSubmitAttempted(false);
+    const novosNomes = arquivos.map((f) => f.name);
+    if (novosNomes.length) {
+      setAnexosSalvos((prev) => Array.from(new Set([...prev, ...novosNomes])));
+    }
     onSalvar?.(tarefa.id, {
       titulo: titulo.trim(),
       descricao: descricao.trim() || undefined,
@@ -257,9 +313,11 @@ export function TarefaDetalheDrawer({
       responsavelId,
       clienteId: clienteIds[0] || undefined,
       clienteIds,
+      solucaoIds,
       dataInicio: dataInicioIso,
       dataFim: dataFimIso,
       colaboradorIds,
+      anexos: anexosSalvos,
       novosArquivos: arquivos,
     });
     setArquivos([]);
@@ -282,6 +340,13 @@ export function TarefaDetalheDrawer({
     }));
   const statusOptions: SearchableOption[] = (Object.entries(STATUS_LABELS) as [Tarefa["status"], string][])
     .map(([value, label]) => ({ value, label, icon: iconForStatus(value) }));
+  const prioridadeOptions: SearchableOption[] = (
+    Object.entries(PRIORIDADE_LABELS) as [Tarefa["prioridade"], string][]
+  ).map(([value, label]) => ({
+    value,
+    label,
+    icon: iconForPrioridade(value),
+  }));
   const clienteOptions: SearchableOption[] = [...clientes]
     .sort((a, b) =>
       (a.empresa?.trim() || a.nome).localeCompare((b.empresa?.trim() || b.nome), "pt-BR", {
@@ -303,6 +368,31 @@ export function TarefaDetalheDrawer({
     if (clientes.length > 0 && base.length === clientes.length) return ["__TODOS__", ...base];
     return base;
   })();
+  const solucaoOptions: SearchableOption[] = [...solucoes]
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }))
+    .map((s) => ({
+      value: s.id,
+      label: s.nome,
+      icon: Package,
+    }));
+
+  const historicoTemCriacao = tarefa.historico.some((h) => /criad/i.test(h.acao));
+
+  const existingAnexoItens = useMemo(
+    () => buildAnexoItens(anexosSalvos, tarefa.id, tarefa.anexoItens),
+    [anexosSalvos, tarefa.id, tarefa.anexoItens]
+  );
+
+  const previewFiles = useMemo(() => {
+    const byName = new Map<string, File>();
+    for (const file of tarefa.arquivos ?? []) {
+      if (!byName.has(file.name)) byName.set(file.name, file);
+    }
+    for (const file of arquivos) {
+      if (!byName.has(file.name)) byName.set(file.name, file);
+    }
+    return Array.from(byName.values());
+  }, [tarefa.arquivos, arquivos]);
 
   const TABS: { id: TabId; label: string; Icon: ElementType }[] = [
     { id: "detalhes", label: "Detalhes", Icon: FileText },
@@ -420,6 +510,18 @@ export function TarefaDetalheDrawer({
                 leadingIcon={STATUS_LEADING_ICON}
               />
             </div>
+            <div>
+              <label htmlFor="t-prioridade" className={formLabelClass}>Prioridade</label>
+              <SearchableSelect
+                options={prioridadeOptions}
+                value={prioridade}
+                onChange={(v) => setPrioridade(v as Tarefa["prioridade"])}
+                placeholder="Selecione a prioridade..."
+                searchPlaceholder="Buscar prioridade..."
+                searchable={false}
+                leadingIcon={PRIORIDADE_LEADING_ICON}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="t-data-inicio" className={formLabelClass}>Data início</label>
@@ -471,6 +573,18 @@ export function TarefaDetalheDrawer({
               />
             </div>
             <div>
+              <label className={formLabelClass}>Soluções vinculadas</label>
+              <SearchableMultiSelect
+                options={solucaoOptions}
+                values={solucaoIds}
+                onChange={setSolucaoIds}
+                placeholder="Selecionar soluções..."
+                searchPlaceholder="Buscar solução..."
+                selectedLabel="Selecionadas"
+                leadingIcon={Package}
+              />
+            </div>
+            <div>
               <label className={formLabelClass}>Clientes vinculados</label>
               <SearchableMultiSelect
                 options={clienteOptionsWithAll}
@@ -492,9 +606,12 @@ export function TarefaDetalheDrawer({
 
             {/* Anexos — EXACT COPY da lógica do Helpdesk (multi + preview + remover) */}
             <MultiFileAttachment
-              existingFiles={tarefa.anexos ?? []}
+              existingFiles={existingAnexoItens}
+              onExistingFilesChange={onSalvar ? setAnexosSalvos : undefined}
+              previewFiles={previewFiles}
               newFiles={arquivos}
               onNewFilesChange={setArquivos}
+              readOnly={!onSalvar}
             />
 
           </div>
@@ -561,10 +678,11 @@ export function TarefaDetalheDrawer({
             </div>
             <ul className="relative mt-4 space-y-0 border-t border-slate-200 pt-6 dark:border-slate-700">
               <span className="absolute bottom-2 left-[11px] top-2 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
-              {historicoOrdenado.length === 0 ? (
+              {historicoOrdenado.length === 0 && !tarefa.createdAt ? (
                 <li className="text-sm text-slate-500 dark:text-slate-400">Nenhuma ação registrada ainda.</li>
               ) : (
-                historicoOrdenado.map((entrada) => (
+                <>
+                {historicoOrdenado.map((entrada) => (
                   <li key={entrada.id} className="relative flex gap-3 pb-6 last:pb-0">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                       {entrada.autor ? iniciais(entrada.autor) : "S"}
@@ -578,28 +696,48 @@ export function TarefaDetalheDrawer({
                       </p>
                       {entrada.anexos?.length ? (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {entrada.anexos.map((nome) => (
+                          {entrada.anexos.map((nome) => {
+                            const file = previewFiles.find((f) => f.name === nome);
+                            const url =
+                              tarefa.anexoItens?.find((item) => item.name === nome)?.url ??
+                              tarefaAnexoLeituraUrl(tarefa.id, nome);
+                            return (
                             <button
                               key={nome}
                               type="button"
-                              onClick={() => {
-                                const w = window.open("", "_blank");
-                                if (!w) return;
-                                w.document.title = nome;
-                                w.document.body.innerHTML = `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \\"Liberation Mono\\", \\"Courier New\\", monospace; padding: 16px;">Preview indisponivel para este anexo: ${nome}</pre>`;
-                              }}
+                              onClick={() => openFilePreview(file, url)}
                               className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 transition-colors hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
                             >
                               <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
                               <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{nome}</span>
                               <Eye className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                             </button>
-                          ))}
+                          );
+                          })}
                         </div>
                       ) : null}
                     </div>
                   </li>
-                ))
+                ))}
+                {tarefa.createdAt && !historicoTemCriacao ? (
+                  <li className="relative flex gap-3 pb-0">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      S
+                    </span>
+                    <div>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {formatHistoricoData(tarefa.createdAt)} - Sistema
+                      </p>
+                      <p className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                        Tarefa criada
+                        {tarefa.registroCriadoPorNome
+                          ? ` por ${tarefa.registroCriadoPorNome}`
+                          : ""}
+                      </p>
+                    </div>
+                  </li>
+                ) : null}
+                </>
               )}
             </ul>
           </div>

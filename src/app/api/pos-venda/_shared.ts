@@ -92,7 +92,11 @@ export function mapPosVendaTask(
 ): TarefaRegua {
   const { meta } = decodePosVendaMeta(t.descricao);
   const status: TarefaRegua["status"] =
-    t.status === "concluido" ? "concluida" : t.status === "impedimento" ? "adiada" : "pendente";
+    t.status === "concluido"
+      ? "concluida"
+      : t.status === "aguardando"
+        ? "adiada"
+        : "pendente";
   return {
     id: t.id,
     tipo: (meta.tipo as TarefaRegua["tipo"]) || "outro",

@@ -7,6 +7,7 @@ import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
 import { composeDescricaoWithCategoria } from "@/lib/tarefas/categorias";
 import { tarefasAccessGate } from "@/lib/server/tarefas-access";
+import { syncTarefaAnexos } from "../sync-anexos";
 
 function buildHistoricoId(tarefaId: string, index: number): string {
   return `${tarefaId}-h-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
@@ -90,36 +91,41 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }
 
       try {
-        await tx.tarefaAnexo.deleteMany({ where: { tarefaId: id } });
-        if (tarefa.anexos?.length) {
-          await tx.tarefaAnexo.createMany({
-            data: tarefa.anexos.map((nomeArquivo) => ({ tarefaId: id, nomeArquivo, url: null })),
+        await tx.tarefaSolucao.deleteMany({ where: { tarefaId: id } });
+        const solucaoIds = Array.from(
+          new Set((tarefa.solucaoIds ?? [tarefa.solucaoId]).filter(Boolean) as string[])
+        );
+        if (solucaoIds.length) {
+          await tx.tarefaSolucao.createMany({
+            data: solucaoIds.map((solucaoCatalogoId) => ({ tarefaId: id, solucaoCatalogoId })),
           });
         }
+      } catch (error) {
+        console.warn("[tarefas/update] soluções indisponível; mantendo atualização principal.", error);
+      }
+
+      try {
+        await syncTarefaAnexos(tx, id, tarefa);
       } catch (error) {
         console.warn("[tarefas/update] anexos indisponível; mantendo atualização principal.", error);
       }
 
-      try {
-        await tx.tarefaHistoricoAnexo.deleteMany({ where: { historico: { tarefaId: id } } });
-        await tx.tarefaHistorico.deleteMany({ where: { tarefaId: id } });
-        for (const [index, h] of (tarefa.historico ?? []).entries()) {
-          const autorId = h.autorId?.trim() ?? "";
-          await tx.tarefaHistorico.create({
-            data: {
-              id: buildHistoricoId(id, index),
-              tarefaId: id,
-              data: new Date(h.data),
-              acao: h.acao,
-              autorId: autorId && autoresValidos.has(autorId) ? autorId : null,
-              anexos: {
-                create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
-              },
+      await tx.tarefaHistoricoAnexo.deleteMany({ where: { historico: { tarefaId: id } } });
+      await tx.tarefaHistorico.deleteMany({ where: { tarefaId: id } });
+      for (const [index, h] of (tarefa.historico ?? []).entries()) {
+        const autorId = h.autorId?.trim() ?? "";
+        await tx.tarefaHistorico.create({
+          data: {
+            id: buildHistoricoId(id, index),
+            tarefaId: id,
+            data: new Date(h.data),
+            acao: h.acao,
+            autorId: autorId && autoresValidos.has(autorId) ? autorId : null,
+            anexos: {
+              create: (h.anexos ?? []).map((nomeArquivo) => ({ nomeArquivo, url: null })),
             },
-          });
-        }
-      } catch (error) {
-        console.warn("[tarefas/update] histórico indisponível; mantendo atualização principal.", error);
+          },
+        });
       }
     });
   } catch (error) {
@@ -167,6 +173,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
         responsavel: true,
         colaboradores: { include: { usuario: true } },
+        solucoesVinculadas: { include: { solucaoCatalogo: { select: { id: true, nome: true } } } },
         anexos: true,
         historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
       },
@@ -224,16 +231,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       console.error("[tarefas/update] falha ao emitir alerta de conclusão:", error);
     }
   }
-  if (previous?.status !== "impedimento" && saved.status === "impedimento") {
+  if (previous?.status !== "aguardando" && saved.status === "aguardando") {
     try {
       await emitAlert(prisma, {
         modulo: "tarefas",
-        titulo: "Tarefa interna com impedimento",
-        descricao: `A tarefa "${saved.titulo}" foi movida para impedimento e precisa de ação.`,
-        dedupeKey: `tarefa-impedimento-${saved.id}`,
+        titulo: "Tarefa interna aguardando",
+        descricao: `A tarefa "${saved.titulo}" foi movida para Aguardando e precisa de ação.`,
+        dedupeKey: `tarefa-aguardando-${saved.id}`,
       });
     } catch (error) {
-      console.error("[tarefas/update] falha ao emitir alerta de impedimento:", error);
+      console.error("[tarefas/update] falha ao emitir alerta de aguardando:", error);
     }
   }
   return ok({ tarefa: mapTarefaFromDb(saved) });

@@ -2,12 +2,19 @@
 export type StatusTarefa =
   | "a_fazer"
   | "em_andamento"
-  | "impedimento"
-  | "concluido";
+  | "aguardando"
+  | "validar"
+  | "concluido"
+  | "cancelado";
 
 export type PrioridadeTarefa = "baixa" | "media" | "alta" | "urgente";
 
 export type UsuarioTarefa = {
+  id: string;
+  nome: string;
+};
+
+export type SolucaoTarefa = {
   id: string;
   nome: string;
 };
@@ -24,6 +31,11 @@ export type HistoricoTarefa = {
   anexos?: string[];
 };
 
+export type TarefaAnexoItem = {
+  name: string;
+  url?: string;
+};
+
 export type Tarefa = {
   id: string;
   codigo?: string;
@@ -32,20 +44,35 @@ export type Tarefa = {
   descricao?: string;
   status: StatusTarefa;
   prioridade: PrioridadeTarefa;
-  dataInicio: string; // ISO
-  dataFim: string; // ISO - Prazo
+  dataInicio: string; // ISO — início planejado da tarefa
+  dataFim: string; // ISO - Prazo final
   responsavel: UsuarioTarefa;
   colaboradores: UsuarioTarefa[];
   clienteId?: string;
   clienteIds?: string[];
   clienteNome?: string;
+  /** @deprecated use solucaoIds */
   solucaoId?: string;
+  solucaoIds?: string[];
+  solucoes?: SolucaoTarefa[];
   /** Nomes dos anexos persistidos */
   anexos: string[];
-  /** Anexos em memória */
+  /** Metadados dos anexos (inclui URL para visualização) */
+  anexoItens?: TarefaAnexoItem[];
+  /** Anexos em memória (pendentes ou cache local) */
   arquivos?: File[];
   historico: HistoricoTarefa[];
   registroCriadoPorNome?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
+
+/** Ordem das colunas no Kanban */
+export const TAREFA_KANBAN_COLUMN_ORDER: StatusTarefa[] = [
+  "a_fazer",
+  "em_andamento",
+  "aguardando",
+  "validar",
+  "concluido",
+  "cancelado",
+];

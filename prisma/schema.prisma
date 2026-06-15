@@ -133,8 +133,10 @@ enum HelpdeskComentarioAutorTipo {
 enum TarefaStatus {
   a_fazer
   em_andamento
-  impedimento
+  aguardando
+  validar
   concluido
+  cancelado
 }
 
 enum TarefaPrioridade {
@@ -504,6 +506,7 @@ model SolucaoCatalogo {
   valorBase      Float?
   ativa          Boolean         @default(true)
   leadSolucoes   LeadSolucao[]
+  tarefasSolucao TarefaSolucao[]
   regrasComissao ComissaoRegra[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -767,6 +770,7 @@ model Tarefa {
   atualizadoPor      Usuario?            @relation("TarefaAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   colaboradores      TarefaColaborador[]
   clientesVinculados TarefaCliente[]
+  solucoesVinculadas TarefaSolucao[]
   anexos             TarefaAnexo[]
   historico          TarefaHistorico[]
   createdAt          DateTime            @default(now())
@@ -795,6 +799,18 @@ model TarefaColaborador {
   updatedAt DateTime @updatedAt
 
   @@unique([tarefaId, usuarioId])
+}
+
+model TarefaSolucao {
+  id                String          @id @default(uuid())
+  tarefaId          String
+  solucaoCatalogoId String
+  tarefa            Tarefa          @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  solucaoCatalogo   SolucaoCatalogo @relation(fields: [solucaoCatalogoId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([tarefaId, solucaoCatalogoId])
 }
 
 model TarefaAnexo {

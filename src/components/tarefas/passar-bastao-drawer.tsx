@@ -2,15 +2,8 @@
 
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
-import { PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
+import { PrioridadeBadge } from "@/components/tarefas/prioridade-badge";
 import clsx from "clsx";
-
-const PRIORIDADE_BADGE: Record<Tarefa["prioridade"], string> = {
-  urgente: "bg-red-50 text-red-700 border-red-200",
-  alta: "bg-amber-50 text-amber-700 border-amber-200",
-  media: "bg-slate-100 text-slate-700 border-slate-200",
-  baixa: "bg-slate-100 text-slate-700 border-slate-200",
-};
 
 type PassarBastaoDrawerProps = {
   tarefa: Tarefa | null;
@@ -66,14 +59,7 @@ export function PassarBastaoDrawer({
           {tarefa.descricao && (
             <p className="mt-1 text-sm text-slate-600">{tarefa.descricao}</p>
           )}
-          <span
-            className={clsx(
-              "mt-2 inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-              PRIORIDADE_BADGE[tarefa.prioridade]
-            )}
-          >
-            {PRIORIDADE_LABELS[tarefa.prioridade]}
-          </span>
+          <PrioridadeBadge prioridade={tarefa.prioridade} variant="pill" className="mt-2" />
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">

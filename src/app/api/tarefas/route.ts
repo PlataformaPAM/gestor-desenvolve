@@ -7,6 +7,7 @@ import { emitAlert } from "@/lib/server/alerts";
 import { Prisma } from "@prisma/client";
 import { composeDescricaoWithCategoria } from "@/lib/tarefas/categorias";
 import { tarefasAccessGate } from "@/lib/server/tarefas-access";
+import { syncTarefaAnexos } from "./sync-anexos";
 
 type TxTarefaCompat = {
   tarefa: {
@@ -175,15 +176,29 @@ export async function POST(req: Request) {
           data: clienteIds.map((clienteId) => ({ tarefaId: tarefa.id, clienteId })),
         });
       } catch (error) {
-        // Não aborta criação por falha no vínculo N:N; clienteId principal já foi salvo em Tarefa.
         console.warn("[tarefas/create] falha ao salvar clientes vinculados; mantendo tarefa criada.", error);
       }
     }
 
+    const solucaoIds = Array.from(
+      new Set((tarefa.solucaoIds ?? [tarefa.solucaoId]).filter(Boolean) as string[])
+    );
+    if (solucaoIds.length) {
+      try {
+        await tx.tarefaSolucao.createMany({
+          data: solucaoIds.map((solucaoCatalogoId) => ({ tarefaId: tarefa.id, solucaoCatalogoId })),
+        });
+      } catch (error) {
+        console.warn("[tarefas/create] falha ao salvar soluções vinculadas.", error);
+      }
+    }
+
     if (tarefa.anexos?.length) {
-      await tx.tarefaAnexo.createMany({
-        data: tarefa.anexos.map((nomeArquivo) => ({ tarefaId: tarefa.id, nomeArquivo, url: null })),
-      });
+      try {
+        await syncTarefaAnexos(tx, tarefa.id, tarefa);
+      } catch (error) {
+        console.warn("[tarefas/create] falha ao salvar anexos; mantendo tarefa criada.", error);
+      }
     }
 
     for (const [index, h] of (tarefa.historico ?? []).entries()) {
@@ -227,7 +242,7 @@ export async function POST(req: Request) {
     console.error("[tarefas/create] falha na criação completa; tentando fallback mínimo.", lastCreateError);
     try {
       const now = new Date();
-      const codigoFallback = buildCodigoFrom(now.getFullYear(), Number.parseInt(String(Date.now()).slice(-4), 10) || 1);
+      const codigoFallback = await proximoCodigoTarefa(prisma as unknown as TxTarefaCompat, now.getFullYear());
       try {
         await prisma.$executeRawUnsafe(
           `INSERT INTO "Tarefa" ("id","codigo","titulo","descricao","status","prioridade","dataInicio","dataFim","clienteId","solucaoId","responsavelId","createdAt","updatedAt")
@@ -282,6 +297,7 @@ export async function POST(req: Request) {
         clientesVinculados: { include: { cliente: { select: { id: true, nome: true, empresa: true } } } },
         responsavel: true,
         colaboradores: { include: { usuario: true } },
+        solucoesVinculadas: { include: { solucaoCatalogo: { select: { id: true, nome: true } } } },
         anexos: true,
         historico: { include: { autor: true, anexos: true }, orderBy: { data: "asc" } },
       },

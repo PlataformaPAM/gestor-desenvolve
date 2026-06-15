@@ -2,19 +2,8 @@
 
 import { Check, ChevronRight } from "lucide-react";
 import type { Tarefa, UsuarioTarefa } from "@/lib/tarefas/types";
-import { PRIORIDADE_LABELS } from "@/lib/tarefas/constants";
+import { PrioridadeBadge } from "@/components/tarefas/prioridade-badge";
 import clsx from "clsx";
-
-const PRIORIDADE_BADGE: Record<Tarefa["prioridade"], string> = {
-  urgente:
-    "border-red-200 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-950/50 dark:text-red-300",
-  alta:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-300",
-  media:
-    "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  baixa:
-    "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300",
-};
 
 function getResponsavelAtual(tarefa: Tarefa): UsuarioTarefa | null {
   if (tarefa.status === "concluido") return null;
@@ -133,14 +122,7 @@ export function TarefasList({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={clsx(
-                          "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                          PRIORIDADE_BADGE[t.prioridade]
-                        )}
-                      >
-                        {PRIORIDADE_LABELS[t.prioridade]}
-                      </span>
+                      <PrioridadeBadge prioridade={t.prioridade} variant="pill" />
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
                       {formatData(t.dataFim)}
@@ -202,14 +184,7 @@ export function TarefasList({
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-1 font-medium text-slate-900 dark:text-slate-100">{t.titulo}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <span
-                    className={clsx(
-                      "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
-                      PRIORIDADE_BADGE[t.prioridade]
-                    )}
-                  >
-                    {PRIORIDADE_LABELS[t.prioridade]}
-                  </span>
+                  <PrioridadeBadge prioridade={t.prioridade} variant="pill" />
                   {responsavel && (
                     <div className="flex items-center gap-1">
                       <Avatar usuario={responsavel} />
